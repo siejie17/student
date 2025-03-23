@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -24,10 +25,8 @@ const SearchBar = ({ onSearch, placeholder = 'Search...', style, onFocus }) => {
   return (
     <View style={[styles.container, style]}>
       <View style={styles.searchContainer}>
-        <Ionicons 
-          name="search" 
-          size={20} 
-          color="#666"
+        <Image
+          source={require('../assets/search.png')}
           style={styles.searchIcon}
         />
         
@@ -82,7 +81,9 @@ const styles = StyleSheet.create({
     }),
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 16,
+    height: 20,
+    width: 20,
   },
   input: {
     flex: 1,

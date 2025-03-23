@@ -1,214 +1,347 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  ImageBackground,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  TouchableWithoutFeedback, 
-  Keyboard,
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
+import {
   ActivityIndicator,
-  RefreshControl
+  Animated,
+  FlatList,
+  Keyboard,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
+
+import { getItem } from '../utils/asyncStorage';
+
+import { collection, getDocs, onSnapshot, orderBy, query, Timestamp, where } from "firebase/firestore";
+import { db } from '../utils/firebaseConfig';
+
+import EventCard from '../components/EventCard';
 import SearchBar from '../components/SearchBar';
 
-import { db } from '../utils/firebaseConfig';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, orderBy, Timestamp } from "firebase/firestore";
-import EventCard from '../components/EventCard';
+const CATEGORIES = [
+  "All",
+  "Academic",
+  "Volunteering",
+  "Entertainment",
+  "Cultural",
+  "Sports",
+  "Health & Wellness",
+  "Others"
+];
+
+const CATEGORIES_MAPPING = {
+  "Academic": 1,
+  "Volunteering": 2,
+  "Entertainment": 3,
+  "Cultural": 4,
+  "Sports": 5,
+  "Health & Wellness": 6,
+  "Others": 7,
+};
+
+const CATEGORY_COLORS = {
+  "All": ['#6C63FF', '#4A45B2'],
+  "Academic": ['#4ECDC4', '#1A9988'],
+  "Volunteering": ['#FF6B6B', '#C82C2C'],
+  "Entertainment": ['#FFD166', '#DBA628'],
+  "Cultural": ['#9649CB', '#6C33A0'],
+  "Sports": ['#06D6A0', '#05A47A'],
+  "Health & Wellness": ['#118AB2', '#0B5D77'],
+  "Others": ['#073B4C', '#052A37'],
+};
 
 const EventListingScreen = ({ navigation }) => {
   const [events, setEvents] = useState([]);
-  const [filteredEvents, setFilteredEvents] = useState([]);
-  const [eventLoading, setEventLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [isLoading, setIsLoading] = useState(false);
+  const [registeredEventIDs, setRegisteredEventIDs] = useState(new Set());
 
-  const categoriesMapping = {
-    "Academic": 1, 
-    "Volunteering": 2, 
-    "Entertainment": 3, 
-    "Cultural": 4, 
-    "Sports": 5, 
-    "Health & Wellness": 6, 
-    "Others": 7,
-  };
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
 
-  const categories = ["All", "Academic", 
-    "Volunteering", 
-    "Entertainment", 
-    "Cultural", 
-    "Sports", 
-    "Health & Wellness", 
-    "Others",
-  ];
+  const unsubscribeRegistrationRef = useRef(null);
+  const unsubscribeEventRef = useRef(null);
+  const unsubscribeTotalParticipantsRef = useRef(null);
+
+  const fetchEventCatalogue = useCallback(async () => {
+    try {
+      setIsLoading(true);
+
+      const studentID = await getItem("studentID");
+      if (!studentID) {
+        setIsLoading(false);
+        return;
+      }
+
+      if (unsubscribeRegistrationRef.current) {
+        unsubscribeRegistrationRef.current();
+      }
+
+      if (unsubscribeEventRef.current) {
+        unsubscribeEventRef.current();
+      }
+
+      if (unsubscribeTotalParticipantsRef.current) {
+        unsubscribeTotalParticipantsRef.current();
+      }
+
+      const registrationRef = collection(db, "registration");
+      const registrationQuery = query(registrationRef, where("studentID", "==", studentID));
+
+      const unsubscribeRegistration = onSnapshot(registrationQuery, (registrationSnap) => {
+        const updatedSet = new Set(registeredEventIDs);
+
+        registrationSnap.forEach((doc) => {
+          updatedSet.add(doc.data().eventID);
+        })
+
+        setRegisteredEventIDs(updatedSet);
+      });
+
+      // Get events where registration is still open
+      const eventsRef = collection(db, "event");
+      const eventsQuery = query(
+        eventsRef,
+        where("registrationClosingDate", ">", Timestamp.now()),
+        where("status", "not-in", ["Completed", "Cancelled"]),
+        orderBy("lastAdded", "desc")
+      );
+
+      const unsubscribeEvent = onSnapshot(eventsQuery, async (eventSnap) => {
+        let filteredEvents = [];
+
+        await Promise.all(
+          eventSnap.docs.map(async (doc) => {
+            const event = { id: doc.id, ...doc.data() };
+
+            if (registeredEventIDs.has(event.id)) return;
+
+            filteredEvents.push(event);
+          })
+        );
+
+        const eventsWithImages = await Promise.all(
+          filteredEvents.map(async event => {
+            const eventImagesRef = collection(db, "eventImages");
+            const eventImagesQuery = query(eventImagesRef, where("eventID", "==", event.id));
+            const eventImagesDoc = await getDocs(eventImagesQuery);
+
+            let thumbnail = null;
+            eventImagesDoc.forEach((doc) => {
+              const imageData = doc.data();
+              if (imageData.images && imageData.images.length > 0) {
+                thumbnail = imageData.images[0];
+              }
+            });
+
+            return { ...event, thumbnail };
+          })
+        );
+
+        setEvents(eventsWithImages);
+        unsubscribeRegistrationRef.current = unsubscribeRegistration;
+        unsubscribeEventRef.current = unsubscribeEvent;
+        setIsLoading(false);
+        setRefreshing(false);
+      })
+    } catch (error) {
+      console.error("Error fetching events:", error);
+    }
+  }, []);
 
   useEffect(() => {
     fetchEventCatalogue();
-  }, []);
 
-  const fetchEventCatalogue = async() => {
-    try {
-      setEventLoading(true);
+    return () => {
+      if (unsubscribeRegistrationRef.current && unsubscribeEventRef.current && unsubscribeTotalParticipantsRef.current) {
+        unsubscribeRegistrationRef.current(); // Cleanup on unmount
+        unsubscribeEventRef.current();
+        unsubscribeTotalParticipantsRef.current();
+      }
+    };
+  }, [fetchEventCatalogue]);
 
-      const eventsSnap = await getDocs(query(collection(db, "event"), where("registrationClosingDate", ">", Timestamp.now()), orderBy("lastAdded", "desc")));
-      let events = eventsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchEventCatalogue();
+  }, [fetchEventCatalogue]);
 
-      const eventsWithImages = await Promise.all(
-        events.map(async event => {
-          const eventImagesRef = collection(db, "eventImages");
-          const eventImagesQuery = query(eventImagesRef, where("eventID", "==", event.id));
-          const eventImagesDoc = await getDocs(eventImagesQuery);
+  useFocusEffect(
+    useCallback(() => {
+      fetchEventCatalogue();
+    }, [])
+  );
 
-          let thumbnail = null;
-          eventImagesDoc.forEach((eventImages) => {
-            if (eventImages.data().images) {
-              const imageData = eventImages.data();
-              thumbnail = imageData.images.length > 0 ? imageData.images[0] : null;
-            }
-          });
-
-          return { ...event, thumbnail };
-        })
-      );
-
-      setEvents(eventsWithImages);
-      setFilteredEvents(eventsWithImages);
-    } catch (error) {
-      console.error("Error fetching event list with image:", error);
-    } finally {
-      setEventLoading(false);
-      setRefreshing(false);
-    }
-  }
-
-  useEffect(() => {
+  const filteredEvents = useMemo(() => {
     let filtered = events;
-  
+
     if (selectedCategory !== 'All') {
-      const categoryID = categoriesMapping[selectedCategory];
+      const categoryID = CATEGORIES_MAPPING[selectedCategory];
       filtered = filtered.filter(event => event.category === categoryID);
     }
-  
+
     if (searchQuery.trim() !== '') {
-      filtered = filtered.filter(event => 
+      filtered = filtered.filter(event =>
         event.eventName.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-  
-    setFilteredEvents(filtered);
-  }, [selectedCategory, searchQuery, events]);
 
-  const handleSearch = () => {
-    console.log("Search");
-  };
+    return filtered;
+  }, [events, selectedCategory, searchQuery]);
 
-  const renderCategoryItem = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.categoryItem,
-        selectedCategory === item && styles.categoryItemSelected
-      ]}
-      onPress={() => handleCategoryPress(item)}
-    >
-      <Text style={[
-        styles.categoryText,
-        selectedCategory === item && styles.categoryTextSelected
-      ]}>
-        {item}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  const handleCategoryPress = (category) => {
+  const handleCategoryPress = useCallback((category) => {
     setSelectedCategory(category);
-  };
+    // Refresh animations when category changes
+    fadeAnim.setValue(0);
+    slideAnim.setValue(50);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchEventCatalogue();
-    // Add filtering
-  }
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      })
+    ]).start();
+  }, [fadeAnim, slideAnim]);
 
-  const renderCard = ({ item }) => (
+  const renderCategoryItem = useCallback(({ item }) => {
+    const isSelected = selectedCategory === item;
+    const colors = CATEGORY_COLORS[item] || ['#6C63FF', '#4A45B2'];
+
+    return (
+      <TouchableOpacity
+        onPress={() => handleCategoryPress(item)}
+        activeOpacity={0.7}
+      >
+        <LinearGradient
+          colors={isSelected ? colors : ['#FFFFFF', '#F8F8F8']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[
+            styles.categoryItem,
+            isSelected && styles.categoryItemSelected
+          ]}
+        >
+          <Text
+            style={[
+              styles.categoryText,
+              isSelected && styles.categoryTextSelected
+            ]}
+          >
+            {item}
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  }, [selectedCategory, handleCategoryPress]);
+
+  const renderCard = useCallback(({ item }) => (
     <TouchableOpacity onPress={() => navigation.navigate('EventDetails', { eventID: item.id })}>
       <EventCard event={item} />
     </TouchableOpacity>
-  );
+  ), [navigation]);
+
+  const ListEmptyComponent = useMemo(() => (
+    <Animated.View
+      style={[
+        styles.emptyContainer,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }]
+        }
+      ]}
+    >
+      <Ionicons name="calendar-outline" size={50} color="#CCCCCC" />
+      <Text style={styles.emptyText}>No events found</Text>
+      <Text style={styles.emptySubText}>
+        Try selecting a different category or search term
+      </Text>
+    </Animated.View>
+  ), [fadeAnim, slideAnim]);
 
   return (
-    <ImageBackground
-      source={require('../assets/background_dot.png')}
-      imageStyle={{ resizeMode: 'repeat' }}
-      style={styles.background}
-    >
-      <View style={{ flex: 1 }}>
-        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-          <View>
-            <View style={styles.header}>
-              <Text style={styles.headerTitle}>Event Listing</Text>
-            </View>
-            
-            <SearchBar 
-              onSearch={setSearchQuery}
-              placeholder="Search events by name..."
-              style={styles.searchBar}
-            />
-    
-            <View style={styles.categoriesContainer}>
-              <FlatList
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                data={categories}
-                renderItem={renderCategoryItem}
-                keyExtractor={item => item}
-                contentContainerStyle={styles.categoriesList}
-              />
-            </View>
+    <View style={styles.container}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Event Listing</Text>
           </View>
-        </TouchableWithoutFeedback>
-    
-        <View style={{ flex: 1 }}>
-          {eventLoading ? (
-            <View style={{ justifyContent: "center", alignItems: "center", flex: 1 }}>
-              <ActivityIndicator size="large" color="#0000ff" />
-            </View>
-          ) : (
-            <FlatList
-              data={filteredEvents}
-              scrollEnabled={true}
-              renderItem={renderCard}
-              keyExtractor={item => item.id}
-              contentContainerStyle={styles.listContainer}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={handleRefresh}
-                  colors={['#0066cc']}
-                /> 
-              }
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>Owh no! No events found.</Text>
-                </View>
-              }
-            />
-          )}
-        </View>
-      </View>
-    </ImageBackground>
-  );
-}
 
-export default EventListingScreen;
+          <SearchBar
+            onSearch={setSearchQuery}
+            placeholder="Search events by name..."
+            style={styles.searchBar}
+          />
+
+          <View style={styles.categoriesContainer}>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={CATEGORIES}
+              renderItem={renderCategoryItem}
+              keyExtractor={item => item}
+              contentContainerStyle={styles.categoriesList}
+            />
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+
+      <View style={styles.listView}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0000ff" />
+          </View>
+        ) : (
+          <FlatList
+            data={filteredEvents}
+            renderItem={renderCard}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={['#0066cc']}
+              />
+            }
+            ListEmptyComponent={ListEmptyComponent}
+          />
+        )}
+      </View>
+    </View>
+  );
+};
+
+export default React.memo(EventListingScreen);
 
 const styles = StyleSheet.create({
   background: {
     flex: 1,
     width: '100%',
+    backgroundColor: '#f8f9fa',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: "white"
   },
   header: {
     padding: 15,
@@ -225,22 +358,27 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   categoriesContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    // borderBottomWidth: 1,
+    // borderBottomColor: '#eee',
   },
   categoriesList: {
     paddingHorizontal: 15,
     paddingVertical: 10,
   },
   categoryItem: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    marginRight: 10,
-    borderRadius: 20,
-    backgroundColor: '#fff',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginRight: 12,
+    borderRadius: 24,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   categoryItemSelected: {
-    backgroundColor: '#007AFF',
+    elevation: 4,
+    shadowOpacity: 0.2,
   },
   categoryText: {
     fontSize: 16,
@@ -250,16 +388,32 @@ const styles = StyleSheet.create({
   categoryTextSelected: {
     color: '#fff',
   },
+  listView: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   listContainer: {
     paddingBottom: 16,
   },
   emptyContainer: {
-    padding: 20,
+    padding: 40,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: 600,
-    color: '#666666',
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

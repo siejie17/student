@@ -1,16 +1,15 @@
-import { View, Text, StyleSheet, ScrollView, ImageBackground, Image, Dimensions, ActivityIndicator, FlatList, RefreshControl, Animated, Modal, Pressable } from 'react-native'
-import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, Dimensions, ActivityIndicator, FlatList, RefreshControl, Animated, Modal, Pressable, StatusBar } from 'react-native'
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
-import LinearGradient from 'react-native-linear-gradient';
-
-import { getItem } from '../utils/asyncStorage';
-import { collection, doc, getDoc, getDocs, orderBy, query, Timestamp, where } from 'firebase/firestore';
+import { LinearGradient } from 'expo-linear-gradient';
+import { getItem, removeItem } from '../utils/asyncStorage';
+import { collection, doc, getDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig';
-import FloatingRankComponent from '../components/FloatingRankComponent';
+import RankingRewardsModal from '../components/RankingRewardsModal';
 
 const { width } = Dimensions.get('window');
 
-const facultyMapping = {
+const FACULTY_MAPPING = {
   1: "Faculty of Applied & Creative Arts",
   2: "Faculty of Built Environment",
   3: "Faculty of Cognitive Sciences & Human Development",
@@ -24,463 +23,632 @@ const facultyMapping = {
 };
 
 const LeaderboardScreen = () => {
-  const [leaderboardTop3, setLeaderboardTop3] = useState([]);
-  const [leaderboardRemainingUsers, setLeaderboardRemainingUsers] = useState([]);
+  const [leaderboardData, setLeaderboardData] = useState({
+    top3: [],
+    remainingUsers: []
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentUserRank, setCurrentUserRank] = useState(null);
   const [facultyName, setFacultyName] = useState("");
-
   const [modalVisible, setModalVisible] = useState(false);
-  const slideAnimation = new Animated.Value(-200);
+  // const [rewardsModalVisible, setRewardsModalVisible] = useState(true);
+  const [rewardsModalVisible, setRewardsModalVisible] = useState(false);
+  // const [previousMonthRanking, setPreviousMonthRanking] = useState(2);
+  const [previousMonthRanking, setPreviousMonthRanking] = useState(null);
+  // const [diamondsRewards, setDiamondsRewards] = useState(750);
+  const [diamondsRewards, setDiamondsRewards] = useState(0);
 
-  const fetchRankings = async () => {
-    const facultyID = await getItem("facultyID");
-    const currentStudentID = await getItem("studentID");
+  // Used to store unsubscribe functions
+  const unsubscribeRef = useRef({
+    main: null,
+    entries: null
+  });
 
+  // Create animation values
+  const modalAnimation = useMemo(() => new Animated.Value(0), []);
+  const headerScaleAnim = useMemo(() => new Animated.Value(1), []);
+
+  const fetchRankings = useCallback(async () => {
     try {
-      setFacultyName(facultyMapping[facultyID] || "");
+      // Clean up any existing subscriptions first
+      if (unsubscribeRef.current.main) {
+        unsubscribeRef.current.main();
+      }
+      if (unsubscribeRef.current.entries) {
+        unsubscribeRef.current.entries();
+      }
+
+      const facultyID = await getItem("facultyID");
+      const currentStudentID = await getItem("studentID");
+      setFacultyName(FACULTY_MAPPING[facultyID] || "");
 
       const leaderboardRef = collection(db, "leaderboard");
-      const leaderboardQuery = query(leaderboardRef, where("facultyID", "==", facultyID))
-      const leaderboardSnap = await getDocs(leaderboardQuery);
+      const leaderboardQuery = query(leaderboardRef, where("facultyID", "==", facultyID));
 
-      if (!leaderboardSnap.empty) {
-        const leaderboardDoc = leaderboardSnap.docs[0];
+      // Subscribe to leaderboard updates
+      unsubscribeRef.current.main = onSnapshot(leaderboardQuery, async (leaderboardSnap) => {
+        if (leaderboardSnap.empty) {
+          setLeaderboardData({ top3: [], remainingUsers: [] });
+          setIsLoading(false);
+          return;
+        }
+
+        const leaderboardDoc = leaderboardSnap.docs[0]; // Assuming one doc per faculty
         const leaderboardId = leaderboardDoc.id;
-
         const leaderboardEntriesRef = collection(db, "leaderboard", leaderboardId, "leaderboardEntries");
-        const leaderboardEntriesQuery = query(leaderboardEntriesRef, orderBy("points", "desc"), orderBy("lastUpdated", "asc"));
-        const leaderboardEntriesSnap = await getDocs(leaderboardEntriesQuery);
+        
+        // Subscribe to leaderboard entries
+        unsubscribeRef.current.entries = onSnapshot(leaderboardEntriesRef, async (leaderboardEntriesSnap) => {
+          const entries = leaderboardEntriesSnap.docs
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }))
+            // Sort by points (desc) then by lastUpdated (asc)
+            .sort((a, b) => {
+              if (b.points !== a.points) return b.points - a.points;
+              return a.lastUpdated - b.lastUpdated;
+            });
 
-        const leaderboardEntries = leaderboardEntriesSnap.docs.map((leaderboardEntry) => ({
-          id: leaderboardEntry.id,
-          studentID: leaderboardEntry.data().studentID,
-          lastUpdated: leaderboardEntry.data().lastUpdated,
-          points: leaderboardEntry.data().points,
-        }));
+          // Fetch user details in parallel
+          const entriesWithUserInfo = await Promise.all(
+            entries.map(async (entry, index) => {
+              const userRef = doc(db, "user", entry.studentID);
+              const userSnap = await getDoc(userRef);
 
-        const leaderboardEntriesWithInfo = await Promise.all(
-          leaderboardEntries.map(async (entry, index) => {
-            const userRef = doc(db, "user", entry.studentID);
-            const userSnap = await getDoc(userRef);
+              const userData = userSnap.exists()
+                ? userSnap.data()
+                : { firstName: "Unknown", profilePicture: "" };
 
-            if (userSnap.exists()) {
-              const userData = userSnap.data();
               const rankData = {
-                id: entry.id,
-                studentID: entry.studentID,
-                lastUpdated: entry.lastUpdated,
-                points: entry.points,
+                ...entry,
                 firstName: userData.firstName,
                 profilePic: userData.profilePicture,
                 rank: index + 1
-              }
+              };
 
-              if (rankData.studentID == currentStudentID) {
+              if (rankData.studentID === currentStudentID) {
                 setCurrentUserRank(index + 1);
               }
 
               return rankData;
-            } else {
-              console.warn(`User not found: ${entry.studentID}`);
-              return { ...entry, firstName: "Unknown", lastName: "", profilePicture: "" };
-            }
-          })
-        );
+            })
+          );
 
-        setLeaderboardTop3(leaderboardEntriesWithInfo.slice(0, 3));
-        setLeaderboardRemainingUsers(leaderboardEntriesWithInfo.slice(3));
-      } else {
-        console.log("No leaderboard data.");
-      }
+          // Split into top 3 and remaining users
+          setLeaderboardData({
+            top3: entriesWithUserInfo.slice(0, 3),
+            remainingUsers: entriesWithUserInfo.slice(3)
+          });
+
+          const showRewardsModalKey = `showLeaderboardModal_${currentStudentID}`;
+          const rewardsModalShown = await getItem(showRewardsModalKey);
+
+          try {
+            if (rewardsModalShown) {
+              const [previousRank, diamondsRewards] = await Promise.all([
+                getItem(`previousRanking_${currentStudentID}`),
+                getItem(`diamonds_${currentStudentID}`)
+              ]);
+          
+              setPreviousMonthRanking(previousRank || "N/A");
+              setDiamondsRewards(diamondsRewards);
+          
+              await removeItem(showRewardsModalKey);
+              setRewardsModalVisible(true);
+            }
+          } catch (error) {
+            console.error("Error retrieving rewards modal data:", error);
+          }
+
+          setIsLoading(false);
+        });
+      });
     } catch (error) {
       console.error("Error fetching leaderboard data:", error);
+      setIsLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      await fetchRankings();
-      setIsLoading(false);
-    };
+    // Initial data fetch
+    fetchRankings();
 
-    loadData();
-  }, []);
+    // Cleanup function for unmounting
+    return () => {
+      if (unsubscribeRef.current.main) {
+        unsubscribeRef.current.main();
+      }
+      if (unsubscribeRef.current.entries) {
+        unsubscribeRef.current.entries();
+      }
+    };
+  }, [fetchRankings]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    Animated.sequence([
+      Animated.timing(headerScaleAnim, {
+        toValue: 0.97,
+        duration: 300,
+        useNativeDriver: true
+      }),
+      Animated.timing(headerScaleAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true
+      })
+    ]).start();
+    
     await fetchRankings();
     setRefreshing(false);
-  }, []);
+  }, [fetchRankings, headerScaleAnim]);
 
-  const renderRemainingRankings = ({ item, index }) => {
+  const handleOpenModal = useCallback(() => {
+    setModalVisible(true);
+    Animated.timing(modalAnimation, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [modalAnimation]);
+
+  const handleCloseModal = useCallback(() => {
+    Animated.timing(modalAnimation, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => setModalVisible(false));
+  }, [modalAnimation]);
+
+  const renderRemainingRankings = useCallback(({ item, index }) => {
     const userRank = index + 4;
+    const isCurrentUser = userRank === currentUserRank;
 
     return (
-      <View style={styles.card}>
+      <Animated.View 
+        style={[
+          styles.card,
+          isCurrentUser && styles.highlightedCard
+        ]}
+      >
         <View style={styles.rankContainer}>
-          <Text style={styles.rankText}>#{userRank}</Text>
+          <Text style={[styles.rankText, isCurrentUser && styles.highlightedRankText]}>#{userRank}</Text>
         </View>
 
         <Image
-          source={{ uri: `data:image/png;base64,${item.profilePic}` }}
-          style={styles.listAvatar}
+          source={item.profilePic 
+            ? { uri: `data:image/png;base64,${item.profilePic}` } 
+            : require('../assets/unknown-profile.png')}
+          style={[styles.listAvatar, isCurrentUser && styles.highlightedAvatar]}
         />
 
         <View style={styles.listUserInfo}>
-          <Text style={styles.listUserName}>{item.firstName}</Text>
+          <Text style={[styles.listUserName, isCurrentUser && styles.highlightedText]}>{item.firstName}</Text>
         </View>
 
         <View style={styles.listPointsContainer}>
-          <Text style={styles.listPointsText}>{item.points}</Text>
-          <Text style={styles.listPointsLabel}>pts</Text>
+          <Text style={[styles.listPointsText, isCurrentUser && styles.highlightedPoints]}>
+            {item.points}
+            <Text style={styles.listPointsLabel}> pts</Text>
+          </Text>
         </View>
-      </View>
-    )
-  };
+      </Animated.View>
+    );
+  }, [currentUserRank]);
 
-  const ListHeaderComponent = () => (
-    <View style={styles.listHeaderContainer}>
-      <View style={styles.refreshPromptContainer}>
-        <MaterialIcons name="arrow-downward" size={16} color="#7f8c8d" />
-        <Text style={styles.refreshPromptText}>Swipe down here to get the latest rankings</Text>
-      </View>
-    </View>
-  );
+  // Memoize podium component
+  const PodiumComponent = useMemo(() => {
+    const { top3 } = leaderboardData;
+    const firstPlace = top3[0] || null;
+    const secondPlace = top3[1] || null;
+    const thirdPlace = top3[2] || null;
 
-  const animateModal = (visible) => {
-    Animated.spring(slideAnimation, {
-      toValue: visible ? 0 : -150,
-      useNativeDriver: true,
-    }).start();
-  };
+    return (
+      <Animated.View 
+        style={[
+          styles.podiumSection,
+          { transform: [{ scale: headerScaleAnim }] }
+        ]}
+      >
+        <View style={styles.infoIconContainer}>
+          <Pressable
+            onPress={handleOpenModal}
+            style={({ pressed }) => [
+              styles.infoButton,
+              { opacity: pressed ? 0.7 : 1 }
+            ]}
+          >
+            <MaterialIcons name="info-outline" size={24} color="#3b82f6" />
+          </Pressable>
+        </View>
+
+        <View style={styles.podiumContainer}>
+          {/* Second Place */}
+          <View style={[styles.podiumPosition, styles.secondPosition]}>
+            <View style={styles.avatarContainer}>
+              <Image
+                source={secondPlace?.profilePic 
+                  ? { uri: `data:image/png;base64,${secondPlace.profilePic}` } 
+                  : require('../assets/unknown-profile.png')}
+                style={[styles.podiumAvatar, styles.secondAvatar]}
+              />
+              <View style={styles.medalContainer}>
+                <Image
+                  source={require('../assets/second-place.png')}
+                  style={styles.image}
+                />
+              </View>
+            </View>
+            <Text style={styles.podiumName} numberOfLines={1}>{secondPlace?.firstName || "—"}</Text>
+            <Text style={[styles.podiumPoints, styles.secondPoints]}>
+              {secondPlace?.points ? `${secondPlace.points} pts` : "—"}
+            </Text>
+          </View>
+
+          {/* First Place */}
+          <View style={[styles.podiumPosition, styles.firstPosition]}>
+            <View style={styles.crownContainer}>
+              <FontAwesome5 name="crown" size={20} color="#FFD700" />
+            </View>
+            <View style={styles.avatarContainer}>
+              <Image
+                source={firstPlace?.profilePic 
+                  ? { uri: `data:image/png;base64,${firstPlace.profilePic}` } 
+                  : require('../assets/unknown-profile.png')}
+                style={[styles.podiumAvatar, styles.firstAvatar]}
+              />
+              <View style={[styles.medalContainer, styles.goldMedal]}>
+                <Image
+                  source={require('../assets/first-place.png')}
+                  style={styles.image}
+                />
+              </View>
+            </View>
+            <Text style={[styles.podiumName, styles.firstName]} numberOfLines={1}>
+              {firstPlace?.firstName || "—"}
+            </Text>
+            <Text style={[styles.podiumPoints, styles.firstPoints]}>
+              {firstPlace?.points ? `${firstPlace.points} pts` : "—"}
+            </Text>
+          </View>
+
+          {/* Third Place */}
+          <View style={[styles.podiumPosition, styles.thirdPosition]}>
+            <View style={styles.avatarContainer}>
+              <Image
+                source={thirdPlace?.profilePic 
+                  ? { uri: `data:image/png;base64,${thirdPlace.profilePic}` } 
+                  : require('../assets/unknown-profile.png')}
+                style={[styles.podiumAvatar, styles.thirdAvatar]}
+              />
+              <View style={[styles.medalContainer, styles.bronzeMedal]}>
+                <Image
+                  source={require('../assets/third-place.png')}
+                  style={styles.image}
+                />
+              </View>
+            </View>
+            <Text style={styles.podiumName} numberOfLines={1}>{thirdPlace?.firstName || "—"}</Text>
+            <Text style={[styles.podiumPoints, styles.thirdPoints]}>
+              {thirdPlace?.points ? `${thirdPlace.points} pts` : "—"}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.podiumPlatform}>
+          <View style={styles.podiumColumn}>
+            <LinearGradient
+              colors={['#C0C0C0', '#E8E8E8']}
+              style={[styles.platform, styles.secondPlatform]}
+            />
+          </View>
+          <View style={styles.podiumColumn}>
+            <LinearGradient
+              colors={['#FFD700', '#FFF7DE']}
+              style={[styles.platform, styles.firstPlatform]}
+            />
+          </View>
+          <View style={styles.podiumColumn}>
+            <LinearGradient
+              colors={['#CD7F32', '#E8C9B9']}
+              style={[styles.platform, styles.thirdPlatform]}
+            />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  }, [leaderboardData.top3, handleOpenModal, headerScaleAnim]);
+
+  // Extract modal component
+  const InfoModal = useMemo(() => (
+    <Modal
+      transparent={true}
+      visible={modalVisible}
+      onRequestClose={handleCloseModal}
+      animationType="none"
+    >
+      <Animated.View 
+        style={[
+          styles.modalOverlay,
+          {
+            opacity: modalAnimation,
+          }
+        ]}
+      >
+        <Animated.View
+          style={[
+            styles.modalContent,
+            {
+              transform: [
+                { 
+                  translateY: modalAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [300, 0],
+                  }) 
+                }
+              ]
+            }
+          ]}
+        >
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Leaderboard Info</Text>
+            <Pressable
+              onPress={handleCloseModal}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            >
+              <MaterialIcons name="close" size={24} color="#333" />
+            </Pressable>
+          </View>
+
+          <ScrollView style={styles.modalBody}>
+            {/* Monthly Refresh Banner */}
+            <View style={styles.refreshBanner}>
+              <MaterialIcons name="refresh" size={20} color="#fff" />
+              <Text style={styles.refreshText}>Leaderboard refreshes monthly</Text>
+              <FontAwesome5 name="trophy" size={24} color="#FFD700" />
+            </View>
+            <Text style={styles.motivationText}>Go, go, go! Grab points to climb to the top spots!</Text>
+            
+            {/* Points Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <MaterialIcons name="stars" size={20} color="#3b82f6" />
+                <Text style={styles.sectionTitle}>How to Earn Points!</Text>
+              </View>
+              
+              <View style={styles.pointsList}>
+                {[
+                  { icon: "event-available", label: "Attendance-based", desc: "Check in to events on time" },
+                  { icon: "alarm-on", label: "Early bird", desc: "Be among the earliest attendees" },
+                  { icon: "people", label: "Networking", desc: "Connect with other attendees" },
+                  { icon: "question-answer", label: "Q&A based", desc: "Answer the questions correctly" },
+                  { icon: "rate-review", label: "Feedback driven", desc: "Complete event surveys" },
+                ].map((item, index) => (
+                  <View key={index} style={styles.pointItem}>
+                    <MaterialIcons name={item.icon} size={20} color="#3b82f6" />
+                    <Text style={styles.pointText}>
+                      <Text style={styles.boldText}>{item.label}:</Text> {item.desc}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Rewards Table */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <MaterialIcons name="diamond" size={20} color="#3b82f6" />
+                <Text style={styles.sectionTitle}>Diamond Rewards</Text>
+              </View>
+              
+              {/* Top 3 Rewards */}
+              {/* Podium Display */}
+              <View style={styles.podiumContainer}>
+                <View style={styles.podiumItem}>
+                  <View style={[styles.podiumPillar, styles.secondPlace]}>
+                    <View style={styles.trophyContainer}>
+                      <FontAwesome5 name="trophy" size={20} color="#C0C0C0" />
+                    </View>
+                    <Text style={styles.podiumRank}>2</Text>
+                    <Text style={styles.podiumReward}>750 💎</Text>
+                  </View>
+                </View>
+
+                <View style={styles.podiumItem}>
+                  <View style={[styles.podiumPillar, styles.firstPlace]}>
+                    <View style={styles.trophyContainer}>
+                      <FontAwesome5 name="trophy" size={24} color="#FFD700" />
+                    </View>
+                    <Text style={styles.podiumRank}>1</Text>
+                    <Text style={styles.podiumReward}>1000 💎</Text>
+                  </View>
+                </View>
+
+                <View style={styles.podiumItem}>
+                  <View style={[styles.podiumPillar, styles.thirdPlace]}>
+                    <View style={styles.trophyContainer}>
+                      <FontAwesome5 name="trophy" size={18} color="#CD7F32" />
+                    </View>
+                    <Text style={styles.podiumRank}>3</Text>
+                    <Text style={styles.podiumReward}>500 💎</Text>
+                  </View>
+                </View>
+              </View>
+              
+              {/* Other Rewards */}
+              <View style={styles.ranksContainer}>
+                {[
+                  ["4th", "400 💎"], ["5th", "350 💎"], 
+                  ["6th", "300 💎"], ["7th", "250 💎"], 
+                  ["8th", "200 💎"], ["9th", "150 💎"], 
+                  ["10th", "100 💎"], ["11th-20th", "50 💎"],
+                  ["21st-30th", "25 💎"], ["31st-40th", "10 💎"], 
+                  ["41st-50th", "5 💎"], ["51st+", "1 💎"]
+                ].map((reward, index) => (
+                  <View key={index} style={styles.rankRow}>
+                    <Text style={styles.rankText}>{reward[0]}</Text>
+                    <Text style={styles.rewardText}>{reward[1]}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  ), [modalVisible, handleCloseModal, modalAnimation]);
+
+  const FloatingRankIndicator = useCallback(() => {
+    if (!currentUserRank) return null;
+    
+    return (
+      <Animated.View style={styles.floatingRankContainer}>
+        <LinearGradient
+          colors={['#3b82f6', '#1d4ed8']}
+          start={[0, 0]}
+          end={[1, 0]}
+          style={styles.floatingRankGradient}
+        >
+          <View style={styles.floatingRankContent}>
+            <Text style={styles.floatingRankText}>Your Rank:</Text>
+            <Text style={styles.floatingRankNumber}>#{currentUserRank}</Text>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+    );
+  }, [currentUserRank]);
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={styles.loadingText}>Loading leaderboard...</Text>
+      </View>
+    );
+  }
 
   return (
-    <ImageBackground
-      source={require('../assets/background_dot.png')}
-      imageStyle={{ resizeMode: 'repeat' }}
-      style={styles.background}
-    >
-      {isLoading ? (
-        <ActivityIndicator size="large" />
-      ) : (
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.headerContainer}>
-            <View style={styles.headerTitleSection}>
-              <Text style={styles.headerTitle}>Leaderboard</Text>
-            </View>
-            <View style={styles.facultySection}>
-              <Text style={styles.facultyText}>{facultyName}</Text>
-            </View>
-          </View>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Leaderboard</Text>
+        <View style={styles.facultyContainer}>
+          <LinearGradient
+            colors={['#3b82f6', '#1d4ed8']}
+            style={styles.facultyGradient}
+          >
+            <Text style={styles.facultyText} numberOfLines={1}>{facultyName}</Text>
+          </LinearGradient>
+        </View>
+      </View>
 
-          {/* Podium section - outside of the FlatList */}
-          <View style={styles.podiumSection}>
-            <View style={styles.infoIconContainer}>
-              <Pressable
-                onPress={() => {
-                  setModalVisible(true);
-                  animateModal(true);
-                }}
-                style={({ pressed }) => [
-                  styles.infoButton,
-                  { opacity: pressed ? 0.7 : 1 }
-                ]}
-              >
-                <MaterialIcons name="info-outline" size={24} color="#415881" />
-              </Pressable>
-            </View>
+      {/* Podium section */}
+      {PodiumComponent}
 
-            <View style={styles.podiumContainer}>
-              <View style={[styles.podiumPosition, styles.secondPosition]}>
-                <Image source={leaderboardTop3[1] ? { uri: `data:image/png;base64,${leaderboardTop3[1].profilePic}` } : require('../assets/unknown-profile.png')} style={[styles.podiumAvatar, styles.secondAvatar]} />
-                <Text style={styles.podiumName} numberOfLines={1}>{leaderboardTop3[1]?.firstName || "No entry yet"}</Text>
-                <Text style={[styles.podiumPoints, styles.secondPoints]}>{leaderboardTop3[1]?.points || "-"}</Text>
-              </View>
-
-              <View style={[styles.podiumPosition, styles.firstPosition]}>
-                <Image source={leaderboardTop3[0] ? { uri: `data:image/png;base64,${leaderboardTop3[0].profilePic}` } : require('../assets/unknown-profile.png')} style={[styles.podiumAvatar, styles.firstAvatar]} />
-                <Text style={[styles.podiumName, styles.firstName]} numberOfLines={1}>{leaderboardTop3[0]?.firstName || "No entry yet"}</Text>
-                <Text style={[styles.podiumPoints, styles.firstPoints]}>{leaderboardTop3[0]?.points || "-"}</Text>
-              </View>
-
-              <View style={[styles.podiumPosition, styles.thirdPosition]}>
-                <Image source={leaderboardTop3[2] ? { uri: `data:image/png;base64,${leaderboardTop3[2].profilePic}` } : require('../assets/unknown-profile.png')} style={[styles.podiumAvatar, styles.thirdAvatar]} />
-                <Text style={styles.podiumName} numberOfLines={1}>{leaderboardTop3[2]?.firstName || "No entry yet"}</Text>
-                <Text style={[styles.podiumPoints, styles.thirdPoints]}>{leaderboardTop3[2]?.points || "-"}</Text>
-              </View>
-
-              <Modal
-                transparent={true}
-                visible={modalVisible}
-                onShow={() => animateModal(true)}
-                onRequestClose={() => {
-                  animateModal(false);
-                  setTimeout(() => setModalVisible(false), 300);
-                }}
-              >
-                <View style={styles.modalOverlay}>
-                  <Animated.View
-                    style={[
-                      styles.modalContent,
-                      { transform: [{ translateY: slideAnimation }] }
-                    ]}
-                  >
-                    <View
-                      style={styles.modalHeader}
-                    >
-                      <Text style={styles.modalTitle}>Leaderboard Guidelines</Text>
-                      <Pressable
-                        onPress={() => {
-                          animateModal(false);
-                          setTimeout(() => setModalVisible(false), 300);
-                        }}
-                        style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-                      >
-                        <MaterialIcons name="close" size={24} color="#000" />
-                      </Pressable>
-                    </View>
-
-                    <ScrollView style={styles.modalBody}>
-                      {/* Monthly Refresh Banner */}
-                      <View style={styles.refreshBanner}>
-                        <MaterialIcons name="refresh" size={24} color="#fff" />
-                        <Text style={styles.refreshText}>Leaderboard refreshes monthly</Text>
-                        <FontAwesome5 name="trophy" size={24} color="#FFD700" />
-                      </View>
-                      <Text style={styles.motivationText}>Go, go, go! Grab points to climb to the top spots!</Text>
-
-                      {/* How to Earn Points */}
-                      <View style={styles.section}>
-                        <View style={styles.sectionHeaderRow}>
-                          <MaterialIcons name="stars" size={22} color="#415881" />
-                          <Text style={styles.sectionTitle}>How to Earn Points</Text>
-                        </View>
-                        
-                        <View style={styles.pointItem}>
-                          <MaterialIcons name="event-available" size={20} color="#415881" />
-                          <Text style={styles.pointText}>
-                            <Text style={styles.boldText}>Attendance-based:</Text> Check in to events on time
-                          </Text>
-                        </View>
-                        
-                        <View style={styles.pointItem}>
-                          <MaterialIcons name="alarm-on" size={20} color="#415881" />
-                          <Text style={styles.pointText}>
-                            <Text style={styles.boldText}>Early bird:</Text> Be among the first 10 attendees
-                          </Text>
-                        </View>
-                        
-                        <View style={styles.pointItem}>
-                          <MaterialIcons name="people" size={20} color="#415881" />
-                          <Text style={styles.pointText}>
-                            <Text style={styles.boldText}>Networking:</Text> Connect with other attendees
-                          </Text>
-                        </View>
-                        
-                        <View style={styles.pointItem}>
-                          <MaterialIcons name="question-answer" size={20} color="#415881" />
-                          <Text style={styles.pointText}>
-                            <Text style={styles.boldText}>Q&A based:</Text> Ask or answer questions during sessions
-                          </Text>
-                        </View>
-                        
-                        <View style={styles.pointItem}>
-                          <MaterialIcons name="rate-review" size={20} color="#415881" />
-                          <Text style={styles.pointText}>
-                            <Text style={styles.boldText}>Feedback driven:</Text> Complete event surveys
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Rewards Section */}
-                      <View style={styles.section}>
-                        <View style={styles.sectionHeaderRow}>
-                          <MaterialIcons name="diamond" size={22} color="#415881" />
-                          <Text style={styles.sectionTitle}>Diamond Rewards</Text>
-                        </View>
-                        
-                        {/* Podium Display */}
-                        <View style={styles.podiumContainer}>
-                          <View style={styles.podiumItem}>
-                            <View style={[styles.podiumPillar, styles.secondPlace]}>
-                              <View style={styles.trophyContainer}>
-                                <FontAwesome5 name="trophy" size={20} color="#C0C0C0" />
-                              </View>
-                              <Text style={styles.podiumRank}>2</Text>
-                              <Text style={styles.podiumReward}>750 💎</Text>
-                            </View>
-                          </View>
-                          
-                          <View style={styles.podiumItem}>
-                            <View style={[styles.podiumPillar, styles.firstPlace]}>
-                              <View style={styles.trophyContainer}>
-                                <FontAwesome5 name="trophy" size={24} color="#FFD700" />
-                              </View>
-                              <Text style={styles.podiumRank}>1</Text>
-                              <Text style={styles.podiumReward}>1000 💎</Text>
-                            </View>
-                          </View>
-                          
-                          <View style={styles.podiumItem}>
-                            <View style={[styles.podiumPillar, styles.thirdPlace]}>
-                              <View style={styles.trophyContainer}>
-                                <FontAwesome5 name="trophy" size={18} color="#CD7F32" />
-                              </View>
-                              <Text style={styles.podiumRank}>3</Text>
-                              <Text style={styles.podiumReward}>500 💎</Text>
-                            </View>
-                          </View>
-                        </View>
-
-                        {/* Other Ranks */}
-                        <View style={styles.ranksContainer}>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 4:</Text>
-                            <Text style={styles.rewardText}>400 💎</Text>
-                          </View>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 5:</Text>
-                            <Text style={styles.rewardText}>350 💎</Text>
-                          </View>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 6:</Text>
-                            <Text style={styles.rewardText}>300 💎</Text>
-                          </View>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 7:</Text>
-                            <Text style={styles.rewardText}>250 💎</Text>
-                          </View>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 8:</Text>
-                            <Text style={styles.rewardText}>200 💎</Text>
-                          </View>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 9:</Text>
-                            <Text style={styles.rewardText}>150 💎</Text>
-                          </View>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 10:</Text>
-                            <Text style={styles.rewardText}>100 💎</Text>
-                          </View>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 11-20:</Text>
-                            <Text style={styles.rewardText}>50 💎</Text>
-                          </View>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 21-30:</Text>
-                            <Text style={styles.rewardText}>25 💎</Text>
-                          </View>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 31-40:</Text>
-                            <Text style={styles.rewardText}>10 💎</Text>
-                          </View>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 41-50:</Text>
-                            <Text style={styles.rewardText}>5 💎</Text>
-                          </View>
-                          <View style={styles.rankRow}>
-                            <Text style={styles.rankText}>Rank 51 onwards:</Text>
-                            <Text style={styles.rewardText}>1 💎</Text>
-                          </View>
-                        </View>
-                      </View>
-                    </ScrollView>
-                  </Animated.View>
-                </View>
-              </Modal>
-            </View>
-
-            <View style={styles.podiumPlatform}>
-              <View style={styles.podiumColumn}>
-                <View style={[styles.platform, styles.secondPlatform]}>
-                  <Image source={require('../assets/second-place.png')} style={[styles.image, styles.secondTrophy]} />
-                </View>
-              </View>
-              <View style={styles.podiumColumn}>
-                <View style={[styles.platform, styles.firstPlatform]}>
-                  <Image source={require('../assets/first-place.png')} style={[styles.image, styles.firstTrophy]} />
-                </View>
-              </View>
-              <View style={styles.podiumColumn}>
-                <View style={[styles.platform, styles.thirdPlatform]}>
-                  <Image source={require('../assets/third-place.png')} style={[styles.image, styles.thirdTrophy]} />
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* FlatList with pull-to-refresh */}
+      {/* FlatList with pull-to-refresh */}
+      <View style={styles.listWrapper}>
+        <LinearGradient
+          colors={['rgba(59, 130, 246, 0.1)', 'rgba(255, 255, 255, 0)']}
+          style={styles.listGradient}
+        >
           <FlatList
-            data={leaderboardRemainingUsers}
+            data={leaderboardData.remainingUsers}
             renderItem={renderRemainingRankings}
             keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor="#415881"
-                colors={["#415881"]}
+                tintColor="#3b82f6"
+                colors={["#3b82f6"]}
               />
             }
-            ListHeaderComponent={ListHeaderComponent}
+            ListHeaderComponent={() => (
+              <View style={styles.listHeader}>
+                <Text style={styles.listHeaderTitle}>Rankings</Text>
+                <Text style={styles.listHeaderSubtitle}>
+                  Swipe down to refresh
+                </Text>
+              </View>
+            )}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyContainer}>
+                <MaterialIcons name="leaderboard" size={48} color="#ccc" />
+                <Text style={styles.emptyText}>No other participants yet</Text>
+              </View>
+            )}
           />
+        </LinearGradient>
+      </View>
 
-          {currentUserRank && (
-            <FloatingRankComponent
-              userRank={currentUserRank}
-            />
-          )}
-        </View>
-      )}
-    </ImageBackground>
-  )
-}
+      <FloatingRankIndicator />
+      {InfoModal}
 
-export default LeaderboardScreen;
+      <RankingRewardsModal
+        rewardsModalVisible={rewardsModalVisible}
+        setRewardsModalVisible={setRewardsModalVisible}
+        previousMonthRanking={previousMonthRanking}
+        diamondsRewards={diamondsRewards}
+      />
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-    width: '100%',
-  },
   container: {
     flex: 1,
+    backgroundColor: "#fff",
   },
-  headerContainer: {
-    width: '100%',
-  },
-  headerTitleSection: {
-    width: '100%',
+  header: {
+    paddingTop: 10,
+    paddingBottom: 15,
     alignItems: 'center',
-    paddingVertical: 14,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '700',
-    color: '#333333',
+    color: '#1e3a8a',
     letterSpacing: 0.5,
+    marginBottom: 12,
   },
-  facultySection: {
-    width: '100%',
+  facultyContainer: {
+    width: '90%',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  facultyGradient: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    paddingVertical: 12,
-    backgroundColor: 'rgba(65, 88, 129, 0.4)',
   },
   facultyText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
   },
   podiumSection: {
-    paddingTop: 24,
-    paddingBottom: 18,
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
+  infoIconContainer: {
+    position: 'absolute',
+    top: 10,
+    right: 20,
+    zIndex: 10,
+  },
+  infoButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   podiumContainer: {
     flexDirection: 'row',
@@ -503,31 +671,61 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     zIndex: 1,
   },
+  crownContainer: {
+    position: 'absolute',
+    top: -18,
+    zIndex: 10,
+  },
+  avatarContainer: {
+    position: 'relative',
+  },
+  medalContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: -5,
+    backgroundColor: '#C0C0C0',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  goldMedal: {
+    backgroundColor: '#FFD700',
+  },
+  bronzeMedal: {
+    backgroundColor: '#CD7F32',
+  },
+  image: {
+    // position: 'absolute',
+    width: width * 0.035,
+    height: width * 0.035,
+    borderRadius: width * 0.06,
+  },
   podiumAvatar: {
     width: 60,
     height: 60,
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderRadius: 30,
+    borderWidth: 3,
+    borderColor: '#fff',
   },
   firstAvatar: {
-    width: 75,
-    height: 75,
-    borderRadius: 35,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     borderColor: '#FFD700',
-    borderWidth: 3,
+    borderWidth: 4,
   },
   secondAvatar: {
     width: 65,
     height: 65,
     borderRadius: 35,
     borderColor: '#C0C0C0',
-    borderWidth: 3,
   },
   thirdAvatar: {
-    borderRadius: 35,
     borderColor: '#CD7F32',
-    borderWidth: 3,
   },
   podiumName: {
     marginTop: 8,
@@ -539,21 +737,22 @@ const styles = StyleSheet.create({
   },
   firstName: {
     fontSize: 16,
+    fontWeight: '700',
   },
   podiumPoints: {
     fontSize: 12,
-    color: '#808080',
+    fontWeight: '500',
+    color: '#666',
     marginTop: 2,
   },
   firstPoints: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#CFAE00',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#F59E0B',
   },
   secondPoints: {
-    fontSize: 14,
-    fontWeight: '550',
-    color: '#ACACAC',
+    fontWeight: '600',
+    color: '#666',
   },
   thirdPoints: {
     fontWeight: '500',
@@ -563,167 +762,180 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'flex-end',
-    marginVertical: 16,
+    marginTop: 16,
     paddingBottom: 10,
+  },
+  podiumColumn: {
+    alignItems: 'center',
   },
   platform: {
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
-    alignItems: 'center', // Center image horizontally
-    justifyContent: 'flex-end', // Push image upwards
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   firstPlatform: {
     height: 35,
     width: width * 0.3,
-    backgroundColor: '#F7D002',
     zIndex: 3,
   },
   secondPlatform: {
-    height: 30,
+    height: 28,
     width: width * 0.25,
-    backgroundColor: '#C0C0C0',
     marginRight: -5,
     zIndex: 2,
   },
   thirdPlatform: {
-    height: 25,
+    height: 22,
     width: width * 0.25,
-    backgroundColor: '#CD7F32',
     marginLeft: -5,
     zIndex: 1,
   },
-  image: {
-    position: 'absolute',
-    width: width * 0.05,
-    height: width * 0.05,
-    borderRadius: width * 0.06, // Circular image
+  listWrapper: {
+    flex: 1,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+    marginTop: 10,
   },
-  firstTrophy: {
-    left: "42%",
-    top: "20%",
-  },
-  secondTrophy: {
-    left: "37%",
-    top: "15%",
-  },
-  thirdTrophy: {
-    right: "37%",
-    top: "10%",
-  },
-  podiumLastUpdatedSection: {
-    marginTop: 5,
-  },
-  podiumLastUpdated: {
-    fontSize: 10,
-    color: '#AAAAAA',
-    textAlign: "center",
-    marginTop: 2,
-  },
-  lastUpdated: {
-    fontSize: 10,
-    color: '#bdc3c7',
-    textAlign: "center",
-    marginTop: 2,
+  listGradient: {
+    flex: 1,
+    paddingTop: 5,
   },
   listContainer: {
-    paddingBottom: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    backgroundColor: "#FAFAFA"
+    paddingHorizontal: 16,
+    paddingBottom: 5, // Space for floating rank indicator
+  },
+  listHeader: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  listHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e3a8a',
+    marginBottom: 4,
+  },
+  listHeaderSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    fontStyle: 'italic',
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
-    borderRadius: 12,
-    marginHorizontal: 12,
-    padding: 16,
-    marginBottom: 8,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
     elevation: 2,
   },
+  highlightedCard: {
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+  },
   rankContainer: {
-    width: 30,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
+    borderRadius: 18,
+    marginRight: 8,
   },
   rankText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#7f8c8d',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  highlightedRankText: {
+    color: '#3b82f6',
   },
   listAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginHorizontal: 12,
-    borderWidth: 1,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    marginRight: 12,
+    borderWidth: 2,
     borderColor: '#E0E0E0',
+  },
+  highlightedAvatar: {
+    borderColor: '#3b82f6',
   },
   listUserInfo: {
     flex: 1,
   },
   listUserName: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#2c3e50',
+    fontWeight: '600',
+    color: '#334155',
+  },
+  highlightedText: {
+    color: '#1e3a8a',
   },
   listPointsContainer: {
-    alignItems: 'flex-end',
+    paddingLeft: 8,
   },
   listPointsText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: 'rgb(65, 88, 129)',
+    color: '#334155',
+  },
+  highlightedPoints: {
+    color: '#3b82f6',
   },
   listPointsLabel: {
     fontSize: 12,
-    color: '#95a5a6',
+    fontWeight: '400',
+    color: '#64748b',
   },
-  lastUpdatedLabel: {
-    fontSize: 10,
-    color: '#bdc3c7',
-    marginTop: 4,
-  },
-  listHeaderContainer: {
+  emptyContainer: {
+    padding: 32,
     alignItems: 'center',
-    paddingVertical: 8,
+    justifyContent: 'center',
   },
-  refreshPromptContainer: {
+  emptyText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  floatingRankContainer: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  floatingRankGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  floatingRankContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
   },
-  refreshPromptText: {
-    fontSize: 10,
-    color: '#7f8c8d',
-    marginLeft: 8,
-    fontWeight: '500',
+  floatingRankText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
+    marginRight: 8,
   },
-  infoIconContainer: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 10,
-  },
-  infoButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+  floatingRankNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'white',
   },
   modalOverlay: {
     flex: 1,
@@ -732,16 +944,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    width: '90%',
-    maxHeight: '80%',
+    width: '85%',
+    maxHeight: '70%',
     backgroundColor: 'white',
-    borderRadius: 15,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -753,7 +965,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: '#1e3a8a',
   },
   modalBody: {
     padding: 16,
@@ -763,7 +975,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#415881',
+    backgroundColor: '#3b82f6',
     borderRadius: 10,
     padding: 12,
     marginBottom: 8,
@@ -778,12 +990,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     fontStyle: 'italic',
-    color: '#415881',
+    color: '#3b82f6',
     marginBottom: 16,
   },
   section: {
     marginBottom: 20,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#f0f9ff',
     borderRadius: 10,
     padding: 12,
     shadowColor: '#000',
@@ -795,12 +1007,12 @@ const styles = StyleSheet.create({
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#415881',
+    color: '#1e3a8a',
     marginLeft: 8,
   },
   pointItem: {
@@ -810,19 +1022,12 @@ const styles = StyleSheet.create({
   },
   pointText: {
     fontSize: 14,
-    color: '#34495e',
+    color: '#1e3a8a',
     marginLeft: 10,
     flex: 1,
   },
   boldText: {
     fontWeight: '700',
-  },
-  podiumContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    marginVertical: 16,
-    height: 140,
   },
   podiumItem: {
     alignItems: 'center',
@@ -867,13 +1072,13 @@ const styles = StyleSheet.create({
   podiumRank: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'white',
     marginTop: 18,
   },
   podiumReward: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'white',
     marginTop: 8,
   },
   ranksContainer: {
@@ -886,27 +1091,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  rankText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#2c3e50',
-  },
   rewardText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#415881',
   },
-  footer: {
-    marginTop: 16,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 8,
-    backgroundColor: '#f0f4f8',
-    borderRadius: 8,
+    color: "#3b82f6"
   },
-  footerText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#415881',
-    fontStyle: 'italic',
-  }
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#1e3a8a',
+  },
 });
+
+export default LeaderboardScreen;
