@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { collection, getDocs, limit, orderBy, query, Timestamp, where } from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.85;
 
-const organiserMapping = {
+// Move this outside component to prevent recreation on each render
+const ORGANISER_MAPPING = {
     1: "Faculty of Applied & Creative Arts",
     2: "Faculty of Built Environment",
     3: "Faculty of Cognitive Sciences & Human Development",
@@ -20,163 +22,258 @@ const organiserMapping = {
     10: "Faculty of Social Sciences & Humanities",
 };
 
-// Mock Data
-const mockEvents = [
-    {
-        id: '1',
-        title: 'International Technology Summit 2025 - Future of AI and Machine Learning',
-        startTime: '2025-03-15 09:00 AM',
-        endTime: '2025-03-17 06:00 PM',
-        organiser: 'Tech Global Solutions',
-        status: 'Ongoing',
-    },
-    {
-        id: '2',
-        title: 'Business Leadership Conference',
-        startTime: '2025-04-01 10:00 AM',
-        endTime: '2025-04-02 05:00 PM',
-        organiser: 'Business Leaders Association',
-        status: 'Upcoming',
-    },
-    {
-        id: '3',
-        title: 'Global Marketing Summit',
-        startTime: '2025-03-16 08:30 AM',
-        endTime: '2025-03-16 04:30 PM',
-        organiser: 'Marketing Professionals Network',
-        status: 'Ongoing',
-    },
-    {
-        id: '4',
-        title: 'Sustainable Energy Expo',
-        startTime: '2025-05-10 09:00 AM',
-        endTime: '2025-05-12 06:00 PM',
-        organiser: 'Green Energy Initiative',
-        status: 'Upcoming',
-    },
-    {
-        id: '5',
-        title: 'Digital Healthcare Conference',
-        startTime: '2025-03-18 08:00 AM',
-        endTime: '2025-03-20 05:00 PM',
-        organiser: 'Healthcare Innovation Network',
-        status: 'Ongoing',
-    },
-];
+// Faculty color mapping
+const FACULTY_COLORS = {
+    1: ['#FF9AA2', '#FFB7B2'], // Arts - Soft pink
+    2: ['#BDB2FF', '#A0C4FF'], // Built Environment - Lavender
+    3: ['#FFE7AA', '#FFDAC1'], // Cognitive Sciences - Light orange
+    4: ['#A5F1E9', '#7BDFF2'], // Computer Science - Cyan
+    5: ['#B5EAD7', '#C7F9CC'], // Economics - Mint green
+    6: ['#E2F0CB', '#CEEDC7'], // Education - Light green
+    7: ['#E7C6FF', '#DCB0FF'], // Engineering - Light purple
+    8: ['#FF9AA2', '#FFB7B2'], // Medicine - Soft pink
+    9: ['#D8E2DC', '#ECE4DB'], // Resource Science - Light gray
+    10: ['#FFCFD2', '#FFC8DD'], // Social Sciences - Pink
+};
 
-const EventStatusCarousel = ({ setIsLoading }) => {
-    const [uoEvents, setUOEvents] = useState([]);
+const EventStatusCarousel = ({ setIsLoading, navigation }) => {
+    const [events, setEvents] = useState([]);
+    const [localLoading, setLocalLoading] = useState(true);
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    // Memoize formatDateTime to prevent recreating on each render
+    const formatDateTime = useCallback((timestamp) => {
+        if (!timestamp || !timestamp.seconds) return "Invalid Date";
+    
+        const date = new Date(timestamp.seconds * 1000);
+        return date.toLocaleString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }, []);
+
+    // Format just the date without time
+    const formatDate = useCallback((timestamp) => {
+        if (!timestamp || !timestamp.seconds) return "Invalid Date";
+    
+        const date = new Date(timestamp.seconds * 1000);
+        return date.toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+        });
+    }, []);
+
+    // Format just the time
+    const formatTime = useCallback((timestamp) => {
+        if (!timestamp || !timestamp.seconds) return "Invalid Time";
+    
+        const date = new Date(timestamp.seconds * 1000);
+        return date.toLocaleString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }, []);
 
     useEffect(() => {
-        const fetchOngoingUpcomingEvents = async () => {
+        const fetchEvents = async () => {
             try {
                 setIsLoading(true);
+                setLocalLoading(true);
 
+                const now = Timestamp.now();
                 const eventsRef = collection(db, "event");
-                const ouEventsQuery = query(
+                const eventsQuery = query(
                     eventsRef,
-                    where("eventEndDateTime", ">=", Timestamp.now()), // Exclude past events
-                    where("status", "not-in", ["completed", "cancelled"]), // Exclude completed & cancelled events
-                    orderBy("eventStartDateTime", "asc"), // Sort by event start time 
+                    where("eventEndDateTime", ">=", now),
+                    where("status", "not-in", ["Completed", "Cancelled"]),
+                    orderBy("eventStartDateTime", "asc"),
                     limit(5)
-                )
-                const ouEventsSnap = await getDocs(ouEventsQuery);
+                );
+                
+                const eventsSnapshot = await getDocs(eventsQuery);
+                const nowMillis = now.toMillis();
 
-                const uoEvents = ouEventsSnap.docs.map(doc => {
+                const formattedEvents = eventsSnapshot.docs.map(doc => {
                     const data = doc.data();
                     const startTime = data.eventStartDateTime;
                     const endTime = data.eventEndDateTime;
+                    
+                    // Determine event status
+                    const isOngoing = nowMillis >= startTime.toMillis() && nowMillis < endTime.toMillis();
+                    
+                    // Calculate time until event starts
+                    const timeUntilStart = startTime.toMillis() - nowMillis;
+                    const daysUntil = Math.floor(timeUntilStart / (1000 * 60 * 60 * 24));
+                    const hoursUntil = Math.floor((timeUntilStart % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    
+                    // Calculate event duration
+                    const durationMs = endTime.toMillis() - startTime.toMillis();
+                    const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+                    const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
+                    // Readable countdown text
+                    let countdownText = "";
+                    if (isOngoing) {
+                        countdownText = "Happening now";
+                    } else if (daysUntil > 0) {
+                        countdownText = `In ${daysUntil} day${daysUntil > 1 ? 's' : ''}`;
+                    } else if (hoursUntil > 0) {
+                        countdownText = `In ${hoursUntil} hour${hoursUntil > 1 ? 's' : ''}`;
+                    } else {
+                        countdownText = "Starting soon";
+                    }
 
                     return {
                         id: doc.id,
                         name: data.eventName,
-                        startTime: startTime,
-                        endTime: endTime,
+                        startTime,
+                        endTime,
                         location: data.locationName,
-                        organiser: organiserMapping[data.organiserID],
-                        status: Timestamp.now().toMillis() >= startTime.toMillis() && Timestamp.now().toMillis() < endTime.toMillis() ? "Ongoing" : "Upcoming"
+                        organiserID: data.organiserID || 4, // Default to CS if missing
+                        organiser: ORGANISER_MAPPING[data.organiserID] || "Unknown Organizer",
+                        status: isOngoing ? "Ongoing" : "Upcoming",
+                        countdownText,
+                        durationText: `${durationHours}h ${durationMinutes}m`,
                     };
                 });
                 
-                setUOEvents(uoEvents);
+                setEvents(formattedEvents);
             } catch (error) {
-                console.error("Error when fetching ongoing and upcoming events", error);
+                console.error("Error fetching events:", error);
             } finally {
                 setIsLoading(false);
+                setLocalLoading(false);
             }
         };
 
-        fetchOngoingUpcomingEvents();
+        fetchEvents();
+    }, [setIsLoading]);
+
+    const onViewableItemsChanged = useCallback(({ viewableItems }) => {
+        if (viewableItems.length > 0) {
+            setActiveIndex(viewableItems[0].index);
+        }
     }, []);
 
-    const formatDateTime = (timestamp) => {
-        if (!timestamp || !timestamp.seconds) return "Invalid Date";
-    
-        const date = new Date(timestamp.seconds * 1000);
-    
-        // Format date (adjust format as needed)
-        return date.toLocaleString("en-US", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
+    const viewabilityConfig = {
+        itemVisiblePercentThreshold: 50
     };
 
-    const renderEventCard = ({ item }) => (
-        <View style={styles.card}>
-            {/* Status Line */}
-            <View style={styles.statusContainer}>
-                <View style={[
-                    styles.statusIndicator,
-                    { backgroundColor: item.status === 'Ongoing' ? '#4CAF50' : '#888888' }
-                ]} />
-                <Text style={[
-                    styles.statusText,
-                    { color: item.status === 'Ongoing' ? '#4CAF50' : '#888888'  }
-                ]}>
-                    {item.status}
-                </Text>
-            </View>
+    // Memoize renderEventCard to prevent recreating on each render
+    const renderEventCard = useCallback(({ item, index }) => {
+        const isOngoing = item.status === 'Ongoing';
+        const statusColor = isOngoing ? '#FF5722' : '#4CAF50';
+        const facultyColors = FACULTY_COLORS[item.organiserID] || ['#E0E0E0', '#BDBDBD'];
+        
+        return (
+            <TouchableOpacity 
+                activeOpacity={0.9}
+                onPress={() => {
+                    // Navigate to event details if you have that screen
+                    if (navigation && navigation.navigate) {
+                        navigation.navigate('EventDetails', { eventId: item.id });
+                    }
+                }}
+            >
+                <View style={styles.card}>
+                    {/* Color bar at top based on faculty */}
+                    <LinearGradient 
+                        colors={facultyColors} 
+                        start={{x: 0, y: 0}} 
+                        end={{x: 1, y: 0}} 
+                        style={styles.cardTopBar} 
+                    />
+                    
+                    <View style={styles.cardContent}>
+                        {/* Status badge */}
+                        <View style={[styles.statusBadge, { backgroundColor: isOngoing ? 'rgba(255, 87, 34, 0.1)' : 'rgba(76, 175, 80, 0.1)' }]}>
+                            <View style={[styles.statusIndicator, { backgroundColor: statusColor }]} />
+                            <Text style={[styles.statusText, { color: statusColor }]}>
+                                {isOngoing ? 'LIVE NOW' : item.countdownText}
+                            </Text>
+                        </View>
 
-            {/* Event Title */}
-            <Text style={styles.title}>
-                {item.name}
-            </Text>
+                        {/* Event Title */}
+                        <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+                            {item.name}
+                        </Text>
+                        
+                        {/* Date card */}
+                        <View style={styles.dateTimeContainer}>
+                            <View style={styles.dateCard}>
+                                <Text style={styles.dateText}>{formatDate(item.startTime)}</Text>
+                            </View>
+                            <View style={styles.timeDetails}>
+                                <Text style={styles.timeText}>{formatTime(item.startTime)} - {formatTime(item.endTime)}</Text>
+                                <Text style={styles.durationText}>Duration: {item.durationText}</Text>
+                            </View>
+                        </View>
 
-            {/* Start Time */}
-            <View style={styles.mainDetailsContainer}>
-                <MaterialIcons name="access-time" size={16} color="#666" />
-                <Text style={styles.mainDetailsText}>Start: {formatDateTime(item.startTime)}</Text>
-            </View>
+                        {/* Location */}
+                        <View style={styles.locationContainer}>
+                            <MaterialIcons name="location-on" size={16} color="#666" />
+                            <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
+                                {item.location}
+                            </Text>
+                        </View>
 
-            {/* End Time */}
-            <View style={styles.mainDetailsContainer}>
-                <MaterialIcons name="access-time" size={16} color="#666" />
-                <Text style={styles.mainDetailsText}>End: {formatDateTime(item.endTime)}</Text>
-            </View>
+                        {/* Organiser */}
+                        <View style={styles.organiserContainer}>
+                            <MaterialIcons name="business" size={16} color="#666" />
+                            <Text style={styles.organiserName} numberOfLines={1} ellipsizeMode="tail">
+                                {item.organiser}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+            </TouchableOpacity>
+        );
+    }, [formatDate, formatTime, navigation]);
 
-            <View style={styles.mainDetailsContainer}>
-                <MaterialIcons name="location-pin" size={16} color="#666" />
-                <Text style={styles.mainDetailsText}>Location: {item.location}</Text>
+    // Pagination dots
+    const renderPaginationDots = () => {
+        return (
+            <View style={styles.paginationContainer}>
+                {events.map((_, index) => (
+                    <View
+                        key={index}
+                        style={[
+                            styles.paginationDot,
+                            index === activeIndex ? styles.paginationDotActive : {}
+                        ]}
+                    />
+                ))}
             </View>
+        );
+    };
 
-            {/* Organiser */}
-            <View style={styles.organiserContainer}>
-                <MaterialIcons name="business" size={16} color="#666" />
-                <Text style={styles.organiserName}>{item.organiser}</Text>
-            </View>
+    // Improved empty component
+    const EmptyComponent = useMemo(() => (
+        <View style={styles.emptyContainer}>
+            {localLoading ? (
+                <ActivityIndicator size="large" color="#007AFF" />
+            ) : (
+                <>
+                    <MaterialIcons name="event-busy" size={50} color="#ccc" />
+                    <Text style={styles.emptyTitle}>No Events Found</Text>
+                    <Text style={styles.emptySubtitle}>
+                        There are no ongoing or upcoming events at this time. Check back later!
+                    </Text>
+                </>
+            )}
         </View>
-    );
+    ), [localLoading]);
 
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
-                <Text style={styles.sectionTitle}>Ongoing and Upcoming Events</Text>
+                <Text style={styles.sectionTitle}>Ongoing & Upcoming Events</Text>
             </View>
             <FlatList
-                data={uoEvents}
+                data={events}
                 renderItem={renderEventCard}
                 keyExtractor={(item) => item.id}
                 horizontal
@@ -184,63 +281,92 @@ const EventStatusCarousel = ({ setIsLoading }) => {
                 snapToInterval={CARD_WIDTH + 20}
                 decelerationRate="fast"
                 pagingEnabled
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={<View><Text>No events</Text></View>}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
+                contentContainerStyle={[
+                    styles.listContent,
+                    events.length === 0 && styles.emptyListContent
+                ]}
+                ListEmptyComponent={EmptyComponent}
             />
+            {events.length > 0 && renderPaginationDots()}
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
-        marginVertical: 20,
-        height: "fit-content", // Increased container height
+        marginVertical: 24,
+        height: "auto",
+        minHeight: 280,
     },
     headerContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        marginBottom: 15,
+        marginBottom: 12,
     },
     sectionTitle: {
         fontSize: 20,
         fontWeight: 'bold',
+        color: '#333',
+    },
+    viewAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     viewAllText: {
-        color: '#007AFF',
         fontSize: 14,
+        color: '#6C63FF',
+        marginRight: 2,
     },
     listContent: {
         paddingHorizontal: 10,
-        marginVertical: 10
+        marginVertical: 8,
+        paddingBottom: 16,
+    },
+    emptyListContent: {
+        width: width,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     card: {
         width: CARD_WIDTH,
-        height: "auto", // Fixed card height
-        padding: 16,
-        marginHorizontal: 10,
+        minHeight: 220,
         backgroundColor: 'white',
         borderRadius: 12,
+        marginHorizontal: 10,
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
-            height: 2,
+            height: 6,
         },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 8,
+        overflow: 'hidden',
     },
-    statusContainer: {
+    cardTopBar: {
+        height: 6,
+        width: '100%',
+    },
+    cardContent: {
+        padding: 16,
+    },
+    statusBadge: {
         flexDirection: 'row',
-        justifyContent: 'flex-end',
         alignItems: 'center',
-        marginBottom: 12, // Increased bottom margin
+        alignSelf: 'flex-start',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginBottom: 12,
     },
     statusIndicator: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
         marginRight: 6,
     },
     statusText: {
@@ -249,32 +375,112 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 16,
+        color: '#333',
+        lineHeight: 22,
+    },
+    dateTimeContainer: {
+        flexDirection: 'row',
+        marginBottom: 12,
+    },
+    dateCard: {
+        backgroundColor: '#F6F8FD',
+        borderRadius: 8,
+        padding: 8,
+        marginRight: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 70,
+    },
+    dateText: {
+        fontSize: 14,
         fontWeight: '600',
-        marginBottom: 16, // Increased bottom margin
         color: '#333',
     },
-    mainDetailsContainer: {
+    timeDetails: {
+        justifyContent: 'center',
+    },
+    timeText: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: '500',
+    },
+    durationText: {
+        fontSize: 12,
+        color: '#666',
+        marginTop: 2,
+    },
+    locationContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 10, // Consistent spacing
+        marginBottom: 12,
     },
-    mainDetailsText: {
+    locationText: {
         marginLeft: 8,
         fontSize: 14,
         color: '#666',
+        flex: 1,
     },
     organiserContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 16, // Added more space before organizer
-        paddingTop: 12, // Added padding to create visual separation
-        borderTopWidth: 1, // Added subtle line for separation
-        borderTopColor: '#f0f0f0', // Light gray line
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
     },
     organiserName: {
         marginLeft: 8,
         fontSize: 14,
         color: '#666',
+        flex: 1,
+    },
+    paginationContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    paginationDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#E0E0E0',
+        marginHorizontal: 3,
+    },
+    paginationDotActive: {
+        width: 10,
+        height: 6,
+        backgroundColor: '#638aff',
+    },
+    emptyContainer: {
+        width: CARD_WIDTH,
+        height: 220,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'white',
+        borderRadius: 12,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 3,
+        padding: 20,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginTop: 15,
+        marginBottom: 8,
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
     },
 });
 

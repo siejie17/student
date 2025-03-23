@@ -1,21 +1,19 @@
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, ActivityIndicator } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { db } from '../utils/firebaseConfig';
-import { doc, getDoc, query, where, getDocs, collection, orderBy } from "firebase/firestore";
+import { doc, onSnapshot, query, where, getDocs, collection, orderBy } from "firebase/firestore";
 import { getItem } from '../utils/asyncStorage';
 import { useNavigation } from '@react-navigation/native';
-
-const MOCK_DATA = {
-    diamonds: 1250,
-    userRank: 4
-  };
 
 const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigation }) => {
     const [diamonds, setDiamonds] = useState(0);
     const [diamondsLoading, setDiamondsLoading] = useState(false);
     const [rank, setRank] = useState(0);
+    const [totalUsers, setTotalUsers] = useState(0);
+    const [percentile, setPercentile] = useState(0);
 
     const navigation = useNavigation();
 
@@ -25,18 +23,18 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
             2: "ⁿᵈ",
             3: "ʳᵈ",
         };
-    
+
         if (place >= 10 && place <= 19) {
             return `${place}ᵗʰ`;
         }
-    
+
         const lastDigit = place % 10;
         const secondLastDigit = Math.floor((place % 100) / 10);
-    
+
         if (secondLastDigit === 1) {
             return `${place}ᵗʰ`; // Covers 11th, 12th, 13th, etc.
         }
-    
+
         return `${place}${superscripts[lastDigit] || "ᵗʰ"}`;
     };
 
@@ -44,25 +42,27 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
         const fetchUserDiamonds = async () => {
             try {
                 const studentID = await getItem("studentID");
-                
+                if (!studentID) return;
+
                 setIsLoading(true);
                 setDiamondsLoading(true);
+
                 const userRef = doc(db, "user", studentID);
-                const userSnap = await getDoc(userRef);
 
-                if (!userSnap.exists()) {
-                    console.log("User does not existed.");
-                    return;
-                }
+                const unsubscribe = onSnapshot(userRef, (userSnap) => {
+                    if (userSnap.exists()) {
+                        setFirstName(userSnap.data().firstName);
+                        setDiamonds(userSnap.data().diamonds);
+                    } else {
+                        console.log("User does not exist.");
+                    }
+                    setDiamondsLoading(false);
+                    setIsLoading(false);
+                });
 
-                const userFirstName = userSnap.data().firstName;
-                const userDiamonds = userSnap.data().diamonds;
-
-                setFirstName(userFirstName);
-                setDiamonds(userDiamonds);
+                return () => unsubscribe(); // Cleanup on unmount
             } catch (error) {
-                console.error("Error occured when fetching user's diamonds", error);
-            } finally {
+                console.error("Error occurred when fetching user's diamonds", error);
                 setDiamondsLoading(false);
                 setIsLoading(false);
             }
@@ -77,37 +77,54 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
                 const studentID = await getItem("studentID");
                 const facultyID = await getItem("facultyID");
 
+                if (!studentID || !facultyID) return;
+
                 setIsLoading(true);
 
                 const leaderboardRef = collection(db, "leaderboard");
                 const leaderboardQuery = query(leaderboardRef, where("facultyID", "==", facultyID));
-                const leaderboardSnap = await getDocs(leaderboardQuery);
 
-                if (leaderboardSnap.empty) {
-                    console.log("No leaderboard found for this faculty.");
-                    return [];
-                }
+                // Listen for real-time updates on leaderboard changes
+                const unsubscribeLeaderboard = onSnapshot(leaderboardQuery, (leaderboardSnap) => {
+                    if (leaderboardSnap.empty) {
+                        console.log("No leaderboard found for this faculty.");
+                        setRank(null);
+                        setTotalUsers(0);
+                        setPercentile(0);
+                        return;
+                    }
 
-                const leaderboardDoc = leaderboardSnap.docs[0]; 
-                const leaderboardID = leaderboardDoc.id;
+                    const leaderboardDoc = leaderboardSnap.docs[0];
+                    const leaderboardID = leaderboardDoc.id;
 
-                // Step 2: Query the inner collection `leaderboardEntries` within the found leaderboard document
-                const leaderboardEntriesRef = collection(db, "leaderboard", leaderboardID, "leaderboardEntries");
-                const leaderboardEntriesQuery = query(leaderboardEntriesRef, orderBy("points", "desc"))
-                const leaderboardEntriesSnapshot = await getDocs(leaderboardEntriesQuery);
+                    // Step 2: Listen for changes in `leaderboardEntries` collection
+                    const leaderboardEntriesRef = collection(db, "leaderboard", leaderboardID, "leaderboardEntries");
+                    const leaderboardEntriesQuery = query(leaderboardEntriesRef, orderBy("points", "desc"));
 
-                const entries = leaderboardEntriesSnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
+                    const unsubscribeEntries = onSnapshot(leaderboardEntriesQuery, (leaderboardEntriesSnapshot) => {
+                        const entries = leaderboardEntriesSnapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
 
-                const userPlace = entries.findIndex(entry => entry.studentID === studentID) + 1;
+                        const userPlace = entries.findIndex(entry => entry.studentID === studentID) + 1;
+                        const totalParticipants = entries.length;
 
-                setRank(userPlace);
+                        // Calculate percentile (top X%)
+                        const calculatedPercentile = Math.ceil((userPlace / totalParticipants) * 100);
+
+                        setRank(userPlace);
+                        setTotalUsers(totalParticipants);
+                        setPercentile(calculatedPercentile);
+                        setIsLoading(false);
+                    });
+
+                    return () => unsubscribeEntries(); // Cleanup
+                });
+
+                return () => unsubscribeLeaderboard(); // Cleanup
             } catch (error) {
                 console.error("Error fetching leaderboard entries:", error);
-                return [];
-            } finally {
                 setIsLoading(false);
             }
         };
@@ -115,33 +132,51 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
         fetchUserPlace();
     }, []);
 
+    const getPlacementColor = () => {
+        if (rank === 1) return ['#FFD700', '#FFC107']; // Gold
+        if (rank === 2) return ['#C0C0C0', '#A9A9A9']; // Silver
+        if (rank === 3) return ['#CD7F32', '#A0522D']; // Bronze
+        return ['#E0E0E0', '#BDBDBD']; // Default
+    };
+
     return (
         <View style={styles.container}>
-            <Pressable 
+            <Pressable
                 style={({ pressed }) => [
-                styles.card,
-                pressed ? styles.cardPressed : styles.cardNormal
+                    styles.card,
+                    pressed ? styles.cardPressed : styles.cardNormal
                 ]}
                 onPress={() => navigation.navigate("MerchandiseTopTabs")}
                 android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
             >
-                <View style={styles.cardContent}>
-                <View style={styles.iconContainer}>
-                    <Ionicons name="diamond-outline" size={24} color="#555555" />
-                </View>
-                <View style={styles.textContainer}>
-                    <View style={styles.diamondContainer}>
-                    <Text style={styles.diamondText}>{diamonds} Diamonds</Text>
+                <LinearGradient
+                    colors={['#F6F8FD', '#EDF0F7']}
+                    style={styles.cardGradient}
+                >
+                    <View style={styles.cardHeader}>
+                        <View style={styles.iconContainer}>
+                            <Image
+                                source={require('../assets/icons/diamond.png')}
+                                style={styles.icon}
+                            />
+                        </View>
+                        <Text style={styles.cardTitle}>Shop</Text>
                     </View>
-                    <Text style={styles.title}>Browse Merchandise</Text>
-                </View>
-                <View style={styles.chevronBack}>
-                    <Ionicons name="chevron-forward" size={20} color="#555555" />
-                </View>
-                </View>
+                    
+                    <View style={styles.cardBody}>
+                        <Text style={styles.diamondAmount}>
+                            <Text style={styles.diamondNumber}>{diamondsLoading ? <ActivityIndicator size={24} color="#6c63ff" /> : `${diamonds} Diamonds`}</Text>
+                        </Text>
+                    </View>
+
+                    <View style={styles.cardFooter}>
+                        <Text style={styles.actionText}>Browse Merchandise</Text>
+                        <Ionicons name="chevron-forward" size={16} color="#6c63ff" />
+                    </View>
+                </LinearGradient>
             </Pressable>
 
-            <Pressable 
+            <Pressable
                 style={({ pressed }) => [
                     styles.card,
                     pressed ? styles.cardPressed : styles.cardNormal
@@ -149,22 +184,48 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
                 onPress={() => navigation.jumpTo("Leaderboard")}
                 android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
             >
-                <View style={styles.cardContent}>
-                <View style={styles.iconContainer}>
-                    <Ionicons name="trophy-outline" size={24} color="#555555" />
-                </View>
-                <View style={styles.textContainer}>
-                    <View style={styles.rankContainer}>
-                    <Text style={styles.rankText}>
-                        <Text style={styles.rankNumber}>{formatLeaderboardPlace(rank)} Place</Text>
-                    </Text>
+                <LinearGradient
+                    colors={['#F6F8FD', '#EDF0F7']}
+                    style={styles.cardGradient}
+                >
+                    <View style={styles.cardHeader}>
+                        <View style={[styles.iconContainer, styles.trophyContainer]}>
+                            <Image
+                                source={require('../assets/icons/trophy.png')}
+                                style={styles.icon}
+                            />
+                        </View>
+                        <Text style={styles.cardTitle}>Rank</Text>
                     </View>
-                    <Text style={styles.title}>View Leaderboard</Text>
-                </View>
-                <View style={styles.chevronBack}>
-                    <Ionicons name="chevron-forward" size={20} color="#555555" />
-                </View>
-                </View>
+                    
+                    <View style={styles.cardBody}>
+                        {rank === 0 ? (
+                            <Text style={styles.rankStart}>Battle On!</Text>
+                        ) : (
+                            <>
+                                <View style={styles.rankBadgeContainer}>
+                                    <LinearGradient
+                                        colors={getPlacementColor()}
+                                        style={styles.rankBadge}
+                                    >
+                                        <Text style={styles.rankNumber}>{rank}</Text>
+                                    </LinearGradient>
+                                    <Text style={styles.rankText}>
+                                        {formatLeaderboardPlace(rank)}
+                                    </Text>
+                                </View>
+                                <Text style={styles.subtitle}>
+                                    Top {percentile}% of {totalUsers} users
+                                </Text>
+                            </>
+                        )}
+                    </View>
+
+                    <View style={styles.cardFooter}>
+                        <Text style={styles.actionText}>View Leaderboard</Text>
+                        <Ionicons name="chevron-forward" size={16} color="#6c63ff" />
+                    </View>
+                </LinearGradient>
             </Pressable>
         </View>
     );
@@ -172,76 +233,115 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
 
 const styles = StyleSheet.create({
     container: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      paddingHorizontal: 12,
-      width: '100%',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        width: '100%',
     },
     card: {
-      flex: 1,
-      backgroundColor: '#FFFFFF',
-      borderRadius: 8,
-      padding: 12,
-      marginHorizontal: 5,
-      elevation: 2,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.08,
-      shadowRadius: 2,
+        flex: 1,
+        borderRadius: 12,
+        marginHorizontal: 6,
+        overflow: 'hidden',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    cardGradient: {
+        padding: 16,
     },
     cardNormal: {
-      backgroundColor: '#FFFFFF',
+        backgroundColor: '#FFFFFF',
     },
     cardPressed: {
-      backgroundColor: '#F5F5F5',
-      transform: [{ scale: 0.98 }],
+        transform: [{ scale: 0.98 }],
     },
-    cardContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    cardTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+        marginLeft: 8,
+    },
+    cardBody: {
+        marginBottom: 16,
+    },
+    cardFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.05)',
     },
     iconContainer: {
-      marginRight: 10,
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: '#F5F7FA',
-      justifyContent: 'center',
-      alignItems: 'center',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(79, 139, 222, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    textContainer: {
-      flex: 1,
+    trophyContainer: {
+        backgroundColor: 'rgba(255, 193, 7, 0.1)',
     },
-    title: {
-      fontSize: 10,
-      color: '#333333',
-      marginBottom: 2,
+    icon: {
+        height: 16,
+        width: 16,
     },
-    diamondContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    diamondAmount: {
+        fontSize: 18,
+        color: '#333',
+        marginBottom: 4,
     },
-    diamondText: {
-      fontWeight: '500',
-      fontSize: 14,
-      color: '#555555',
+    diamondNumber: {
+        fontWeight: '700',
+        color: '#638aff',
     },
-    rankContainer: {
-      fontWeight: '500',
-      flexDirection: 'row',
-      alignItems: 'center',
+    subtitle: {
+        fontSize: 12,
+        color: '#666',
     },
-    rankText: {
-      fontSize: 14,
-      color: '#555555',
+    actionText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#638aff',
+    },
+    rankBadgeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    rankBadge: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 8,
     },
     rankNumber: {
-      fontWeight: '500',
-      color: '#555555',
+        fontSize: 14,
+        fontWeight: '700',
+        color: 'white',
     },
-    chevronBack: {
-      marginLeft: 1,
+    rankText: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+    },
+    rankStart: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#FFC107',
+        marginBottom: 4,
     }
 });
 
-export default MerchLeaderboardCards
+export default MerchLeaderboardCards;

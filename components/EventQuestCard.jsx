@@ -1,0 +1,228 @@
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+const EventQuestCard = ({ 
+  questNumber,
+  title,
+  isCompleted,
+  diamondReward,
+  pointsReward,
+  onPress
+}) => {
+  return (
+    <TouchableOpacity 
+      style={styles.container}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      {/* Status Indicator */}
+      <View 
+        style={[
+          styles.statusIndicator,
+          { backgroundColor: isCompleted ? '#E8F5E9' : '#FFF8F8' }
+        ]}
+      >
+        <View 
+          style={[
+            styles.statusDot,
+            { backgroundColor: isCompleted ? '#4CAF50' : '#FF6B6B' }
+          ]} 
+        />
+      </View>
+      
+      {/* Content Area */}
+      <View style={styles.contentArea}>
+        {/* Header with Quest Number and Title */}
+        <View style={styles.header}>
+          <Text style={styles.questNumber}>
+            {questNumber}
+          </Text>
+          <Text 
+            style={styles.title} 
+            numberOfLines={2}
+          >
+            {title}
+          </Text>
+        </View>
+        
+        {/* Main Content */}
+        <View style={styles.mainContent}>
+          {/* Progress Indicator */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBarContainer}>
+              <View 
+                style={[
+                  styles.progressBar,
+                  { width: isCompleted ? '100%' : '0%' },
+                  { backgroundColor: isCompleted ? '#4CAF50' : '#5B7FDE' }
+                ]} 
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {isCompleted ? 'Complete' : 'In progress'}
+            </Text>
+          </View>
+
+          {/* Rewards */}
+          <View style={styles.rewards}>
+            <View style={styles.rewardItem}>
+              <MaterialCommunityIcons 
+                name="diamond-stone" 
+                size={16} 
+                color="#1E90FF" 
+              />
+              <Text style={styles.rewardValue}>{diamondReward}</Text>
+            </View>
+            <View style={styles.rewardItem}>
+              <MaterialCommunityIcons 
+                name="star" 
+                size={16} 
+                color="#FFD700" 
+              />
+              <Text style={styles.rewardValue}>{pointsReward}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+      
+      {/* Action Area */}
+      <View style={styles.actionArea}>
+        <View 
+          style={[
+            styles.actionButton,
+            { backgroundColor: isCompleted ? '#4CAF50' : '#5B7FDE' }
+          ]}
+        >
+          <MaterialCommunityIcons 
+            name={isCompleted ? "check" : "chevron-right"} 
+            size={20} 
+            color="#FFFFFF" 
+          />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    overflow: 'hidden',
+  },
+  
+  // Status indicator on the left
+  statusIndicator: {
+    width: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  statusDot: {
+    width: 4,
+    height: 24,
+    borderRadius: 2,
+  },
+  
+  // Content area
+  contentArea: {
+    flex: 1,
+    padding: 16,
+  },
+  
+  // Header section
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  questNumber: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#9E9E9E',
+    marginRight: 8,
+  },
+  title: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212121',
+    letterSpacing: 0.2,
+    lineHeight: 22,
+  },
+  
+  // Main content with progress and rewards
+  mainContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  
+  // Progress section
+  progressContainer: {
+    flex: 1,
+    marginRight: 16,
+  },
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: '#F0F0F0',
+    borderRadius: 2,
+    marginBottom: 6,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progressText: {
+    fontSize: 12,
+    color: '#757575',
+    fontWeight: '500',
+  },
+  
+  // Rewards section
+  rewards: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  rewardItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  rewardValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#424242',
+  },
+  
+  // Action area on the right
+  actionArea: {
+    width: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FAFAFA',
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
+export default EventQuestCard;

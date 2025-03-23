@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, Platform, TouchableOpacity, View, Text } from 'react-native';
+import { StatusBar, StyleSheet, TouchableOpacity, View, Text, ActivityIndicator, ImageBackground } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './utils/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 
 import SignInScreen from './screens/SignInScreen.jsx';
@@ -21,11 +21,13 @@ import MerchandiseListingScreen from './screens/MerchandiseListingScreen.jsx';
 import MerchandiseDetailsScreen from './screens/MerchandiseDetailsScreen.jsx';
 import EventDetailsScreen from './screens/EventDetailsScreen.jsx';
 import RedemptionListingScreen from './screens/RedemptionListingScreen.jsx';
+import RegisteredEventScreen from './screens/RegisteredEventScreen.jsx';
 import EventQuestsScreen from './screens/EventQuestsScreen.jsx';
 import BadgeScreen from './screens/BadgeScreen.jsx';
+import NetworkScreen from './screens/NetworkScreen.jsx';
 
-import { getItem, setItem } from './utils/asyncStorage.js';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { getItem, removeItem, setItem } from './utils/asyncStorage.js';
+import { auth } from './utils/firebaseConfig';
 
 const MainStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
@@ -41,7 +43,8 @@ const TopTab = createMaterialTopTabNavigator();
 
 export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(null);
-  const [user, setUser] = useState(null);
+  const [studentID, setStudentID] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkIfAlreadyOnboarded = async () => {
@@ -53,40 +56,57 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (authUser) => {
-      setUser(authUser);
-    });
+    const checkAuth = async () => {
+      const storedStudentID = await getItem('studentID');
 
-    return unsubscribe;
+      onAuthStateChanged(auth, async (user) => {
+        if (user && user.emailVerified) {
+          setStudentID(storedStudentID);
+        } else {
+          setStudentID(null);
+        }
+        setLoading(false);
+      })
+    }
+
+    checkAuth();
   }, []);
 
-    // Delete after Sign In is completed.
-    useEffect(() => {
-      setItem('studentID', "BEUJi1zSGwHNbor9vHL9");
-      setItem('facultyID', "4");
-    }, []);
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
 
   if (showOnboarding === null) return null;
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar
-        backgroundColor="#f0f0f0" // Background color (Android only)
-        barStyle="dark-content" // 'light-content', 'dark-content', or 'default'
-        translucent={false} // Whether the app should render below status bar (Android)
-        hidden={false} // Hide the status bar
+        backgroundColor="transparent"
+        barStyle="dark-content"
+        translucent={false}
+        hidden={false}
       />
       <NavigationContainer>
-        {/* {user ? <AppTabs /> : <AuthStackScreen showOnboarding={showOnboarding} />} */}
-        <MainStack.Navigator>
-          <MainStack.Screen name="AppTabs" component={AppTabs} options={{ headerShown: false }} />
-          <MainStack.Screen name="MerchandiseTopTabs" component={MerchandiseTopTabs} options={{ headerShown: false }} />
-          <MainStack.Screen name="EventDetails" component={EventDetailsScreen} options={{ headerShown: false }} />
-        </MainStack.Navigator>
+        {studentID ? <AppStack /> : <AuthStackScreen showOnboarding={showOnboarding} />}
       </NavigationContainer>
     </SafeAreaView>
   );
 }
+
+const AppStack = () => (
+  <MainStack.Navigator>
+    <MainStack.Screen name="AppTabs" component={AppTabs} options={{ headerShown: false }} />
+    <MainStack.Screen name="MerchandiseTopTabs" component={MerchandiseTopTabs} options={{ headerShown: false }} />
+    <MainStack.Screen name="EventDetails" component={EventDetailsScreen} options={{ headerShown: false }} />
+    <MainStack.Screen name="RegisteredEventsTopTabs" component={RegisteredEventTopTabs} options={{ headerShown: false }} />
+    <MainStack.Screen name="BadgeDetails" component={BadgeScreen} options={{ headerShown: false }} />
+    <MainStack.Screen name="NetworkList" component={NetworkScreen} options={{ headerShown: false }} />
+  </MainStack.Navigator>
+)
 
 const AuthStackScreen = ({ showOnboarding }) => (
   <AuthStack.Navigator initialRouteName={showOnboarding ? 'Onboarding' : 'SignIn'}>
@@ -98,10 +118,10 @@ const AuthStackScreen = ({ showOnboarding }) => (
 );
 
 const HomeStackScreen = () => (
-    <HomeStack.Navigator>
-      <HomeStack.Screen name="HomeMain" component={HomeScreen} options={{ headerShown: false }} />
-      <HomeStack.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: "Leaderboard" }} />
-    </HomeStack.Navigator>
+  <HomeStack.Navigator>
+    <HomeStack.Screen name="HomeMain" component={HomeScreen} options={{ headerShown: false }} />
+    <HomeStack.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: "Leaderboard" }} />
+  </HomeStack.Navigator>
 );
 
 const CustomHeader = ({ title, onBack }) => {
@@ -117,48 +137,83 @@ const CustomHeader = ({ title, onBack }) => {
 
 const CustomTabBar = ({ state, descriptors, navigation }) => {
   return (
-      <View style={styles.tabBar}>
-        {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const label = options.tabBarLabel || options.title || route.name;
-          const isFocused = state.index === index;
+    <View style={styles.tabBar}>
+      {state.routes.map((route, index) => {
+        const { options } = descriptors[route.key];
+        const label = options.tabBarLabel || options.title || route.name;
+        const isFocused = state.index === index;
 
-          const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
 
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
 
-          return (
-            <TouchableOpacity
-              key={index}
-              accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
-              accessibilityLabel={options.tabBarAccessibilityLabel}
-              testID={options.tabBarTestID}
-              onPress={onPress}
-              style={[
-                styles.tabItem,
-                isFocused ? styles.tabItemActive : null
-              ]}
-            >
-              <Text style={[
-                styles.tabText,
-                isFocused ? styles.tabTextActive : null
-              ]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+        return (
+          <TouchableOpacity
+            key={index}
+            accessibilityRole="button"
+            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={options.tabBarAccessibilityLabel}
+            testID={options.tabBarTestID}
+            onPress={onPress}
+            style={[
+              styles.tabItem,
+              isFocused ? styles.tabItemActive : null
+            ]}
+          >
+            <Text style={[
+              styles.tabText,
+              isFocused ? styles.tabTextActive : null
+            ]}>
+              {label}
+            </Text>
+            {isFocused && <View style={styles.activeIndicator} />}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
+};
+
+// Registered Event Manager Top Tabs
+const RegisteredEventTopTabs = ({ route }) => {
+  const navigation = useNavigation();
+
+  const params = route.params || {};
+
+  return (
+    <View style={styles.container}>
+      <CustomHeader
+        title={params.eventName}
+        onBack={() => navigation.goBack()}
+      />
+
+      <TopTab.Navigator
+        tabBar={props => <CustomTabBar {...props} />}
+        screenOptions={{
+          // These styles will be overridden by our custom tab bar
+          // but they're needed for the navigator configuration
+          tabBarActiveTintColor: '#5B8CDD',
+          tabBarInactiveTintColor: 'A0B4D6',
+          tabBarStyle: {
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          swipeEnabled: false
+        }}
+      >
+        <TopTab.Screen name="Details" component={RegisteredEventScreen} initialParams={params} />
+        <TopTab.Screen name="Quest" component={EventQuestsScreen} initialParams={params} />
+      </TopTab.Navigator>
+    </View>
+  )
 };
 
 // Merchandise Top Tabs
@@ -167,22 +222,21 @@ const MerchandiseTopTabs = () => {
 
   return (
     <View style={styles.container}>
-      <CustomHeader 
-        title="Merchandise" 
-        onBack={() => navigation.goBack()} 
+      <CustomHeader
+        title="Merchandise"
+        onBack={() => navigation.goBack()}
       />
-    
+
       <TopTab.Navigator
         tabBar={props => <CustomTabBar {...props} />}
         screenOptions={{
-          // These styles will be overridden by our custom tab bar
-          // but they're needed for the navigator configuration
           tabBarActiveTintColor: '#fff',
           tabBarInactiveTintColor: 'rgba(0, 0, 0, 0.7)',
           tabBarStyle: {
             elevation: 0,
             shadowOpacity: 0,
           },
+          swipeEnabled: false
         }}
       >
         <TopTab.Screen name="Shop" component={ShopStackScreen} />
@@ -213,14 +267,6 @@ const CalendarStackScreen = () => (
   </CalendarStack.Navigator>
 );
 
-// Registered Event Manager Top Tabs
-const RegisteredEventTopTabs = () => (
-  <TopTab.Navigator>
-    <TopTab.Screen name="Details" component={EventDetailsScreen} />
-    <TopTab.Screen name="Quest" component={EventQuestsScreen} />
-  </TopTab.Navigator>
-);
-
 // Profile Stack
 const ProfileStackScreen = () => (
   <ProfileStack.Navigator>
@@ -230,6 +276,7 @@ const ProfileStackScreen = () => (
 );
 
 const AppTabs = () => (
+  <View style={styles.bottomBarBackground}>
   <Tab.Navigator
     screenOptions={({ route }) => ({
       headerShown: false,
@@ -261,102 +308,108 @@ const AppTabs = () => (
           </View>
         );
       },
-      tabBarActiveTintColor: '#415881',
-      tabBarInactiveTintColor: '#94A3B8',
+      tabBarActiveTintColor: '#3B6FC9',
+      tabBarInactiveTintColor: '#A9BFE0',
       tabBarShowLabel: true,
       tabBarStyle: styles.bottomBar,
       tabBarItemStyle: styles.tabBarItem,
       tabBarLabelStyle: styles.tabBarLabel,
     })}
   >
-    <Tab.Screen 
-      name="Home" 
+    <Tab.Screen
+      name="Home"
       component={HomeStackScreen}
       options={{
         tabBarLabel: 'Home'
       }}
     />
-    <Tab.Screen 
-      name="Events" 
+    <Tab.Screen
+      name="Events"
       component={EventsStackScreen}
       options={{
         tabBarLabel: 'Events'
       }}
     />
-    <Tab.Screen 
-      name="Agenda" 
+    <Tab.Screen
+      name="Agenda"
       component={CalendarStackScreen}
       options={{
         tabBarLabel: 'Agenda'
       }}
     />
-    <Tab.Screen 
-      name="Leaderboard" 
+    <Tab.Screen
+      name="Leaderboard"
       component={LeaderboardScreen}
       options={{
         tabBarLabel: 'Leaderboard'
       }}
     />
-    <Tab.Screen 
-      name="Profile" 
+    <Tab.Screen
+      name="Profile"
       component={ProfileStackScreen}
       options={{
         tabBarLabel: 'Profile'
       }}
     />
   </Tab.Navigator>
+  </View>
 );
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
+  },
+  bottomBarBackground: {
+    flex: 1,
+    backgroundColor: "white"
   },
   bottomBar: {
-    height: 80,
-    backgroundColor: '#FFFFFF',
-    left: 20,
-    right: 20,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    paddingHorizontal: 10,
-    paddingBottom: 8,
-    elevation: 10,
-    shadowColor: '#000',
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,                     // Added border width
+    borderColor: '#b3b9c4',             // Added subtle border color
+    borderBottomWidth: 0,               // No border at the bottom
+    elevation: 8,
+    height: 70,
+    left: 24,
+    paddingBottom: 4,
+    paddingHorizontal: 8,
+    right: 24,
+    shadowColor: 'rgba(59, 111, 201, 0.2)',
     shadowOffset: {
       width: 0,
-      height: 5,
+      height: 4,
     },
     shadowOpacity: 0.15,
-    shadowRadius: 10,
-    borderTopWidth: 0,
+    shadowRadius: 12,
   },
   tabBarItem: {
-    height: 60,
-    marginTop: 8,
+    height: 52,
     marginHorizontal: 4,
-    borderRadius: 16,
+    top: 5,
   },
   tabBarLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     letterSpacing: 0.2,
+    marginBottom: 4,
     marginTop: 2,
-    marginBottom: 8,
   },
   iconContainer: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   indicator: {
     position: 'absolute',
-    bottom: -18,
-    width: 4,
-    height: 4,
-    borderRadius: 4,
-    backgroundColor: '#415881',
+    bottom: -12,
+    width: 18,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#3B6FC9',
   },
   header: {
     flexDirection: 'row',
@@ -373,7 +426,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  // Custom Tab Bar Styles
   tabBarContainer: {
     overflow: 'hidden',
     borderRadius: 20,
@@ -390,29 +442,43 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    padding: 4,
-    marginHorizontal: 5,
-    backgroundColor: 'rgba(65, 88, 129, 0.4)', // Semi-transparent overlay
-    borderRadius: 20,
+    padding: 6,
+    marginHorizontal: 16,
+    marginVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#5B8CDD',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 3,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    borderRadius: 16,
-    marginHorizontal: 4,
+    borderRadius: 12,
+    position: 'relative',
   },
   tabItemActive: {
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: 'rgba(91, 140, 221, 0.06)',
   },
   tabText: {
     fontSize: 14,
     fontWeight: '500',
-    color: 'rgba(67, 67, 67, 0.7)',
+    color: '#A0B4D6',
   },
   tabTextActive: {
-    color: '#000000',
-    fontWeight: 'bold',
+    color: '#5B8CDD',
+    fontWeight: '600',
   },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    height: 3,
+    width: '30%',
+    backgroundColor: '#5B8CDD',
+    borderRadius: 3,
+  }
 });
