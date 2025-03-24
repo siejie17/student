@@ -233,23 +233,6 @@ const EventStatusCarousel = ({ setIsLoading, navigation }) => {
         );
     }, [formatDate, formatTime, navigation]);
 
-    // Pagination dots
-    const renderPaginationDots = () => {
-        return (
-            <View style={styles.paginationContainer}>
-                {events.map((_, index) => (
-                    <View
-                        key={index}
-                        style={[
-                            styles.paginationDot,
-                            index === activeIndex ? styles.paginationDotActive : {}
-                        ]}
-                    />
-                ))}
-            </View>
-        );
-    };
-
     // Improved empty component
     const EmptyComponent = useMemo(() => (
         <View style={styles.emptyContainer}>
@@ -289,16 +272,16 @@ const EventStatusCarousel = ({ setIsLoading, navigation }) => {
                 ]}
                 ListEmptyComponent={EmptyComponent}
             />
-            {events.length > 0 && renderPaginationDots()}
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
-        marginVertical: 24,
+        marginTop: 24,
+        marginBottom: 8,
         height: "auto",
-        minHeight: 280,
+        minHeight: 200,
     },
     headerContainer: {
         flexDirection: 'row',

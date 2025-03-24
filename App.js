@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, TouchableOpacity, View, Text, ActivityIndicator, ImageBackground } from 'react-native';
+import { StatusBar, StyleSheet, TouchableOpacity, View, Text, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -26,8 +26,9 @@ import EventQuestsScreen from './screens/EventQuestsScreen.jsx';
 import BadgeScreen from './screens/BadgeScreen.jsx';
 import NetworkScreen from './screens/NetworkScreen.jsx';
 
-import { getItem, removeItem, setItem } from './utils/asyncStorage.js';
+import { getItem } from './utils/asyncStorage.js';
 import { auth } from './utils/firebaseConfig';
+import FeedbackFormScreen from './screens/FeedbackFormScreen.jsx';
 
 const MainStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
@@ -103,6 +104,7 @@ const AppStack = () => (
     <MainStack.Screen name="MerchandiseTopTabs" component={MerchandiseTopTabs} options={{ headerShown: false }} />
     <MainStack.Screen name="EventDetails" component={EventDetailsScreen} options={{ headerShown: false }} />
     <MainStack.Screen name="RegisteredEventsTopTabs" component={RegisteredEventTopTabs} options={{ headerShown: false }} />
+    <MainStack.Screen name="FeedbackForm" component={FeedbackFormScreen} options={{ headerShown: false }} />
     <MainStack.Screen name="BadgeDetails" component={BadgeScreen} options={{ headerShown: false }} />
     <MainStack.Screen name="NetworkList" component={NetworkScreen} options={{ headerShown: false }} />
   </MainStack.Navigator>
@@ -277,81 +279,81 @@ const ProfileStackScreen = () => (
 
 const AppTabs = () => (
   <View style={styles.bottomBarBackground}>
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      headerShown: false,
-      tabBarIcon: ({ focused, color, size }) => {
-        let iconName;
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
 
-        switch (route.name) {
-          case 'Home':
-            iconName = focused ? 'home' : 'home-outline';
-            break;
-          case 'Events':
-            iconName = focused ? 'search' : 'search-outline';
-            break;
-          case 'Agenda':
-            iconName = focused ? 'calendar' : 'calendar-outline';
-            break;
-          case 'Leaderboard':
-            iconName = focused ? 'trophy' : 'trophy-outline';
-            break;
-          case 'Profile':
-            iconName = focused ? 'person' : 'person-outline';
-            break;
-        }
+          switch (route.name) {
+            case 'Home':
+              iconName = focused ? 'home' : 'home-outline';
+              break;
+            case 'Events':
+              iconName = focused ? 'search' : 'search-outline';
+              break;
+            case 'Agenda':
+              iconName = focused ? 'calendar' : 'calendar-outline';
+              break;
+            case 'Leaderboard':
+              iconName = focused ? 'trophy' : 'trophy-outline';
+              break;
+            case 'Profile':
+              iconName = focused ? 'person' : 'person-outline';
+              break;
+          }
 
-        return (
-          <View style={styles.iconContainer}>
-            <Ionicons name={iconName} size={size} color={color} />
-            {focused && <View style={styles.indicator} />}
-          </View>
-        );
-      },
-      tabBarActiveTintColor: '#3B6FC9',
-      tabBarInactiveTintColor: '#A9BFE0',
-      tabBarShowLabel: true,
-      tabBarStyle: styles.bottomBar,
-      tabBarItemStyle: styles.tabBarItem,
-      tabBarLabelStyle: styles.tabBarLabel,
-    })}
-  >
-    <Tab.Screen
-      name="Home"
-      component={HomeStackScreen}
-      options={{
-        tabBarLabel: 'Home'
-      }}
-    />
-    <Tab.Screen
-      name="Events"
-      component={EventsStackScreen}
-      options={{
-        tabBarLabel: 'Events'
-      }}
-    />
-    <Tab.Screen
-      name="Agenda"
-      component={CalendarStackScreen}
-      options={{
-        tabBarLabel: 'Agenda'
-      }}
-    />
-    <Tab.Screen
-      name="Leaderboard"
-      component={LeaderboardScreen}
-      options={{
-        tabBarLabel: 'Leaderboard'
-      }}
-    />
-    <Tab.Screen
-      name="Profile"
-      component={ProfileStackScreen}
-      options={{
-        tabBarLabel: 'Profile'
-      }}
-    />
-  </Tab.Navigator>
+          return (
+            <View style={styles.iconContainer}>
+              <Ionicons name={iconName} size={size} color={color} />
+              {focused && <View style={styles.indicator} />}
+            </View>
+          );
+        },
+        tabBarActiveTintColor: '#3B6FC9',
+        tabBarInactiveTintColor: '#A9BFE0',
+        tabBarShowLabel: true,
+        tabBarStyle: styles.bottomBar,
+        tabBarItemStyle: styles.tabBarItem,
+        tabBarLabelStyle: styles.tabBarLabel,
+      })}
+    >
+      <Tab.Screen
+        name="Home"
+        component={HomeStackScreen}
+        options={{
+          tabBarLabel: 'Home'
+        }}
+      />
+      <Tab.Screen
+        name="Events"
+        component={EventsStackScreen}
+        options={{
+          tabBarLabel: 'Events'
+        }}
+      />
+      <Tab.Screen
+        name="Agenda"
+        component={CalendarStackScreen}
+        options={{
+          tabBarLabel: 'Agenda'
+        }}
+      />
+      <Tab.Screen
+        name="Leaderboard"
+        component={LeaderboardScreen}
+        options={{
+          tabBarLabel: 'Leaderboard'
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileStackScreen}
+        options={{
+          tabBarLabel: 'Profile'
+        }}
+      />
+    </Tab.Navigator>
   </View>
 );
 

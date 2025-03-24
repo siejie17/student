@@ -1,13 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { collection, setDoc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc, where, getDoc, doc } from 'firebase/firestore';
 import { db } from '../../utils/firebaseConfig';
 import { getItem } from '../../utils/asyncStorage';
 
-const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatus }) => {
-    // Placeholder for current attendees
-    const [currentEarlyBirdAttendees, setCurrentEarlyBirdAttendees] = useState(0);
+const FeedbackQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatus, registrationID, navigation }) => {
     const [animatingDiamonds, setAnimatingDiamonds] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -28,42 +25,6 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
     }))).current;
 
     if (!selectedQuest) return null;
-
-    useEffect(() => {
-        const fetchCurrentEarlyBirdiesNum = async () => {
-            try {
-                setIsLoading(true);
-
-                const studentID = await getItem("studentID");
-
-                const currentEarlyBirdiesRef = collection(db, "registration");
-                const currentEarlyBirdiesQuery = query(currentEarlyBirdiesRef, where("eventID", "==", eventID), where("isAttended", "==", true), orderBy("attendanceScannedTime", "asc"), limit(selectedQuest.maxEarlyBird));
-
-                const unsubscribeEarlyBirdies = onSnapshot(currentEarlyBirdiesQuery, (earlyBirdiesSnap) => {
-                    setCurrentEarlyBirdAttendees(earlyBirdiesSnap.size);
-                    const earlyBirdiesData = earlyBirdiesSnap.docs.map(doc => doc.data());
-                    const currentStudentExists = earlyBirdiesData.some(item => item.studentID === studentID);
-                    if (currentStudentExists && selectedQuest.progress !== selectedQuest.completionNum) {
-                        console.log("Here");
-                    }
-                });
-
-                setIsLoading(false);
-
-                return unsubscribeEarlyBirdies;
-            } catch (error) {
-                console.error("Error when fetching current early birdies number", error)
-            }
-        };
-
-        fetchCurrentEarlyBirdiesNum();
-    }, []);
-
-    // Calculate percentage for visual indicator
-    const attendancePercentage = Math.min(
-        (currentEarlyBirdAttendees / selectedQuest.maxEarlyBird) * 100,
-        100
-    );
 
     const claimRewards = () => {
         setAnimatingDiamonds(true);
@@ -248,26 +209,6 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
             {/* Quest Description */}
             <Text style={styles.description}>{selectedQuest.description}</Text>
 
-            {/* Attendance Counter - Centralized */}
-            <View style={styles.attendanceContainer}>
-                <View style={styles.attendanceCard}>
-                    <View style={styles.progressBarContainer}>
-                        <View
-                            style={[
-                                styles.progressBar,
-                                { width: `${attendancePercentage}%` }
-                            ]}
-                        />
-                    </View>
-                    <Text style={styles.attendanceText}>
-                        <Text style={styles.currentNumber}>{currentEarlyBirdAttendees}</Text>
-                        <Text style={styles.slashText}> / </Text>
-                        <Text style={styles.maxNumber}>{selectedQuest.maxEarlyBird}</Text>
-                    </Text>
-                    <Text style={styles.attendanceLabel}>Early Birdies Attended</Text>
-                </View>
-            </View>
-
             {/* Rewards Section */}
             <View style={styles.rewardsSection}>
                 <Text style={styles.rewardsTitle}>Rewards</Text>
@@ -293,6 +234,12 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
                     </View>
                 </View>
             </View>
+
+            {selectedQuest.progress !== selectedQuest.completionNum && !selectedQuest.isCompleted && (
+                <TouchableOpacity style={[styles.feedbackFormButton, { marginBottom: 5 }]} onPress={() => navigation.navigate("FeedbackForm", { eventID: eventID, questProgressID: selectedQuest.id, registrationID: registrationID })}>
+                    <Text style={styles.feedbackFormButtonText}>Fill in Feedback Form</Text>
+                </TouchableOpacity>
+            )}
 
             {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
                 <TouchableOpacity style={[styles.rewardsButton, { marginBottom: 5 }]} onPress={claimRewards}>
@@ -492,6 +439,22 @@ const styles = StyleSheet.create({
         backgroundColor: '#E9ECEF',
         marginHorizontal: 10,
     },
+    feedbackFormButton: {
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: '#50A653',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 1,
+    },
+    feedbackFormButtonText: {
+        textAlign: 'center',
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFF',
+    },
     rewardsButton: {
         paddingVertical: 14,
         borderRadius: 12,
@@ -559,4 +522,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default EarlyBirdQuestSheet;
+export default FeedbackQuestSheet;

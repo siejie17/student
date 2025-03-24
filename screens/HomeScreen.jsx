@@ -20,7 +20,7 @@ import MerchLeaderboardCards from '../components/MerchLeaderboardCards'
 import SearchBar from '../components/SearchBar'
 import MemoizedFlatList from '../components/MemoizedFlatList'
 import { getItem, setItem } from '../utils/asyncStorage'
-import { collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore'
+import { collection, deleteDoc, getDocs, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore'
 import { db } from '../utils/firebaseConfig'
 
 const HomeScreen = () => {

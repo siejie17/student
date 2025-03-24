@@ -162,7 +162,7 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
                         </View>
                         <Text style={styles.cardTitle}>Shop</Text>
                     </View>
-                    
+
                     <View style={styles.cardBody}>
                         <Text style={styles.diamondAmount}>
                             <Text style={styles.diamondNumber}>{diamondsLoading ? <ActivityIndicator size={24} color="#6c63ff" /> : `${diamonds} Diamonds`}</Text>
@@ -197,27 +197,16 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
                         </View>
                         <Text style={styles.cardTitle}>Rank</Text>
                     </View>
-                    
+
                     <View style={styles.cardBody}>
                         {rank === 0 ? (
                             <Text style={styles.rankStart}>Battle On!</Text>
                         ) : (
-                            <>
-                                <View style={styles.rankBadgeContainer}>
-                                    <LinearGradient
-                                        colors={getPlacementColor()}
-                                        style={styles.rankBadge}
-                                    >
-                                        <Text style={styles.rankNumber}>{rank}</Text>
-                                    </LinearGradient>
-                                    <Text style={styles.rankText}>
-                                        {formatLeaderboardPlace(rank)}
-                                    </Text>
-                                </View>
-                                <Text style={styles.subtitle}>
-                                    Top {percentile}% of {totalUsers} users
+                            <View style={styles.rankBadgeContainer}>
+                                <Text style={styles.rankText}>
+                                    {formatLeaderboardPlace(rank)} Place
                                 </Text>
-                            </>
+                            </View>
                         )}
                     </View>
 

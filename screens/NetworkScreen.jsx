@@ -132,16 +132,12 @@ const NetworkScreen = () => {
 
     if (isLoading) {
         return (
-            <ImageBackground
-                source={require('../assets/background_dot.png')}
-                imageStyle={{ resizeMode: 'repeat' }}
-                style={styles.background}
-            >
+            <View style={styles.container}>
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#415881" />
                     <Text style={styles.loadingText}>Loading networks...</Text>
                 </View>
-            </ImageBackground>
+            </View>
         );
     }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ImageBackground, StatusBar, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { Agenda } from 'react-native-calendars';
-import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { getItem } from '../utils/asyncStorage.js';
 import { collection, doc, getDoc, query, where, onSnapshot } from 'firebase/firestore';
@@ -251,8 +251,6 @@ const AgendaScreen = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
-      
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>

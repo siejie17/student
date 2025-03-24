@@ -1,15 +1,55 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { db } from '../utils/firebaseConfig';
+import { getItem } from '../utils/asyncStorage';
 
 const EventQuestCard = ({ 
   questNumber,
   title,
   isCompleted,
-  diamondReward,
-  pointsReward,
+  rewardsClaimed,
+  diamondsRewards,
+  questType,
+  maxEarlyBird,
+  eventID,
+  pointsRewards,
   onPress
 }) => {
+  const [isFailed, setIsFailed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchEarlyBirdStatus = async () => {
+      try{
+        setIsLoading(true);
+        const studentID = await getItem("studentID");
+
+        const currentEarlyBirdiesRef = collection(db, "registration");
+        const currentEarlyBirdiesQuery = query(currentEarlyBirdiesRef, where("eventID", "==", eventID), where("isAttended", "==", true), orderBy("attendanceScannedTime", "asc"), limit(maxEarlyBird));
+
+        const unsubscribeEarlyBirdies = onSnapshot(currentEarlyBirdiesQuery, (earlyBirdiesSnap) => {
+          const earlyBirdiesData = earlyBirdiesSnap.docs.map(doc => doc.data());
+          const currentStudentExists = earlyBirdiesData.some(item => item.studentID === studentID);
+          if (currentStudentExists && earlyBirdiesSnap.size >= maxEarlyBird) {
+            setIsFailed(true);
+          }
+        });
+
+        setIsLoading(false);
+
+        return unsubscribeEarlyBirdies;
+      } catch (error) {
+        console.error("Error when updating failed status", error)
+      }
+    }
+
+    if (questType === "earlyBird") {
+      fetchEarlyBirdStatus();
+    }
+  }, []);
+  
   return (
     <TouchableOpacity 
       style={styles.container}
@@ -26,9 +66,10 @@ const EventQuestCard = ({
         <View 
           style={[
             styles.statusDot,
-            { backgroundColor: isCompleted ? '#4CAF50' : '#FF6B6B' }
+            { backgroundColor: !isLoading && (questType === "earlyBird" ? (isFailed ? '#FF6B6B' : (isCompleted ? '#4CAF50' : '#5E96CE')) : (isCompleted ? '#4CAF50' : '#5E96CE')) }
           ]} 
         />
+        {/* {console.log(isFailed, ";")} */}
       </View>
       
       {/* Content Area */}
@@ -60,27 +101,19 @@ const EventQuestCard = ({
               />
             </View>
             <Text style={styles.progressText}>
-              {isCompleted ? 'Complete' : 'In progress'}
+              {!isLoading && (questType === "earlyBird" ? (isFailed ? 'Failed' : (isCompleted ? (isCompleted && rewardsClaimed) ? 'Rewards Claimed' : 'Complete' : 'In progress')) : (isCompleted ? (isCompleted && rewardsClaimed) ? 'Rewards Claimed' : 'Complete' : 'In progress'))}
             </Text>
           </View>
 
           {/* Rewards */}
           <View style={styles.rewards}>
             <View style={styles.rewardItem}>
-              <MaterialCommunityIcons 
-                name="diamond-stone" 
-                size={16} 
-                color="#1E90FF" 
-              />
-              <Text style={styles.rewardValue}>{diamondReward}</Text>
+              <Image source={require("../assets/icons/diamond.png")} style={styles.iconImage} />                
+              <Text style={styles.rewardValue}>{diamondsRewards}</Text>
             </View>
             <View style={styles.rewardItem}>
-              <MaterialCommunityIcons 
-                name="star" 
-                size={16} 
-                color="#FFD700" 
-              />
-              <Text style={styles.rewardValue}>{pointsReward}</Text>
+              <Image source={require("../assets/icons/point.png")} style={styles.iconImage} />
+              <Text style={styles.rewardValue}>{pointsRewards}</Text>
             </View>
           </View>
         </View>
@@ -202,6 +235,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  iconImage: {
+    height: 16,
+    width: 16,
   },
   rewardValue: {
     fontSize: 14,

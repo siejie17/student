@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ImageBackground, ScrollView, Image, Dimensions, Platform, Alert } from 'react-native'
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Image, Dimensions, Platform, Alert } from 'react-native'
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Entypo, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';

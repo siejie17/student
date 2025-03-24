@@ -1,7 +1,6 @@
-import { View, Text, StyleSheet, Image, ImageBackground, KeyboardAvoidingView, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal } from 'react-native'
+import { View, Text, StyleSheet, Image, KeyboardAvoidingView, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal } from 'react-native'
 import React, { useState, memo } from 'react';
 import { useNavigation } from '@react-navigation/native';
-import LottieView from 'lottie-react-native';
 import Header from '../components/Authentication/Header';
 import Button from '../components/Authentication/Button';
 import TextInput from '../components/Authentication/TextInput';
