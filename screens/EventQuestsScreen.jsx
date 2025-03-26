@@ -1,17 +1,19 @@
-import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native'
+import { View, StyleSheet, ActivityIndicator, FlatList } from 'react-native'
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { getItem } from '../utils/asyncStorage';
-import { collection, query, where, getDocs, onSnapshot, getDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig';
 import EventQuestCard from '../components/EventQuestCard';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import EarlyBirdQuestSheet from '../components/Quests/EarlyBirdQuestSheet';
-import { useNavigation } from '@react-navigation/native';
 import FeedbackQuestSheet from '../components/Quests/FeedbackQuestSheet';
+import QuestionAnswerQuestSheet from '../components/Quests/QuestionAnswerQuestSheet';
+import NetworkingQuestSheet from '../components/Quests/NetworkingQuestSheet';
+import AttendanceQuestSheet from '../components/Quests/AttendanceQuestSheet';
 
 const EventQuestsScreen = ({ route, navigation }) => {
-  const { eventID, registrationID } = route.params || {};
+  const { eventID, categoryID, latitude, longitude, registrationID } = route.params || {};
 
   const [selectedQuest, setSelectedQuest] = useState(null);
   const [userQuestsList, setUserQuestsList] = useState([]);
@@ -20,7 +22,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isQuestSheetVisible, setIsQuestSheetVisible] = useState(false);
 
-  const snapPoints = useMemo(() => ['50%', '75%'], []);
+  const snapPoints = useMemo(() => ['50%', '75%', '110%'], []);
 
   const bottomSheetRef = useRef(null);
 
@@ -222,7 +224,10 @@ const EventQuestsScreen = ({ route, navigation }) => {
         enableHandlePanningGesture
         enableOverDrag={false}
       >
-        <BottomSheetView style={{ padding: 8 }}>
+        <BottomSheetScrollView
+          style={{ flexGrow: 1, padding: 8 }}
+          showsVerticalScrollIndicator={false}
+        >
           {selectedQuest && (
             <>
               {selectedQuest.questType === "earlyBird" &&
@@ -243,9 +248,42 @@ const EventQuestsScreen = ({ route, navigation }) => {
                   registrationID={registrationID}
                 />
               }
+              {selectedQuest.questType === "q&a" &&
+                <QuestionAnswerQuestSheet
+                  selectedQuest={selectedQuest}
+                  onCancel={handleClosePress}
+                  eventID={eventID}
+                  updateQuestStatus={updateQuestStatus}
+                  navigation={navigation}
+                  registrationID={registrationID}
+                />
+              }
+              {selectedQuest.questType === "networking" &&
+                <NetworkingQuestSheet
+                  selectedQuest={selectedQuest}
+                  onCancel={handleClosePress}
+                  eventID={eventID}
+                  updateQuestStatus={updateQuestStatus}
+                  navigation={navigation}
+                  registrationID={registrationID}
+                />
+              }
+              {selectedQuest.questType === "attendance" &&
+                <AttendanceQuestSheet
+                  selectedQuest={selectedQuest}
+                  onCancel={handleClosePress}
+                  eventID={eventID}
+                  categoryID={categoryID}
+                  updateQuestStatus={updateQuestStatus}
+                  navigation={navigation}
+                  registrationID={registrationID}
+                  latitude={latitude}
+                  longitude={longitude}
+                />
+              }
             </>
           )}
-        </BottomSheetView>
+        </BottomSheetScrollView>
       </BottomSheet>
     </GestureHandlerRootView>
   )
@@ -259,6 +297,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   bottomSheetStyles: {
+    flex: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.5,

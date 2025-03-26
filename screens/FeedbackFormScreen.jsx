@@ -10,16 +10,19 @@ import {
     Alert
 } from 'react-native';
 import { getItem } from '../utils/asyncStorage';
-import { addDoc, collection, doc, getDocs, increment, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, increment, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig';
 
 const FeedbackFormScreen = ({ route, navigation }) => {
-    const { eventID, questProgressID, registrationID } = route.params;
+    const { eventID, questProgressID, registrationID, questName, questType } = route.params;
 
     const [q1Rating, setQ1Rating] = useState(0);
     const [q2Rating, setQ2Rating] = useState(0);
     const [additionalFeedback, setAdditionalFeedback] = useState('');
     const [isFormValid, setIsFormValid] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
+
+    const [completedModalVisible, setCompletedModalVisible] = useState(false);
 
     // Validate form whenever inputs change
     useEffect(() => {
@@ -30,8 +33,12 @@ const FeedbackFormScreen = ({ route, navigation }) => {
     const handleSubmit = async () => {
         if (isFormValid) {
             try {
+                setSubmitted(true);
                 const studentID = await getItem("studentID");
                 if (!studentID && !eventID) return;
+
+                let feedbackBadge;
+                let badgeProgressID;
 
                 const questProgressListQuery = query(
                     collection(db, "questProgress"),
@@ -50,6 +57,8 @@ const FeedbackFormScreen = ({ route, navigation }) => {
                         isCompleted: true,
                         progress: increment(1),
                     })
+
+                    setCompletedModalVisible(true);
                 })
 
                 const feedbackRef = await addDoc(collection(db, "feedback"), {
@@ -59,6 +68,55 @@ const FeedbackFormScreen = ({ route, navigation }) => {
                     gamificationFeedback: q2Rating.toString(),
                     overallImprovement: additionalFeedback,
                 });
+
+                const feedbackBadgeQuery = query(collection(db, "badge"), where("badgeType", "==", questType));
+                const feedbackBadgeSnap = await getDocs(feedbackBadgeQuery);
+
+                feedbackBadgeSnap.forEach((badge) => {
+                    feedbackBadge = { 
+                        id: badge.id,
+                        ...badge.data(),
+                    }
+                });
+
+                const badgeProgressQuery = query(
+                    collection(db, "badgeProgress"),
+                    where("studentID", "==", studentID)
+                );
+
+                const badgeProgressSnap = await getDocs(badgeProgressQuery);
+
+                badgeProgressSnap.forEach(async (badgeProgress) => {
+                    badgeProgressID = badgeProgress.id;
+
+                    const userFeedbackBadgeRef = doc(db, "badgeProgress", badgeProgressID, "userBadgeProgress", feedbackBadge.id);
+                    const userFeedbackBadgeSnap = await getDoc(userFeedbackBadgeRef);
+
+                    if (userFeedbackBadgeSnap.exists()) {
+                        let userFeedbackBadgeProgress = userFeedbackBadgeSnap.data();
+
+                        if (!userFeedbackBadgeProgress.isUnlocked) {
+                            let userProgress = userFeedbackBadgeProgress.progress;
+
+                            userProgress++;
+
+                            if (userProgress === feedbackBadge.unlockProgress) {
+                                await updateDoc(userFeedbackBadgeRef, {
+                                    isUnlocked: true,
+                                    progress: increment(1),
+                                    dateUpdated: serverTimestamp()
+                                });
+                            } else {
+                                await updateDoc(userFeedbackBadgeRef, {
+                                    progress: increment(1),
+                                    dateUpdated: serverTimestamp()
+                                });
+                            }
+                        }
+                    } else {
+                        console.error("No user feedback badge progress has been found");
+                    }
+                })
 
                 Alert.alert("Success", "Your feedback has been submitted. Thank you!");
                 // Reset form after submission
@@ -168,9 +226,9 @@ const FeedbackFormScreen = ({ route, navigation }) => {
 
             <View style={styles.buttonRow}>
                 <TouchableOpacity
-                    style={[styles.submitButton, !isFormValid && styles.disabledButton]}
+                    style={[styles.submitButton, !isFormValid && styles.disabledButton, submitted && styles.disabledButton]}
                     onPress={handleSubmit}
-                    disabled={!isFormValid}
+                    disabled={!isFormValid && submitted}
                 >
                     <Text style={styles.submitButtonText}>Submit</Text>
                 </TouchableOpacity>
@@ -180,6 +238,15 @@ const FeedbackFormScreen = ({ route, navigation }) => {
                     <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
             </View>
+
+            {completedModalVisible && (
+                <QuestCompletedModal 
+                    isVisible={completedModalVisible}
+                    onClose={() => setCompletedModalVisible(false)}
+                    questName={questName}
+                    autoDismissTime={2000} // Optional: custom auto-dismiss time
+                />
+            )}
         </View>
     );
 };

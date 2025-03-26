@@ -1,13 +1,25 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, Image, TextInput } from 'react-native';
 import { collection, setDoc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc, where, getDoc, doc } from 'firebase/firestore';
 import { db } from '../../utils/firebaseConfig';
 import { getItem } from '../../utils/asyncStorage';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import QuestCompletedModal from '../Modal/QuestCompleteModal';
 
-const FeedbackQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatus, registrationID, navigation }) => {
+const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatus, registrationID, navigation }) => {
     const [animatingDiamonds, setAnimatingDiamonds] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [answer, setAnswer] = useState('');
+    const [wrongMessage, setWrongMessage] = useState('');
+    const [isAllowSubmit, setIsAllowSubmit] = useState(false);
     const [claimed, setClaimed] = useState(false);
+
+    const [completedModalVisible, setCompletedModalVisible] = useState(false);
+
+    useEffect(() => {
+        const allowSubmit = answer.trim() !== '';
+        setIsAllowSubmit(allowSubmit);
+    }, [answer]);
 
     const diamondAnims = useRef([...Array(30)].map(() => ({
         translateX: new Animated.Value(0),
@@ -26,6 +38,102 @@ const FeedbackQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatu
     }))).current;
 
     if (!selectedQuest) return null;
+
+    const handleSubmitAnswer = async () => {
+        const wrongMessageVariations = [
+            "Oops! That answer was about as accurate as a blindfolded archer 🎯",
+            "Swing and a miss! That answer couldn't hit the broad side of a barn 🚜",
+            "Nice try, but that's further from correct than Earth is from Pluto 🌍🚀",
+            "Bzzzzt! Wrong answer. The truth ran away faster than you can say 'Oops!' 🏃‍♂️",
+            "Houston, we have a problem... and that problem is your answer 🚀",
+            "Well, that was... something. Let's try again, shall we? 🤔",
+            "Error 404: Correct Answer Not Found 💻"
+        ];
+
+        if (answer.trim().toLowerCase() === (selectedQuest.correctAnswer).toLowerCase()) {
+            try {
+                const studentID = await getItem("studentID");
+                if (!studentID) return;
+
+                let qaBadge;
+                let badgeProgressID;
+
+                const questProgressQuery = query(collection(db, "questProgress"), where("eventID", "==", eventID), where("studentID", "==", studentID));
+                const questProgressSnap = await getDocs(questProgressQuery);
+
+                questProgressSnap.forEach(async (questProgress) => {
+                    const questProgressID = questProgress.id;
+
+                    const userQuestProgressRef = doc(db, "questProgress", questProgressID, "questProgressList", selectedQuest.id);
+
+                    await updateDoc(userQuestProgressRef, {
+                        isCompleted: true,
+                        progress: increment(1),
+                    })
+
+                    setCompletedModalVisible(true);
+                })
+
+                const qaBadgeQuery = query(collection(db, "badge"), where("badgeType", "==", selectedQuest.questType));
+                const qaBadgeSnap = await getDocs(qaBadgeQuery);
+
+                qaBadgeSnap.forEach((badge) => {
+                    qaBadge = {
+                        id: badge.id,
+                        ...badge.data(),
+                    }
+                });
+
+                const badgeProgressQuery = query(
+                    collection(db, "badgeProgress"),
+                    where("studentID", "==", studentID)
+                );
+
+                const badgeProgressSnap = await getDocs(badgeProgressQuery);
+
+                badgeProgressSnap.forEach(async (badgeProgress) => {
+                    badgeProgressID = badgeProgress.id;
+
+                    const userQABadgeRef = doc(db, "badgeProgress", badgeProgressID, "userBadgeProgress", qaBadge.id);
+                    const userQABadgeSnap = await getDoc(userQABadgeRef);
+
+                    if (userQABadgeSnap.exists()) {
+                        let userQABadgeProgress = userQABadgeSnap.data();
+
+                        if (!userQABadgeProgress.isUnlocked) {
+                            let userProgress = userQABadgeProgress.progress;
+
+                            userProgress++;
+
+                            if (userProgress === qaBadge.unlockProgress) {
+                                await updateDoc(userQABadgeRef, {
+                                    isUnlocked: true,
+                                    progress: increment(1),
+                                    dateUpdated: serverTimestamp()
+                                });
+                            } else {
+                                await updateDoc(userQABadgeRef, {
+                                    progress: increment(1),
+                                    dateUpdated: serverTimestamp()
+                                });
+                            }
+                        }
+                    } else {
+                        console.error("No user Q&A badge progress has been found");
+                    }
+                })
+                
+                setAnswer('');
+            } catch (error) {
+                console.log("Error when updating user's question and answer quest progress:", error);
+            }
+        } else {
+            const randomFunnyMessage = wrongMessageVariations[
+                Math.floor(Math.random() * wrongMessageVariations.length)
+            ];
+            setWrongMessage(randomFunnyMessage);
+        }
+    }
 
     const claimRewards = () => {
         setClaimed(true);
@@ -172,7 +280,7 @@ const FeedbackQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatu
                     // 🔹 Entry exists, update the points
                     const existingEntryDoc = leaderboardEntrySnapshot.docs[0]; // Get the first match
                     const existingEntryRef = doc(db, "leaderboard", leaderboardID, "leaderboardEntries", existingEntryDoc.id);
-                
+
                     const existingEntrySnap = await getDoc(existingEntryRef);
 
                     console.log(existingEntrySnap.data());
@@ -211,9 +319,65 @@ const FeedbackQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatu
             {/* Quest Description */}
             <Text style={styles.description}>{selectedQuest.description}</Text>
 
+            <Text style={styles.cardTitle}>Question</Text>
+            <View style={styles.questionContainer}>
+                <View style={styles.questionCard}>
+                    <Text style={styles.questionText}>{selectedQuest.question}</Text>
+                </View>
+            </View>
+
+            {selectedQuest.progress !== selectedQuest.completionNum && !selectedQuest.isCompleted && (
+                <View style={styles.answerContainer}>
+                    <View style={styles.inputWrapper}>
+                        <TextInput
+                            style={[
+                                styles.answerArea,
+                                answer && styles.activeInput,
+                            ]}
+                            placeholder="Enter your answer here..."
+                            placeholderTextColor="#A0A0A0"
+                            value={answer}
+                            onChangeText={setAnswer}
+                            textAlignVertical="center"
+                        />
+                        {answer && (
+                            <TouchableOpacity
+                                style={styles.clearButton}
+                                onPress={() => {
+                                    setAnswer('')
+                                    setWrongMessage('');
+                                }}
+                            >
+                                <MaterialIcons name='clear' size={20} color="#A0A0A0" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
+                    {wrongMessage && (
+                        <View style={styles.wrongMessageContainer}>
+                            <View style={styles.alertIconContainer}>
+                                <MaterialCommunityIcons name='alert' size={15} color="#EF4444" />
+                            </View>
+                            <Text style={styles.wrongMessageText}>
+                                {wrongMessage}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+            )}
+
+            {selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
+                <View style={styles.answerContainer}>
+                    <Text style={styles.answerLabel}>Answer:</Text>
+                    <Text style={styles.answerText}>
+                        {selectedQuest.correctAnswer}
+                    </Text>
+                </View>
+            )}
+
             {/* Rewards Section */}
             <View style={styles.rewardsSection}>
-                <Text style={styles.rewardsTitle}>Rewards</Text>
+                <Text style={styles.cardTitle}>Rewards</Text>
                 <View style={styles.rewardsContainer}>
                     <View style={styles.rewardItem}>
                         <View style={styles.iconContainer}>
@@ -238,14 +402,12 @@ const FeedbackQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatu
             </View>
 
             {selectedQuest.progress !== selectedQuest.completionNum && !selectedQuest.isCompleted && (
-                <TouchableOpacity style={[styles.feedbackFormButton, { marginBottom: 5 }]} onPress={() => navigation.navigate("FeedbackForm", { 
-                    eventID: eventID, 
-                    questProgressID: selectedQuest.id, 
-                    registrationID: registrationID, 
-                    questName: selectedQuest.questName,
-                    questType: selectedQuest.questType 
-                })}>
-                    <Text style={styles.feedbackFormButtonText}>Fill in Feedback Form</Text>
+                <TouchableOpacity
+                    style={[styles.submitButton, { marginBottom: 5 }, !isAllowSubmit && styles.disabledSubmit]}
+                    disabled={!isAllowSubmit}
+                    onPress={handleSubmitAnswer}
+                >
+                    <Text style={styles.submitButtonText}>Submit Answer</Text>
                 </TouchableOpacity>
             )}
 
@@ -315,6 +477,13 @@ const FeedbackQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatu
             <TouchableOpacity style={[styles.cancelButton, { marginTop: 5 }]} onPress={onCancel}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
+
+            <QuestCompletedModal
+                isVisible={completedModalVisible}
+                onClose={() => setCompletedModalVisible(false)}
+                questName={selectedQuest.questName}
+                autoDismissTime={2000}
+            />
         </View>
     );
 };
@@ -340,61 +509,47 @@ const styles = StyleSheet.create({
         marginBottom: 24,
         lineHeight: 22,
     },
-    attendanceContainer: {
+    answerArea: {
+        flex: 1,
+        backgroundColor: '#F7F7F7',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: '#333',
+        marginRight: 8,
+    },
+    questionContainer: {
         alignItems: 'center',
-        marginBottom: 24,
+        marginBottom: 18,
         width: '100%',
     },
-    attendanceCard: {
+    questionCard: {
         backgroundColor: '#ffffff',
         borderRadius: 16,
         padding: 16,
         width: '100%',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        elevation: 5,
+        backgroundColor: '#FFFFFF',
     },
-    progressBarContainer: {
-        height: 8,
-        backgroundColor: '#E9ECEF',
-        borderRadius: 4,
-        marginBottom: 12,
-        overflow: 'hidden',
-    },
-    progressBar: {
-        height: '100%',
-        backgroundColor: '#5E96CE',
-        borderRadius: 4,
-    },
-    attendanceText: {
-        fontSize: 18,
-        textAlign: 'center',
-        marginBottom: 4,
-    },
-    currentNumber: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#5E96CE',
-    },
-    slashText: {
-        color: '#888',
-    },
-    maxNumber: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#252A34',
-    },
-    attendanceLabel: {
-        fontSize: 14,
-        color: '#777',
-        textAlign: 'center',
+    questionText: {
+        fontSize: 15,
+        color: '#333333',
+        fontWeight: '500',
+        lineHeight: 22,
     },
     rewardsSection: {
         marginBottom: 24,
     },
-    rewardsTitle: {
+    cardTitle: {
         fontSize: 18,
         fontWeight: 'bold',
         marginBottom: 16,
@@ -451,21 +606,25 @@ const styles = StyleSheet.create({
         backgroundColor: '#E9ECEF',
         marginHorizontal: 10,
     },
-    feedbackFormButton: {
+    submitButton: {
         paddingVertical: 14,
         borderRadius: 12,
-        backgroundColor: '#50A653',
+        backgroundColor: '#5E96CE',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 5,
         elevation: 1,
     },
-    feedbackFormButtonText: {
+    submitButtonText: {
         textAlign: 'center',
         fontSize: 16,
         fontWeight: '600',
         color: '#FFF',
+    },
+    disabledSubmit: {
+        backgroundColor: '#B0BEC5',
+        opacity: 0.7,
     },
     rewardsButton: {
         paddingVertical: 14,
@@ -535,6 +694,73 @@ const styles = StyleSheet.create({
         width: 22,
         resizeMode: 'contain',
     },
+    answerContainer: {
+        marginBottom: 16,
+    },
+    answerLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6B7280', // Muted gray for label
+        marginBottom: 8,
+    },
+    answerText: {
+        fontSize: 16,
+        color: '#374151', // Dark gray for answer text
+        lineHeight: 24,
+    },
+    wrongMessageContainer: {
+        backgroundColor: '#FFF1F2', // Ultra-light pastel red
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: '#EF4444', // Accent red
+        marginBottom: 16,
+
+        // Minimal, subtle shadow
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    wrongMessageText: {
+        flex: 1,
+        fontSize: 14,
+        color: '#4A4A4A', // Soft charcoal for better readability
+        fontWeight: '500',
+    },
+    inputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        position: 'relative',
+        marginBottom: 12,
+    },
+    alertIconContainer: {
+        backgroundColor: '#FFE4E6',
+        borderRadius: 20,
+        width: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    clearButton: {
+        position: 'absolute',
+        right: 12,
+        padding: 8,
+    },
+    activeInput: {
+        borderColor: '#4A90E2',
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#4A90E2',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
 });
 
-export default FeedbackQuestSheet;
+export default QuestionAnswerQuestSheet;

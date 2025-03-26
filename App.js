@@ -188,6 +188,8 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
 const RegisteredEventTopTabs = ({ route }) => {
   const navigation = useNavigation();
 
+  console.log("Received Route Params:", route.params);
+
   const params = route.params || {};
 
   return (

@@ -68,6 +68,8 @@ const AgendaScreen = () => {
             eventID: reg.eventID,
             eventName: eventInfo.eventName,
             eventLocation: eventInfo.locationName || "No location specified",
+            latitude: eventInfo.locationLatitude,
+            longitude: eventInfo.locationLongitude,
             eventDate: startDateTime.toDateString(),
             startTime: startDateTime.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true }),
             endTime: startDateStr === endDateStr
@@ -157,11 +159,21 @@ const AgendaScreen = () => {
       <TouchableOpacity
         style={styles.eventCard}
         activeOpacity={0.7}
-        onPress={() => navigation.navigate("RegisteredEventsTopTabs", { 
-          registrationID: item.id,
-          eventName: item.eventName,
-          eventID: item.eventID
-        })}
+        onPress={() => {
+          if (item) {
+            navigation.navigate("RegisteredEventsTopTabs", { 
+              registrationID: item.id,
+              eventName: item.eventName,
+              eventID: item.eventID,
+              categoryID: item.category,
+              longitude: item.longitude,
+              latitude: item.latitude,
+            });
+          } else {
+            // Optional: Show an error message or handle missing data
+            console.warn("Missing event details for navigation");
+          }
+        }}
       >
         <View style={[styles.categoryIndicator, { backgroundColor: categoryColor }]} />
         <View style={styles.eventContent}>

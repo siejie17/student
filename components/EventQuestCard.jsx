@@ -30,11 +30,15 @@ const EventQuestCard = ({
         const currentEarlyBirdiesQuery = query(currentEarlyBirdiesRef, where("eventID", "==", eventID), where("isAttended", "==", true), orderBy("attendanceScannedTime", "asc"), limit(maxEarlyBird));
 
         const unsubscribeEarlyBirdies = onSnapshot(currentEarlyBirdiesQuery, (earlyBirdiesSnap) => {
+          setIsLoading(true);
+          setIsFailed(false);
           const earlyBirdiesData = earlyBirdiesSnap.docs.map(doc => doc.data());
           const currentStudentExists = earlyBirdiesData.some(item => item.studentID === studentID);
-          if (currentStudentExists && earlyBirdiesSnap.size >= maxEarlyBird) {
+          console.log(!currentStudentExists, earlyBirdiesSnap.size, maxEarlyBird)
+          if (!currentStudentExists && earlyBirdiesSnap.size >= maxEarlyBird) {
             setIsFailed(true);
           }
+          setIsLoading(false);
         });
 
         setIsLoading(false);

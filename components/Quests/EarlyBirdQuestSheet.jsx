@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, setDoc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc, where, getDoc, doc } from 'firebase/firestore';
+import { collection, setDoc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc, where, getDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../../utils/firebaseConfig';
 import { getItem } from '../../utils/asyncStorage';
 
@@ -10,6 +10,7 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
     const [currentEarlyBirdAttendees, setCurrentEarlyBirdAttendees] = useState(0);
     const [animatingDiamonds, setAnimatingDiamonds] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [claimed, setClaimed] = useState(false);
 
     const diamondAnims = useRef([...Array(30)].map(() => ({
         translateX: new Animated.Value(0),
@@ -39,12 +40,28 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
                 const currentEarlyBirdiesRef = collection(db, "registration");
                 const currentEarlyBirdiesQuery = query(currentEarlyBirdiesRef, where("eventID", "==", eventID), where("isAttended", "==", true), orderBy("attendanceScannedTime", "asc"), limit(selectedQuest.maxEarlyBird));
 
-                const unsubscribeEarlyBirdies = onSnapshot(currentEarlyBirdiesQuery, (earlyBirdiesSnap) => {
+                const unsubscribeEarlyBirdies = onSnapshot(currentEarlyBirdiesQuery, async (earlyBirdiesSnap) => {
                     setCurrentEarlyBirdAttendees(earlyBirdiesSnap.size);
                     const earlyBirdiesData = earlyBirdiesSnap.docs.map(doc => doc.data());
                     const currentStudentExists = earlyBirdiesData.some(item => item.studentID === studentID);
                     if (currentStudentExists && selectedQuest.progress !== selectedQuest.completionNum) {
-                        console.log("Here");
+                        const studentQuestsRef = collection(db, "questProgress");
+                        const studentQuestsQuery = query(studentQuestsRef, where("eventID", "==", eventID), where("studentID", "==", studentID));
+                        const studentQuestsSnapshot = await getDocs(studentQuestsQuery);
+
+                        const studentQuestsDocID = studentQuestsSnapshot.docs[0].id;
+
+                        const earlyBirdQuestRef = doc(db, "questProgress", studentQuestsDocID, "questProgressList", selectedQuest.id);
+                        const earlyBirdQuestSnap = await getDoc(earlyBirdQuestRef);
+
+                        if (earlyBirdQuestSnap.exists()) {
+                            if (!earlyBirdQuestSnap.data().isCompleted) {
+                                await updateDoc(earlyBirdQuestRef, {
+                                    isCompleted: true,
+                                    progress: increment(1),
+                                })
+                            }
+                        }
                     }
                 });
 
@@ -66,6 +83,7 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
     );
 
     const claimRewards = () => {
+        setClaimed(true);
         setAnimatingDiamonds(true);
 
         // Reset animations
@@ -173,6 +191,67 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
         }, 1500);
     }
 
+    const updateEarlyBirdBadge = async () => {
+        try {
+            const studentID = await getItem("studentID");
+            if (!studentID) return;
+
+            let feedbackBadge;
+            let badgeProgressID;
+
+            const feedbackBadgeQuery = query(collection(db, "badge"), where("badgeType", "==", selectedQuest.questType));
+            const feedbackBadgeSnap = await getDocs(feedbackBadgeQuery);
+
+            feedbackBadgeSnap.forEach((badge) => {
+                feedbackBadge = {
+                    id: badge.id,
+                    ...badge.data(),
+                }
+            });
+
+            const badgeProgressQuery = query(
+                collection(db, "badgeProgress"),
+                where("studentID", "==", studentID)
+            );
+
+            const badgeProgressSnap = await getDocs(badgeProgressQuery);
+
+            badgeProgressSnap.forEach(async (badgeProgress) => {
+                badgeProgressID = badgeProgress.id;
+
+                const userFeedbackBadgeRef = doc(db, "badgeProgress", badgeProgressID, "userBadgeProgress", feedbackBadge.id);
+                const userFeedbackBadgeSnap = await getDoc(userFeedbackBadgeRef);
+
+                if (userFeedbackBadgeSnap.exists()) {
+                    let userFeedbackBadgeProgress = userFeedbackBadgeSnap.data();
+
+                    if (!userFeedbackBadgeProgress.isUnlocked) {
+                        let userProgress = userFeedbackBadgeProgress.progress;
+
+                        userProgress++;
+
+                        if (userProgress === feedbackBadge.unlockProgress) {
+                            await updateDoc(userFeedbackBadgeRef, {
+                                isUnlocked: true,
+                                progress: increment(1),
+                                dateUpdated: serverTimestamp()
+                            });
+                        } else {
+                            await updateDoc(userFeedbackBadgeRef, {
+                                progress: increment(1),
+                                dateUpdated: serverTimestamp()
+                            });
+                        }
+                    }
+                } else {
+                    console.error("No user feedback badge progress has been found");
+                }
+            })
+        } catch (error) {
+            console.error("Error when updating user's early bird badge progress:", error);
+        }
+    }
+
     const updateDatabase = async () => {
         try {
             const studentID = await getItem("studentID");
@@ -209,7 +288,7 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
                     // 🔹 Entry exists, update the points
                     const existingEntryDoc = leaderboardEntrySnapshot.docs[0]; // Get the first match
                     const existingEntryRef = doc(db, "leaderboard", leaderboardID, "leaderboardEntries", existingEntryDoc.id);
-                
+
                     const existingEntrySnap = await getDoc(existingEntryRef);
 
                     console.log(existingEntrySnap.data());
@@ -222,6 +301,7 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
                 }
             });
 
+            updateEarlyBirdBadge();
             updateQuestStatus();
         } catch (error) {
             console.error("Error when adding points and diamonds to Firebase:", error)
@@ -295,7 +375,11 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
             </View>
 
             {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
-                <TouchableOpacity style={[styles.rewardsButton, { marginBottom: 5 }]} onPress={claimRewards}>
+                <TouchableOpacity 
+                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]} 
+                    disabled={claimed}
+                    onPress={claimRewards}
+                >
                     <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
                 </TouchableOpacity>
             )}
@@ -501,6 +585,9 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 5,
         elevation: 1,
+    },
+    claimedButton: {
+        backgroundColor: "#7e967f",
     },
     rewardsButtonText: {
         textAlign: 'center',

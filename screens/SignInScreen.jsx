@@ -74,8 +74,6 @@ const SignInScreen = () => {
             profilePicture: ProfilePicBase64
           });
 
-          console.log("Here 1");
-
           const badgeProgressCollectionRef = collection(db, "badgeProgress");
           const badgeProgressDocRef = await addDoc(badgeProgressCollectionRef, {
             studentID: user.uid

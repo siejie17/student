@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 // Badge image mapping
 const BADGE_MAPPING = {
   academic: require("../assets/badges/academic.png"),
-  attendance: require("../assets/badges/attendance.png"),
+  earlyBird: require("../assets/badges/earlyBird.png"),
   entertainment: require("../assets/badges/entertainment.png"),
   feedback: require("../assets/badges/feedback.png"),
   health_wellness: require("../assets/badges/health_wellness.png"),

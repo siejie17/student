@@ -804,7 +804,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 5, // Space for floating rank indicator
+    paddingBottom: 70, // Space for floating rank indicator
   },
   listHeader: {
     paddingVertical: 16,
