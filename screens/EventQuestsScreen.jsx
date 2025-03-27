@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { getItem } from '../utils/asyncStorage';
 import { collection, query, where, getDocs, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig';
-import EventQuestCard from '../components/EventQuestCard';
+import EventQuestCard from '../components/QuestCard/EventQuestCard';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import EarlyBirdQuestSheet from '../components/Quests/EarlyBirdQuestSheet';

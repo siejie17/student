@@ -1,11 +1,11 @@
 import { View, Text, StyleSheet, ScrollView, Image, Dimensions, ActivityIndicator, FlatList, RefreshControl, Animated, Modal, Pressable, StatusBar } from 'react-native'
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome5, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getItem, removeItem } from '../utils/asyncStorage';
 import { collection, doc, getDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig';
-import RankingRewardsModal from '../components/RankingRewardsModal';
+import RankingRewardsModal from '../components/Leaderboard/RankingRewardsModal';
 
 const { width } = Dimensions.get('window');
 
@@ -30,6 +30,7 @@ const LeaderboardScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentUserRank, setCurrentUserRank] = useState(null);
+  const [refreshDate, setRefreshDate] = useState(new Date());
   const [facultyName, setFacultyName] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   // const [rewardsModalVisible, setRewardsModalVisible] = useState(true);
@@ -76,8 +77,11 @@ const LeaderboardScreen = () => {
 
         const leaderboardDoc = leaderboardSnap.docs[0]; // Assuming one doc per faculty
         const leaderboardId = leaderboardDoc.id;
+
+        setRefreshDate(leaderboardDoc.data().refreshDateTime);
+
         const leaderboardEntriesRef = collection(db, "leaderboard", leaderboardId, "leaderboardEntries");
-        
+
         // Subscribe to leaderboard entries
         unsubscribeRef.current.entries = onSnapshot(leaderboardEntriesRef, async (leaderboardEntriesSnap) => {
           const entries = leaderboardEntriesSnap.docs
@@ -131,10 +135,10 @@ const LeaderboardScreen = () => {
                 getItem(`previousRanking_${currentStudentID}`),
                 getItem(`diamonds_${currentStudentID}`)
               ]);
-          
+
               setPreviousMonthRanking(previousRank || "N/A");
               setDiamondsRewards(diamondsRewards);
-          
+
               await removeItem(showRewardsModalKey);
               setRewardsModalVisible(true);
             }
@@ -180,7 +184,7 @@ const LeaderboardScreen = () => {
         useNativeDriver: true
       })
     ]).start();
-    
+
     await fetchRankings();
     setRefreshing(false);
   }, [fetchRankings, headerScaleAnim]);
@@ -207,7 +211,7 @@ const LeaderboardScreen = () => {
     const isCurrentUser = userRank === currentUserRank;
 
     return (
-      <Animated.View 
+      <Animated.View
         style={[
           styles.card,
           isCurrentUser && styles.highlightedCard
@@ -218,9 +222,9 @@ const LeaderboardScreen = () => {
         </View>
 
         <Image
-          source={item.profilePic 
-            ? { uri: `data:image/png;base64,${item.profilePic}` } 
-            : require('../assets/unknown-profile.png')}
+          source={item.profilePic
+            ? { uri: `data:image/png;base64,${item.profilePic}` }
+            : require('../assets/leaderboard/unknown-profile.png')}
           style={[styles.listAvatar, isCurrentUser && styles.highlightedAvatar]}
         />
 
@@ -246,7 +250,7 @@ const LeaderboardScreen = () => {
     const thirdPlace = top3[2] || null;
 
     return (
-      <Animated.View 
+      <Animated.View
         style={[
           styles.podiumSection,
           { transform: [{ scale: headerScaleAnim }] }
@@ -260,7 +264,7 @@ const LeaderboardScreen = () => {
               { opacity: pressed ? 0.7 : 1 }
             ]}
           >
-            <MaterialIcons name="info-outline" size={24} color="#3b82f6" />
+            <MaterialIcons name="info-outline" size={24} color="#46699e" />
           </Pressable>
         </View>
 
@@ -269,14 +273,14 @@ const LeaderboardScreen = () => {
           <View style={[styles.podiumPosition, styles.secondPosition]}>
             <View style={styles.avatarContainer}>
               <Image
-                source={secondPlace?.profilePic 
-                  ? { uri: `data:image/png;base64,${secondPlace.profilePic}` } 
-                  : require('../assets/unknown-profile.png')}
+                source={secondPlace?.profilePic
+                  ? { uri: `data:image/png;base64,${secondPlace.profilePic}` }
+                  : require('../assets/leaderboard/unknown-profile.png')}
                 style={[styles.podiumAvatar, styles.secondAvatar]}
               />
               <View style={styles.medalContainer}>
                 <Image
-                  source={require('../assets/second-place.png')}
+                  source={require('../assets/leaderboard/second-place.png')}
                   style={styles.image}
                 />
               </View>
@@ -294,14 +298,14 @@ const LeaderboardScreen = () => {
             </View>
             <View style={styles.avatarContainer}>
               <Image
-                source={firstPlace?.profilePic 
-                  ? { uri: `data:image/png;base64,${firstPlace.profilePic}` } 
-                  : require('../assets/unknown-profile.png')}
+                source={firstPlace?.profilePic
+                  ? { uri: `data:image/png;base64,${firstPlace.profilePic}` }
+                  : require('../assets/leaderboard/unknown-profile.png')}
                 style={[styles.podiumAvatar, styles.firstAvatar]}
               />
               <View style={[styles.medalContainer, styles.goldMedal]}>
                 <Image
-                  source={require('../assets/first-place.png')}
+                  source={require('../assets/leaderboard/first-place.png')}
                   style={styles.image}
                 />
               </View>
@@ -318,14 +322,14 @@ const LeaderboardScreen = () => {
           <View style={[styles.podiumPosition, styles.thirdPosition]}>
             <View style={styles.avatarContainer}>
               <Image
-                source={thirdPlace?.profilePic 
-                  ? { uri: `data:image/png;base64,${thirdPlace.profilePic}` } 
-                  : require('../assets/unknown-profile.png')}
+                source={thirdPlace?.profilePic
+                  ? { uri: `data:image/png;base64,${thirdPlace.profilePic}` }
+                  : require('../assets/leaderboard/unknown-profile.png')}
                 style={[styles.podiumAvatar, styles.thirdAvatar]}
               />
               <View style={[styles.medalContainer, styles.bronzeMedal]}>
                 <Image
-                  source={require('../assets/third-place.png')}
+                  source={require('../assets/leaderboard/third-place.png')}
                   style={styles.image}
                 />
               </View>
@@ -369,7 +373,7 @@ const LeaderboardScreen = () => {
       onRequestClose={handleCloseModal}
       animationType="none"
     >
-      <Animated.View 
+      <Animated.View
         style={[
           styles.modalOverlay,
           {
@@ -382,11 +386,11 @@ const LeaderboardScreen = () => {
             styles.modalContent,
             {
               transform: [
-                { 
+                {
                   translateY: modalAnimation.interpolate({
                     inputRange: [0, 1],
                     outputRange: [300, 0],
-                  }) 
+                  })
                 }
               ]
             }
@@ -410,14 +414,14 @@ const LeaderboardScreen = () => {
               <FontAwesome5 name="trophy" size={24} color="#FFD700" />
             </View>
             <Text style={styles.motivationText}>Go, go, go! Grab points to climb to the top spots!</Text>
-            
+
             {/* Points Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
                 <MaterialIcons name="stars" size={20} color="#3b82f6" />
                 <Text style={styles.sectionTitle}>How to Earn Points!</Text>
               </View>
-              
+
               <View style={styles.pointsList}>
                 {[
                   { icon: "event-available", label: "Attendance-based", desc: "Check in to events on time" },
@@ -442,7 +446,7 @@ const LeaderboardScreen = () => {
                 <MaterialIcons name="diamond" size={20} color="#3b82f6" />
                 <Text style={styles.sectionTitle}>Diamond Rewards</Text>
               </View>
-              
+
               {/* Top 3 Rewards */}
               {/* Podium Display */}
               <View style={styles.podiumContainer}>
@@ -476,15 +480,15 @@ const LeaderboardScreen = () => {
                   </View>
                 </View>
               </View>
-              
+
               {/* Other Rewards */}
               <View style={styles.ranksContainer}>
                 {[
-                  ["4th", "400 💎"], ["5th", "350 💎"], 
-                  ["6th", "300 💎"], ["7th", "250 💎"], 
-                  ["8th", "200 💎"], ["9th", "150 💎"], 
+                  ["4th", "400 💎"], ["5th", "350 💎"],
+                  ["6th", "300 💎"], ["7th", "250 💎"],
+                  ["8th", "200 💎"], ["9th", "150 💎"],
                   ["10th", "100 💎"], ["11th-20th", "50 💎"],
-                  ["21st-30th", "25 💎"], ["31st-40th", "10 💎"], 
+                  ["21st-30th", "25 💎"], ["31st-40th", "10 💎"],
                   ["41st-50th", "5 💎"], ["51st+", "1 💎"]
                 ].map((reward, index) => (
                   <View key={index} style={styles.rankRow}>
@@ -502,11 +506,11 @@ const LeaderboardScreen = () => {
 
   const FloatingRankIndicator = useCallback(() => {
     if (!currentUserRank) return null;
-    
+
     return (
       <Animated.View style={styles.floatingRankContainer}>
         <LinearGradient
-          colors={['#3b82f6', '#1d4ed8']}
+          colors={['#a1c2f7', '#71a3f5']}
           start={[0, 0]}
           end={[1, 0]}
           style={styles.floatingRankGradient}
@@ -523,7 +527,7 @@ const LeaderboardScreen = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3b82f6" />
+        <ActivityIndicator size="large" color="#1d4ed8" />
         <Text style={styles.loadingText}>Loading leaderboard...</Text>
       </View>
     );
@@ -532,17 +536,24 @@ const LeaderboardScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Leaderboard</Text>
         <View style={styles.facultyContainer}>
-          <LinearGradient
-            colors={['#3b82f6', '#1d4ed8']}
-            style={styles.facultyGradient}
-          >
-            <Text style={styles.facultyText} numberOfLines={1}>{facultyName}</Text>
-          </LinearGradient>
+          <View style={styles.facultyCard}>
+            <View style={styles.facultyNameContainer}>
+              <Text style={styles.facultyText} numberOfLines={1}>
+                {facultyName}
+              </Text>
+            </View>
+            <View style={styles.refreshDateContainer}>
+              <Feather name="refresh-cw" size={12} color="#4A6B9E" style={styles.refreshIcon} />
+              <Text style={styles.refreshDateText}>
+                Next Reset: {refreshDate.toDate().toLocaleDateString()}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -613,24 +624,53 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1e3a8a',
+    color: '#2C3E50',
     letterSpacing: 0.5,
     marginBottom: 12,
   },
   facultyContainer: {
     width: '90%',
-    borderRadius: 8,
-    overflow: 'hidden',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 4,
   },
-  facultyGradient: {
-    paddingVertical: 8,
+  facultyCard: {
+    backgroundColor: '#F5F7FA',
+    borderRadius: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
+    alignItems: 'center',
+    borderWidth: 0.5,
+    borderColor: 'rgba(98, 132, 191, 0.2)',
+  },
+  facultyNameContainer: {
+    borderBottomWidth: 0.5,
+    borderColor: '#6284bf',
+    paddingBottom: 6,
+    marginBottom: 6,
+    width: '100%',
     alignItems: 'center',
   },
   facultyText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: '#4A6B9E',
+  },
+  refreshDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refreshIcon: {
+    marginRight: 8,
+  },
+  refreshDateText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4A6B9E',
   },
   podiumSection: {
     paddingTop: 20,
@@ -646,7 +686,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    backgroundColor: 'rgba(101, 153, 230, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1100,12 +1140,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    color: "#3b82f6"
+    color: "#3b82f6",
+    backgroundColor: "white"
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
-    color: '#1e3a8a',
+    color: '#364c87',
+    fontWeight: '500',
   },
 });
 

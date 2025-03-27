@@ -5,8 +5,8 @@ import { getItem } from '../utils/asyncStorage';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
-import NetworkCard from '../components/NetworkCard';
-import EmptyNetworkState from '../components/EmptyNetworkState';
+import NetworkCard from '../components/Network/NetworkCard';
+import EmptyNetworkState from '../components/Network/EmptyNetworkState';
 
 const NetworkScreen = () => {
     const [networks, setNetworks] = useState([]);

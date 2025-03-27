@@ -7,21 +7,22 @@ import {
   Animated,
   SafeAreaView,
   Image
-} from 'react-native'
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
-import { useFocusEffect } from '@react-navigation/native'
-import { useNavigation } from '@react-navigation/native'
+} from 'react-native';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import { collection, deleteDoc, getDocs, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore'
 
 // Components
-import HeroBanner from '../components/HeroBanner'
-import EventStatusCarousel from '../components/EventStatusCarousel'
-import LatestEvents from '../components/LatestEvents'
-import MerchLeaderboardCards from '../components/MerchLeaderboardCards'
-import SearchBar from '../components/SearchBar'
-import MemoizedFlatList from '../components/MemoizedFlatList'
-import { getItem, setItem } from '../utils/asyncStorage'
-import { collection, deleteDoc, getDocs, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore'
-import { db } from '../utils/firebaseConfig'
+import HeroBanner from '../components/Home/HeroBanner';
+import OngoingUpcomingEventCarousel from '../components/Home/OngoingUpcomingEventCarousel';
+import LatestAddedEvents from '../components/Home/LatestAddedEvents';
+import MerchandiseLeaderboardCards from '../components/Home/MerchandiseLeaderboardCards';
+import SearchBar from '../components/EventListing/SearchBar';
+import MemoizedFlatList from '../components/Home/MemoizedFlatList';
+
+import { getItem, setItem } from '../utils/asyncStorage';
+import { db } from '../utils/firebaseConfig';
 
 const HomeScreen = () => {
   // State management
@@ -41,7 +42,7 @@ const HomeScreen = () => {
     const checkLeaderboardRefresh = async () => {
       const studentID = await getItem("studentID");
       const facultyID = await getItem("facultyID");
-      if (!studentID || !facultyID) return; // Fixed condition
+      if (!studentID || !facultyID) return;
   
       try {
         const leaderboardRef = collection(db, "leaderboard");
@@ -98,7 +99,7 @@ const HomeScreen = () => {
             currentRefreshDateTime.setMonth(currentRefreshDateTime.getMonth() + 1);
             let newRefreshDateTime = Timestamp.fromDate(currentRefreshDateTime);
   
-            await updateDoc(leaderboardDocRef, { refreshDateTime: newRefreshDateTime }); // Fixed incorrect query reference
+            await updateDoc(leaderboardDocRef, { refreshDateTime: newRefreshDateTime });
           }
         }
       } catch (error) {
@@ -171,11 +172,11 @@ const HomeScreen = () => {
         case 'banner':
           return <HeroBanner />
         case 'ml-cards':
-          return <MerchLeaderboardCards setIsLoading={setIsLoading} setFirstName={setFirstName} />
+          return <MerchandiseLeaderboardCards setIsLoading={setIsLoading} setFirstName={setFirstName} />
         case 'ou-events':
-          return <EventStatusCarousel setIsLoading={setIsLoading} />
+          return <OngoingUpcomingEventCarousel setIsLoading={setIsLoading} />
         case 'la-events':
-          return <LatestEvents setIsLoading={setIsLoading} />
+          return <LatestAddedEvents setIsLoading={setIsLoading} />
         default:
           return null
       }
@@ -257,7 +258,7 @@ const HomeScreen = () => {
         onSearch={setSearchQuery}
         placeholder="Search events..."
         style={styles.searchBar}
-        onFocus={() => navigation.navigate("Events")}
+        onPress={() => navigation.navigate("Events")}
         icon="search"
       />
 

@@ -103,7 +103,7 @@ const AgendaScreen = () => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    
+
     // Unsubscribe from previous listener if needed
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
@@ -147,7 +147,7 @@ const AgendaScreen = () => {
       cancelled: { icon: 'close-circle', color: '#F44336' },
       default: { icon: 'information-outline', color: '#757575' }
     };
-    
+
     return statusConfig[status.toLowerCase()] || statusConfig.default;
   };
 
@@ -160,18 +160,23 @@ const AgendaScreen = () => {
         style={styles.eventCard}
         activeOpacity={0.7}
         onPress={() => {
-          if (item) {
-            navigation.navigate("RegisteredEventsTopTabs", { 
-              registrationID: item.id,
-              eventName: item.eventName,
-              eventID: item.eventID,
-              categoryID: item.category,
-              longitude: item.longitude,
-              latitude: item.latitude,
-            });
+          if (item && item.id) {
+            try {
+              navigation.navigate("RegisteredEventsTopTabs", {
+                registrationID: item.id,
+                eventName: item.eventName,
+                eventID: item.eventID,
+                categoryID: item.category,
+                longitude: item.longitude,
+                latitude: item.latitude,
+              });
+            } catch (error) {
+              console.error("Navigation Error:", error);
+              Alert.alert("Navigation Error", "Could not navigate to event details");
+            }
           } else {
-            // Optional: Show an error message or handle missing data
             console.warn("Missing event details for navigation");
+            Alert.alert("Error", "Event details are incomplete");
           }
         }}
       >
@@ -186,7 +191,7 @@ const AgendaScreen = () => {
               </Text>
             </View>
           </View>
-          
+
           <View style={styles.eventDetails}>
             <View style={styles.detailRow}>
               <MaterialCommunityIcons name="clock-outline" size={16} color="#757575" />
@@ -199,7 +204,7 @@ const AgendaScreen = () => {
               <Text style={styles.detailText}>{item.eventLocation}</Text>
             </View>
           </View>
-          
+
           <View style={styles.eventFooter}>
             <View style={styles.badgeContainer}>
               {item.isVerified && (
@@ -213,7 +218,7 @@ const AgendaScreen = () => {
                 </View>
               )}
             </View>
-            
+
             <MaterialCommunityIcons name="chevron-right" size={22} color="#BBBBBB" />
           </View>
         </View>
@@ -242,8 +247,8 @@ const AgendaScreen = () => {
         <Text style={styles.emptyDescription}>
           Your schedule is clear for {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </Text>
-        <TouchableOpacity 
-          style={styles.browseButton} 
+        <TouchableOpacity
+          style={styles.browseButton}
           onPress={() => navigation.navigate("Events")}
         >
           <Text style={styles.browseButtonText}>Browse Available Events</Text>
@@ -255,7 +260,7 @@ const AgendaScreen = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#5B7FFF" />
+        <ActivityIndicator size="large" color="#6284bf" />
         <Text style={styles.loadingText}>Loading your event calendar...</Text>
       </View>
     );
@@ -268,10 +273,9 @@ const AgendaScreen = () => {
         <View style={styles.header}>
           <View style={styles.headerContainer}>
             <Text style={styles.headerTitle}>My Calendar</Text>
-            <Text style={styles.headerSubtitle}>Track your registered events</Text>
           </View>
         </View>
-        
+
         {/* Calendar Agenda */}
         <View style={styles.calendarContainer}>
           <Agenda
@@ -283,14 +287,14 @@ const AgendaScreen = () => {
             theme={{
               agendaDayTextColor: '#333333',
               agendaDayNumColor: '#333333',
-              agendaTodayColor: '#3B6FC9',
-              agendaKnobColor: '#3B6FC9',
-              selectedDayBackgroundColor: '#3B6FC9',
-              dotColor: '#3B6FC9',
-              todayTextColor: '#3B6FC9',
-              reservationsBackgroundColor: 'rgba(59, 111, 201, 0.03)',
+              agendaTodayColor: '#6284bf',
+              agendaKnobColor: '#6284bf',
+              selectedDayBackgroundColor: '#6284bf',
+              dotColor: '#6284bf',
+              todayTextColor: '#6284bf',
+              reservationsBackgroundColor: 'rgba(98, 132, 191, 0.02)',
               calendarBackground: '#FFFFFF',
-              textSectionTitleColor: '#3B6FC9',
+              textSectionTitleColor: '#333333',
               dayTextColor: '#333333',
               monthTextColor: '#333333',
             }}
@@ -328,18 +332,18 @@ const styles = StyleSheet.create({
     backgroundColor: "white"
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 14,
     fontSize: 16,
-    color: '#3B6FC9',
+    color: '#36454F',
     fontWeight: '500',
   },
   header: {
-    height: 80,
+    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 12,
+    paddingBottom: 8,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
@@ -471,7 +475,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(200, 227, 247, 0.5)',
+    backgroundColor: 'rgba(29, 78, 216, 0.06)',
     zIndex: -1,
   },
   emptyTitle: {
@@ -489,7 +493,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   browseButton: {
-    backgroundColor: '#3B6FC9',
+    backgroundColor: '#6284bf',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,

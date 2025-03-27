@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { collection, getDocs, limit, orderBy, query, Timestamp, where } from 'firebase/firestore';
-import { db } from '../utils/firebaseConfig';
+import { db } from '../../utils/firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
@@ -36,24 +36,10 @@ const FACULTY_COLORS = {
     10: ['#FFCFD2', '#FFC8DD'], // Social Sciences - Pink
 };
 
-const EventStatusCarousel = ({ setIsLoading, navigation }) => {
+const OngoingUpcomingEventCarousel = ({ setIsLoading, navigation }) => {
     const [events, setEvents] = useState([]);
     const [localLoading, setLocalLoading] = useState(true);
     const [activeIndex, setActiveIndex] = useState(0);
-
-    // Memoize formatDateTime to prevent recreating on each render
-    const formatDateTime = useCallback((timestamp) => {
-        if (!timestamp || !timestamp.seconds) return "Invalid Date";
-    
-        const date = new Date(timestamp.seconds * 1000);
-        return date.toLocaleString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    }, []);
 
     // Format just the date without time
     const formatDate = useCallback((timestamp) => {
@@ -82,7 +68,7 @@ const EventStatusCarousel = ({ setIsLoading, navigation }) => {
             try {
                 setIsLoading(true);
                 setLocalLoading(true);
-
+    
                 const now = Timestamp.now();
                 const eventsRef = collection(db, "event");
                 const eventsQuery = query(
@@ -95,7 +81,7 @@ const EventStatusCarousel = ({ setIsLoading, navigation }) => {
                 
                 const eventsSnapshot = await getDocs(eventsQuery);
                 const nowMillis = now.toMillis();
-
+    
                 const formattedEvents = eventsSnapshot.docs.map(doc => {
                     const data = doc.data();
                     const startTime = data.eventStartDateTime;
@@ -111,9 +97,10 @@ const EventStatusCarousel = ({ setIsLoading, navigation }) => {
                     
                     // Calculate event duration
                     const durationMs = endTime.toMillis() - startTime.toMillis();
-                    const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+                    const durationDays = Math.floor(durationMs / (1000 * 60 * 60 * 24));
+                    const durationHours = Math.floor((durationMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                     const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-
+    
                     // Readable countdown text
                     let countdownText = "";
                     if (isOngoing) {
@@ -125,18 +112,26 @@ const EventStatusCarousel = ({ setIsLoading, navigation }) => {
                     } else {
                         countdownText = "Starting soon";
                     }
-
+    
+                    const startDateTime = new Date(startTime.seconds * 1000);
+                    const endDateTime = new Date(endTime.seconds * 1000);
+    
+                    const startDateStr = startDateTime.toISOString().split('T')[0];
+                    const endDateStr = endDateTime.toISOString().split('T')[0];
+    
                     return {
                         id: doc.id,
                         name: data.eventName,
                         startTime,
-                        endTime,
+                        endTime: startDateStr === endDateStr
+                            ? endDateTime.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true })
+                            : endDateTime.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true }) + " (" + endDateTime.toLocaleDateString("en-GB") + ")",
                         location: data.locationName,
-                        organiserID: data.organiserID || 4, // Default to CS if missing
-                        organiser: ORGANISER_MAPPING[data.organiserID] || "Unknown Organizer",
+                        organiserID: data.organiserID,
+                        organiser: ORGANISER_MAPPING[data.organiserID],
                         status: isOngoing ? "Ongoing" : "Upcoming",
                         countdownText,
-                        durationText: `${durationHours}h ${durationMinutes}m`,
+                        durationText: durationDays > 0 ? `${durationDays}d ${durationHours}h ${durationMinutes}m` : `${durationHours}h ${durationMinutes}m`,
                     };
                 });
                 
@@ -148,9 +143,14 @@ const EventStatusCarousel = ({ setIsLoading, navigation }) => {
                 setLocalLoading(false);
             }
         };
-
-        fetchEvents();
-    }, [setIsLoading]);
+    
+        fetchEvents(); // Fetch immediately on mount
+    
+        // Set interval to refresh every minute
+        const intervalId = setInterval(fetchEvents, 60000); 
+    
+        return () => clearInterval(intervalId); // Cleanup interval on unmount
+    }, []);    
 
     const onViewableItemsChanged = useCallback(({ viewableItems }) => {
         if (viewableItems.length > 0) {
@@ -207,7 +207,7 @@ const EventStatusCarousel = ({ setIsLoading, navigation }) => {
                                 <Text style={styles.dateText}>{formatDate(item.startTime)}</Text>
                             </View>
                             <View style={styles.timeDetails}>
-                                <Text style={styles.timeText}>{formatTime(item.startTime)} - {formatTime(item.endTime)}</Text>
+                                <Text style={styles.timeText}>{formatTime(item.startTime)} - {item.endTime}</Text>
                                 <Text style={styles.durationText}>Duration: {item.durationText}</Text>
                             </View>
                         </View>
@@ -253,7 +253,10 @@ const EventStatusCarousel = ({ setIsLoading, navigation }) => {
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
+                <View style={styles.headerTitleContainer}>
+                <MaterialIcons name="upcoming" size={20} color="#A9A9A9" />
                 <Text style={styles.sectionTitle}>Ongoing & Upcoming Events</Text>
+                </View>
             </View>
             <FlatList
                 data={events}
@@ -290,10 +293,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginBottom: 12,
     },
+    headerTitleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     sectionTitle: {
         fontSize: 20,
         fontWeight: 'bold',
         color: '#333',
+        marginLeft: 8,
     },
     viewAllButton: {
         flexDirection: 'row',
@@ -467,4 +475,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default EventStatusCarousel;
+export default OngoingUpcomingEventCarousel;

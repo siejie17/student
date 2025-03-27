@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Image } from 'react-native'
 import React, { useState, memo } from 'react'
-import Background from '../components/Background';
-import BackButton from '../components/BackButton';
+import Background from '../components/Authentication/Background';
+import BackButton from '../components/Authentication/BackButton';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../core/theme';
 import Header from '../components/Authentication/Header';
@@ -74,7 +74,7 @@ const PasswordResetScreen = () => {
         <View style={styles.modalBackground}>
           <View style={styles.passwordResetModal}>
             <Image
-              source={require('../assets/password-reset.png')}
+              source={require('../assets/auth/password-reset.png')}
               style={styles.passwordResetImage}
             />
 

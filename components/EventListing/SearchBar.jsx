@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const SearchBar = ({ onSearch, placeholder = 'Search...', style, onFocus }) => {
+const SearchBar = ({ onSearch, placeholder = 'Search...', style, onPress }) => {
   const [searchQuery, setSearchQuery] = useState('');
     
     const handleChange = (text) => {
@@ -26,7 +26,7 @@ const SearchBar = ({ onSearch, placeholder = 'Search...', style, onFocus }) => {
     <View style={[styles.container, style]}>
       <View style={styles.searchContainer}>
         <Image
-          source={require('../assets/search.png')}
+          source={require('../../assets/eventListing/search.png')}
           style={styles.searchIcon}
         />
         
@@ -34,7 +34,7 @@ const SearchBar = ({ onSearch, placeholder = 'Search...', style, onFocus }) => {
           style={styles.input}
           value={searchQuery}
           onChangeText={handleChange}
-          onFocus={onFocus}
+          onPress={onPress}
           placeholder={placeholder}
           placeholderTextColor="#999"
           returnKeyType="search"

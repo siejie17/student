@@ -12,15 +12,15 @@ import { Ionicons } from '@expo/vector-icons';
 
 // Badge image mapping
 const BADGE_MAPPING = {
-  academic: require("../assets/badges/academic.png"),
-  earlyBird: require("../assets/badges/earlyBird.png"),
-  entertainment: require("../assets/badges/entertainment.png"),
-  feedback: require("../assets/badges/feedback.png"),
-  health_wellness: require("../assets/badges/health_wellness.png"),
-  networking: require("../assets/badges/networking.png"),
-  quiz: require("../assets/badges/quiz.png"),
-  sports: require("../assets/badges/sports.png"),
-  volunteering: require("../assets/badges/volunteering.png"),
+  "academic": require("../assets/badges/academic.png"),
+  "earlyBird": require("../assets/badges/earlyBird.png"),
+  "entertainment": require("../assets/badges/entertainment.png"),
+  "feedback": require("../assets/badges/feedback.png"),
+  "health_wellness": require("../assets/badges/health_wellness.png"),
+  "networking": require("../assets/badges/networking.png"),
+  "q&a": require("../assets/badges/quiz.png"),
+  "sports": require("../assets/badges/sports.png"),
+  "volunteering": require("../assets/badges/volunteering.png"),
 }
 
 const BadgeScreen = ({ route }) => {

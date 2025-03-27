@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
-  Alert
+  Alert,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { getItem, removeItem } from '../utils/asyncStorage';
@@ -30,18 +30,18 @@ const FACULTY_MAPPING = {
 }
 
 const BADGE_MAPPING = {
-  academic: require("../assets/badges/academic.png"),
-  earlyBird: require("../assets/badges/earlyBird.png"),
-  entertainment: require("../assets/badges/entertainment.png"),
-  feedback: require("../assets/badges/feedback.png"),
-  health_wellness: require("../assets/badges/health_wellness.png"),
-  networking: require("../assets/badges/networking.png"),
-  quiz: require("../assets/badges/quiz.png"),
-  sports: require("../assets/badges/sports.png"),
-  volunteering: require("../assets/badges/volunteering.png"),
+  "academic": require("../assets/badges/academic.png"),
+  "earlyBird": require("../assets/badges/earlyBird.png"),
+  "entertainment": require("../assets/badges/entertainment.png"),
+  "feedback": require("../assets/badges/feedback.png"),
+  "health_wellness": require("../assets/badges/health_wellness.png"),
+  "networking": require("../assets/badges/networking.png"),
+  "q&a": require("../assets/badges/quiz.png"),
+  "sports": require("../assets/badges/sports.png"),
+  "volunteering": require("../assets/badges/volunteering.png"),
 }
 
-const DEFAULT_PROFILE_IMAGE = require('../assets/defaultProfilePic.png'); // Make sure this asset exists
+const DEFAULT_PROFILE_IMAGE = require('../assets/auth/defaultProfilePic.png'); // Make sure this asset exists
 
 const ProfileScreen = () => {
   const [userData, setUserData] = useState(null);
@@ -51,69 +51,18 @@ const ProfileScreen = () => {
   const navigation = useNavigation();
 
   useEffect(() => {
-    const fetchUserInfo = async () => {
+    const handleFetchUserData = async () => {
       try {
         setIsLoading(true);
-        const studentID = await getItem("studentID");
 
-        const userRef = doc(db, "user", studentID);
-        const badgeProgressQuery = query(
-          collection(db, "badgeProgress"),
-          where("studentID", "==", studentID)
-        );
+        const userData = await fetchUserInfo();
+        setUserData(userData);
 
-        const [userSnap, badgeProgressSnapshot] = await Promise.all([
-          getDoc(userRef), // Query user collection
-          getDocs(badgeProgressQuery), // Query badgeProgress collection
-        ]);
-
-        if (userSnap.exists()) {
-          setUserData(userSnap.data());
-        } else {
-          console.warn("User not found.");
-          setUserData(null);
-        }
-
-        if (badgeProgressSnapshot.empty) {
-          console.log("No badge progress found for this student.");
-          setBadgeProgressList([]);
-          return;
-        }
-
-        const badgeProgressDoc = badgeProgressSnapshot.docs[0];
-        const userBadgeProgressRef = collection(badgeProgressDoc.ref, "userBadgeProgress");
-
-        const userBadgeProgressSnapshot = await getDocs(userBadgeProgressRef);
-        if (userBadgeProgressSnapshot.empty) {
-          console.log("No badge progress records found.");
-          setBadgeProgressList([]);
-          return;
-        }
-
-        const badgeDocs = userBadgeProgressSnapshot.docs.map((doc) => ({
-          badgeDocID: doc.id,
-          ...doc.data(),
-        }));
-
-        const badgeDetailPromises = badgeDocs.map(async (badge) => {
-          const badgeRef = doc(db, "badge", badge.badgeDocID);
-          const badgeSnapshot = await getDoc(badgeRef);
-          return badgeSnapshot.exists()
-            ? {
-              id: badge.badgeDocID,
-              progress: badge.progress,
-              isUnlocked: badge.isUnlocked,
-              dateUpdated: badge.dateUpdated,
-              ...badgeSnapshot.data(), // Merge badge metadata
-            }
-            : null;
-        });
-
-        const resolvedBadgeProgress = (await Promise.all(badgeDetailPromises)).filter(Boolean);
-
-        setBadgeProgressList(resolvedBadgeProgress);
+        // Then, fetch badge progress
+        const badgeProgress = await fetchUserBadgeProgress();
+        setBadgeProgressList(badgeProgress);
       } catch (error) {
-        console.error("Error when fetching user information,", error);
+        console.error("Error in data fetching sequence:", error);
         setUserData(null);
         setBadgeProgressList([]);
       } finally {
@@ -121,8 +70,85 @@ const ProfileScreen = () => {
       }
     }
 
-    fetchUserInfo();
+    handleFetchUserData();
   }, []);
+
+  const fetchUserInfo = async () => {
+    try {
+      const studentID = await getItem("studentID");
+      const userRef = doc(db, "user", studentID);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        return userSnap.data();
+      } else {
+        console.warn("User not found.");
+        return null;
+      }
+    } catch (error) {
+      console.error("Error fetching user information:", error);
+      throw error;
+    }
+  };
+
+  // Then fetch badge progress info
+  const fetchUserBadgeProgress = async () => {
+    try {
+      const studentID = await getItem("studentID");
+
+      const badgeProgressQuery = query(
+        collection(db, "badgeProgress"),
+        where("studentID", "==", studentID)
+      );
+
+      const badgeProgressSnapshot = await getDocs(badgeProgressQuery);
+
+      if (badgeProgressSnapshot.empty) {
+        console.log("No badge progress found for this student.");
+        return [];
+      }
+
+      const badgeProgressDoc = badgeProgressSnapshot.docs[0];
+      const userBadgeProgressRef = collection(badgeProgressDoc.ref, "userBadgeProgress");
+
+      const userBadgeProgressSnapshot = await getDocs(userBadgeProgressRef);
+      if (userBadgeProgressSnapshot.empty) {
+        console.log("No badge progress records found.");
+        return [];
+      }
+
+      const badgeDocs = userBadgeProgressSnapshot.docs.map((doc) => ({
+        badgeDocID: doc.id,
+        ...doc.data(),
+      }));
+
+      const badgeDetailPromises = badgeDocs.map(async (badge) => {
+        const badgeRef = doc(db, "badge", badge.badgeDocID);
+        const badgeSnapshot = await getDoc(badgeRef);
+
+        return badgeSnapshot.exists()
+          ? {
+            id: badge.badgeDocID,
+            progress: badge.progress,
+            isUnlocked: badge.isUnlocked,
+            dateUpdated: badge.dateUpdated,
+            ...badgeSnapshot.data(),
+          }
+          : null;
+      });
+
+      return (await Promise.all(badgeDetailPromises)).filter(Boolean);
+    } catch (error) {
+      console.error("Error fetching badge progress:", error);
+      throw error;
+    }
+  };
+
+  const calculateBadgeColumns = () => {
+    const screenWidth = Dimensions.get('window').width;
+    const badgeWidth = 80; // Estimated badge width
+    return Math.floor(screenWidth / badgeWidth);
+  };
 
   const renderBadge = (badge) => {
     return (
@@ -159,7 +185,6 @@ const ProfileScreen = () => {
       removeItem("studentID");
       removeItem("facultyID");
       Alert.alert("Success", "You have been logged out!");
-      navigation.replace("Login"); // Redirect to Login screen
     } catch (error) {
       Alert.alert("Error", error.message);
     }
@@ -198,104 +223,104 @@ const ProfileScreen = () => {
   }
 
   return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
-        </View>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Profile</Text>
+      </View>
 
-        <ScrollView 
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ flexGrow: 1 }}
-        >
-          <View style={styles.profileContainer}>
-            <View style={styles.profileImageContainer}>
-              <Image
-                alt="Profile Picture"
-                source={
-                  userData.profilePicture
-                    ? { uri: `data:image/png;base64,${userData.profilePicture}` }
-                    : DEFAULT_PROFILE_IMAGE
-                }
-                style={styles.profileImage}
-              />
-              <TouchableOpacity
-                style={styles.editProfileButton}
-                onPress={handleEditProfilePicture}
-              >
-                <Feather name="edit-2" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.userDetailsContainer}>
-              <Text style={styles.profileName}>{`${userData.firstName || ''} ${userData.lastName || ''}`}</Text>
-              <Text style={styles.profileHandle}>
-                {userData.email || 'No email provided'}
-              </Text>
-              <View style={styles.academicInfo}>
-                {userData.yearOfStudy && (
-                  <View style={styles.infoItem}>
-                    <Ionicons name="book-outline" size={18} color="#4A6FA5" />
-                    <Text style={styles.infoText}>Year {userData.yearOfStudy}</Text>
-                  </View>
-                )}
-                {userData.facultyID && FACULTY_MAPPING[userData.facultyID] && (
-                  <View style={styles.infoItem}>
-                    <Ionicons name="school-outline" size={18} color="#4A6FA5" />
-                    <Text style={styles.infoText}>{FACULTY_MAPPING[userData.facultyID]}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        <View style={styles.profileContainer}>
+          <View style={styles.profileImageContainer}>
+            <Image
+              alt="Profile Picture"
+              source={
+                userData.profilePicture
+                  ? { uri: `data:image/png;base64,${userData.profilePicture}` }
+                  : DEFAULT_PROFILE_IMAGE
+              }
+              style={styles.profileImage}
+            />
+            <TouchableOpacity
+              style={styles.editProfileButton}
+              onPress={handleEditProfilePicture}
+            >
+              <Feather name="edit-2" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
-
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeaderRow}>
-              <Feather name="award" size={18} color="#4A6FA5" />
-              <Text style={styles.sectionTitle}>Your Badges</Text>
-            </View>
-
-            <View style={styles.achievementsFrame}>
-              {badgeProgressList.length > 0 ? (
-                <View style={styles.achievementsContainer}>
-                  {badgeProgressList.map(badge => renderBadge(badge))}
+          <View style={styles.userDetailsContainer}>
+            <Text style={styles.profileName}>{`${userData.firstName || ''} ${userData.lastName || ''}`}</Text>
+            <Text style={styles.profileHandle}>
+              {userData.email || 'No email provided'}
+            </Text>
+            <View style={styles.academicInfo}>
+              {userData.yearOfStudy && (
+                <View style={styles.infoItem}>
+                  <Ionicons name="book-outline" size={18} color="#121212" />
+                  <Text style={styles.infoText}>Year {userData.yearOfStudy}</Text>
                 </View>
-              ) : (
-                <Text style={styles.noBadgesText}>No badges earned yet</Text>
+              )}
+              {userData.facultyID && FACULTY_MAPPING[userData.facultyID] && (
+                <View style={styles.infoItem}>
+                  <Ionicons name="school-outline" size={18} color="#121212" />
+                  <Text style={styles.infoText}>{FACULTY_MAPPING[userData.facultyID]}</Text>
+                </View>
               )}
             </View>
           </View>
+        </View>
 
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeaderRow}>
-              <Feather name="list" size={18} color="#4A6FA5" />
-              <Text style={styles.sectionTitle}>Others</Text>
-            </View>
-            
-            <View style={styles.networkCardContainer}>
-              <TouchableOpacity 
-                style={styles.networkCard} 
-                onPress={() => navigation.navigate("NetworkList")}
-              >
-                <View style={styles.networkIconContainer}>
-                  <Ionicons name="people-outline" size={24} color="#4A6FA5" />
-                </View>
-                
-                <View style={styles.networkContentContainer}>
-                  <Text style={styles.networkTitle}>Networks</Text>
-                  <Text style={styles.networkSubtitle}>Review scanned networks throughout events</Text>
-                </View>
-                
-                <View style={styles.chevronContainer}>
-                  <Feather name="chevron-right" size={20} color="#8DABC9" />
-                </View>
-              </TouchableOpacity>
-            </View>
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderRow}>
+            <Feather name="award" size={18} color="#A9A9A9" />
+            <Text style={styles.sectionTitle}>Your Badges</Text>
           </View>
 
-          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-            <Text style={styles.signOutText}>Sign Out</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
+          <View style={styles.achievementsFrame}>
+            {badgeProgressList.length > 0 ? (
+              <View style={styles.achievementsContainer}>
+                {badgeProgressList.map(badge => renderBadge(badge))}
+              </View>
+            ) : (
+              <Text style={styles.noBadgesText}>No badges earned yet</Text>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderRow}>
+            <Feather name="list" size={18} color="#A9A9A9" />
+            <Text style={styles.sectionTitle}>Others</Text>
+          </View>
+
+          <View style={styles.networkCardContainer}>
+            <TouchableOpacity
+              style={styles.networkCard}
+              onPress={() => navigation.navigate("NetworkList")}
+            >
+              <View style={styles.networkIconContainer}>
+                <Ionicons name="people-outline" size={24} color="#121212" />
+              </View>
+
+              <View style={styles.networkContentContainer}>
+                <Text style={styles.networkTitle}>Networks</Text>
+                <Text style={styles.networkSubtitle}>Review scanned networks throughout events</Text>
+              </View>
+
+              <View style={styles.chevronContainer}>
+                <Feather name="chevron-right" size={20} color="#8DABC9" />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   )
 }
 
@@ -324,18 +349,20 @@ const styles = StyleSheet.create({
     color: '#2C3E50',
   },
   profileContainer: {
-    // padding: 12,
+    padding: 12,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(169, 169, 169, 0.2)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    marginBottom: 24,
+    marginBottom: 18,
     shadowColor: '#BFCFE7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 5,
   },
   profileImageContainer: {
     position: 'relative',
@@ -346,13 +373,13 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     marginRight: 6,
     borderWidth: 2,
-    borderColor: '#E6EEF7',
+    borderColor: '#F0F0F0',
   },
   editProfileButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#4A6FA5',
+    backgroundColor: '#6284bf',
     width: 30,
     height: 30,
     borderRadius: 15,
@@ -385,14 +412,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: 10,
-    backgroundColor: '#EDF2F7',
+    backgroundColor: '#F0F0F0',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
   },
   infoText: {
     fontSize: 14,
-    color: '#4A6FA5',
+    color: '#36454f',
     marginLeft: 5,
   },
   sectionHeaderRow: {
@@ -417,7 +444,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#E6EEF7',
+    borderColor: 'rgba(169, 169, 169, 0.2)',
   },
   achievementsContainer: {
     flexDirection: 'row',
@@ -444,11 +471,11 @@ const styles = StyleSheet.create({
     shadowRadius: 1.5,
   },
   lockedBadge: {
-    backgroundColor: '#E6EEF7',
+    backgroundColor: '#F0F0F0',
   },
   lockedBadgeImage: {
     opacity: 0.5,
-    tintColor: '#8DABC9',
+    tintColor: '#A9A9A9',
   },
   badgeImage: {
     width: 40,
@@ -457,7 +484,7 @@ const styles = StyleSheet.create({
   },
   badgeTitle: {
     fontSize: 12,
-    color: '#5E6F84',
+    color: '#121212',
     textAlign: 'center',
   },
   sectionContainer: {
@@ -480,7 +507,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E6EEF7',
+    borderColor: 'rgba(169, 169, 169, 0.2)',
     overflow: 'hidden',
     shadowColor: '#BFCFE7',
     shadowOffset: { width: 0, height: 2 },
@@ -498,7 +525,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#EDF2F7',
+    backgroundColor: '#F0F0F0',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -521,7 +548,7 @@ const styles = StyleSheet.create({
   },
   signOutButton: {
     marginBottom: 24,
-    backgroundColor: '#4A6FA5',
+    backgroundColor: '#6284bf',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
@@ -542,9 +569,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 14,
     fontSize: 16,
-    color: '#4A6FA5',
+    color: '#36454F',
+    fontWeight: '500',
   },
   errorContainer: {
     flex: 1,
@@ -573,6 +601,6 @@ const styles = StyleSheet.create({
     maxWidth: 80,
   },
   lockedBadgeName: {
-    color: '#8DABC9',
+    color: '#899499',
   },
 });

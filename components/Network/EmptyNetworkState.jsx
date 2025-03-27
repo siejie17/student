@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
@@ -17,7 +17,7 @@ const EmptyNetworkState = ({ onScanQRPress }) => {
         useNativeDriver
       >
         <Image 
-          source={require('../assets/lonely-student.png')} 
+          source={require('../../assets/network/lonely-student.png')} 
           style={styles.image}
           resizeMode="contain"
         />

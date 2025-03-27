@@ -8,9 +8,9 @@ import {
     StyleSheet,
     Image,
 } from 'react-native';
-import { getItem } from '../utils/asyncStorage';
+import { getItem } from '../../utils/asyncStorage';
 import { doc, increment, updateDoc } from 'firebase/firestore';
-import { db } from '../utils/firebaseConfig';
+import { db } from '../../utils/firebaseConfig';
 
 const FUNNY_MESSAGES = [
     "You're #1! Even your cat is impressed (maybe).",
@@ -169,7 +169,7 @@ const RankingRewardsModal = ({
                         <View style={styles.diamondsRewardContainer}>
                             <Text style={styles.youEarnedText}>You've earned</Text>
                             <View style={styles.diamondsContainer}>
-                                <Image source={require('../assets/icons/diamond.png')} style={styles.diamondImage} />
+                                <Image source={require('../../assets/icons/diamond.png')} style={styles.diamondImage} />
                                 <Text style={styles.diamondValue}>{diamondsRewards}</Text>
                             </View>
                         </View>
@@ -194,7 +194,7 @@ const RankingRewardsModal = ({
                                     },
                                 ]}
                             >
-                                <Image source={require('../assets/icons/diamond.png')} style={styles.diamondImage} />
+                                <Image source={require('../../assets/icons/diamond.png')} style={styles.diamondImage} />
                             </Animated.View>
                         ))}
 

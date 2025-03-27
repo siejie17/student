@@ -3,7 +3,7 @@ import { ImageBackground, StyleSheet, KeyboardAvoidingView } from 'react-native'
 
 const Background = ({ children }) => (
     <ImageBackground
-        source={require('../assets/sword.png')}
+        source={require('../../assets/auth/sword.png')}
         style={styles.background}
         imageStyle={styles.backgroundImage}
     >
@@ -17,6 +17,7 @@ const styles = StyleSheet.create({
     background: {
         flex: 1,
         width: '100%',
+        backgroundColor: 'white',
     },
     backgroundImage: {
         opacity: 0.15,

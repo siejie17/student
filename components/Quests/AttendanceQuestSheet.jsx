@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, Image } from 'react-native';
-import { collection, setDoc, getDocs, increment, query, updateDoc, where, getDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, setDoc, getDocs, increment, query, updateDoc, where, getDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../utils/firebaseConfig';
 import { getItem } from '../../utils/asyncStorage';
 import Constants from 'expo-constants';
@@ -10,6 +10,7 @@ import * as Location from 'expo-location';
 import QuestCompletedModal from '../Modal/QuestCompleteModal';
 import { getDistance } from 'geolib';
 import { Ionicons } from '@expo/vector-icons';
+import AttendanceFailureModal from '../Modal/AttendanceFailureModal';
 
 const EVENT_TYPE_MAPPING = {
     1: "academic",
@@ -19,7 +20,7 @@ const EVENT_TYPE_MAPPING = {
     6: "health_wellness",
 }
 
-const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, latitude, longitude, updateQuestStatus, registrationID, navigation }) => {
+const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, latitude, longitude, updateQuestStatus, registrationID }) => {
     // Mode state: 'display' for showing QR, 'scan' for scanning QR
     const [mode, setMode] = useState('display');
 
@@ -27,8 +28,12 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
     const [animatingDiamonds, setAnimatingDiamonds] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
-    const [claimed, setClaimed] = useState(false);
+    const [attendanceFailureModalVisible,setAttendanceFailureModalVisible] = useState(false);
     const [completedModalVisible, setCompletedModalVisible] = useState(false);
+    const [attendanceFailureModalContent, setAttendanceFailureModalContent] = useState({
+        title: '',
+        subtitle: '',
+    })
 
     // Camera, location and scanning states
     const [permission, requestPermission] = useCameraPermissions({
@@ -40,8 +45,6 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
         title: 'Location Access Needed'
     });
     const [scanned, setScanned] = useState(false);
-
-    const [currentLocation, setCurrentLocation] = useState(null);
 
     // Get encryption key
     const secretKey = Constants.expoConfig?.extra?.encryptionKey || 'UniEXP2025';
@@ -136,19 +139,33 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
                     }
                 } else {
                     console.log("The user is too far away from the event location.");
+                    setAttendanceFailureModalContent({
+                        title: 'Distance Denied!',
+                        subtitle: 'Halt, valiant warrior! Your current position is too far from the quest zone. Teleport closer or prepare for an epic trek! 🗺️'
+                    });
+                    setAttendanceFailureModalContent(true);
                 }
+            } else {
+                setAttendanceFailureModalContent({
+                    title: "Time Warp Warning!",
+                    subtitle: "Whoa, brave adventurer! The QR code has expired! 🕰️"
+                });
+                setAttendanceFailureModalContent(true);
             }
             setScanned(false);
             setMode('display');
         } catch (error) {
             console.error('Error processing QR code:', error);
-            Alert.alert('Error', 'Invalid QR code. Please try again.');
+            setAttendanceFailureModalContent({
+                title: "Oops, Invalid QR Code!",
+                subtitle: "Looks like your QR scroll got a bit wonky. Please try again! 🕹️"
+              });
+            setAttendanceFailureModalVisible(true);
         }
     }
 
     const updateQuestProgress = async (studentID) => {
         try {
-
             const questProgressQuery = query(collection(db, "questProgress"), where("eventID", "==", eventID), where("studentID", "==", studentID));
             const questProgressSnap = await getDocs(questProgressQuery);
 
@@ -228,7 +245,6 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
     }
 
     const claimRewards = () => {
-        setClaimed(true);
         setAnimatingDiamonds(true);
 
         // Reset animations
@@ -332,7 +348,6 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
         setTimeout(() => {
             setAnimatingDiamonds(false);
             updateDatabase();
-            // addDiamondsToDatabase();
         }, 1500);
     }
 
@@ -526,8 +541,8 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
 
             {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
                 <TouchableOpacity
-                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
-                    disabled={claimed}
+                    style={[styles.rewardsButton, { marginBottom: 5 }, animatingDiamonds && styles.claimedButton]}
+                    disabled={animatingDiamonds}
                     onPress={claimRewards}
                 >
                     <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
@@ -599,6 +614,15 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
                     autoDismissTime={2000}
                 />
             )}
+
+            {attendanceFailureModalVisible && (
+                <AttendanceFailureModal
+                    isVisible={attendanceFailureModalVisible}
+                    onClose={() => setAttendanceFailureModalVisible(false)}
+                    title={attendanceFailureModalContent.title}
+                    subtitle={attendanceFailureModalContent.subtitle}
+                />
+            )}
         </View>
     );
 };
@@ -640,41 +664,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 8,
         elevation: 3,
-    },
-    progressBarContainer: {
-        height: 8,
-        backgroundColor: '#E9ECEF',
-        borderRadius: 4,
-        marginBottom: 12,
-        overflow: 'hidden',
-    },
-    progressBar: {
-        height: '100%',
-        backgroundColor: '#5E96CE',
-        borderRadius: 4,
-    },
-    networkText: {
-        fontSize: 18,
-        textAlign: 'center',
-        marginBottom: 4,
-    },
-    currentNetworkNumber: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#5E96CE',
-    },
-    slashText: {
-        color: '#888',
-    },
-    requiredNetworkNumber: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#252A34',
-    },
-    networkLabel: {
-        fontSize: 14,
-        color: '#777',
-        textAlign: 'center',
     },
     rewardsSection: {
         marginBottom: 24,
@@ -735,26 +724,6 @@ const styles = StyleSheet.create({
         height: '80%',
         backgroundColor: '#E9ECEF',
         marginHorizontal: 10,
-    },
-    submitButton: {
-        paddingVertical: 14,
-        borderRadius: 12,
-        backgroundColor: '#5E96CE',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
-        elevation: 1,
-    },
-    submitButtonText: {
-        textAlign: 'center',
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#FFF',
-    },
-    disabledSubmit: {
-        backgroundColor: '#B0BEC5',
-        opacity: 0.7,
     },
     rewardsButton: {
         paddingVertical: 14,
@@ -850,27 +819,6 @@ const styles = StyleSheet.create({
         borderColor: 'white',
         borderRadius: 20,
     },
-    scanModeContainer: {
-        backgroundColor: '#F7F9FC',
-        borderRadius: 16,
-    },
-    scanFrameBorder: {
-        position: 'absolute',
-        backgroundColor: 'white',
-        width: 30,
-        height: 4,
-        borderRadius: 2,
-    },
-    scanFrameBorderHorizontal: {
-        transform: [{ rotate: '90deg' }],
-    },
-    scanInstructions: {
-        marginTop: 20,
-        color: 'white',
-        fontSize: 16,
-        fontWeight: '500',
-        textAlign: 'center',
-    },
     permissionContainer: {
         justifyContent: 'center',
         alignItems: 'center',
@@ -881,14 +829,6 @@ const styles = StyleSheet.create({
         fontSize: 18,
         marginBottom: 16,
         textAlign: 'center',
-    },
-    permissionDescription: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        marginBottom: 24,
-        lineHeight: 24,
-        paddingHorizontal: 20,
     },
     permissionButton: {
         width: '100%',
@@ -908,47 +848,6 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 14,
         fontWeight: '600',
-    },
-    blurContainer: {
-        width: '100%',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 20,
-        overflow: 'hidden',
-        paddingHorizontal: 10,
-        paddingVertical: 5
-    },
-    qrContainer: {
-        aspectRatio: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 10,
-    },
-    profileInfoContainer: {
-        width: '100%',
-        alignItems: 'center',
-    },
-    nameText: {
-        fontSize: 12,
-        fontWeight: '600',
-        marginBottom: 8,
-    },
-    academicInfo: {
-        flexDirection: 'row',
-        gap: 10,
-    },
-    infoItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F0F0F0',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-    },
-    infoText: {
-        fontSize: 14,
-        color: '#000000',
-        marginLeft: 5,
     },
     showQRButton: {
         paddingVertical: 14,

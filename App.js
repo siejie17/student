@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, TouchableOpacity, View, Text, ActivityIndicator } from 'react-native';
+import { StatusBar, StyleSheet, TouchableOpacity, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -25,10 +25,12 @@ import RegisteredEventScreen from './screens/RegisteredEventScreen.jsx';
 import EventQuestsScreen from './screens/EventQuestsScreen.jsx';
 import BadgeScreen from './screens/BadgeScreen.jsx';
 import NetworkScreen from './screens/NetworkScreen.jsx';
+import FeedbackFormScreen from './screens/FeedbackFormScreen.jsx';
+
+import LoadingIndicator from './components/General/LoadingIndicator.jsx';
 
 import { getItem } from './utils/asyncStorage.js';
 import { auth } from './utils/firebaseConfig';
-import FeedbackFormScreen from './screens/FeedbackFormScreen.jsx';
 
 const MainStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
@@ -75,9 +77,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#0000ff" />
-      </View>
+      <LoadingIndicator />
     );
   }
 
@@ -185,25 +185,19 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
 };
 
 // Registered Event Manager Top Tabs
-const RegisteredEventTopTabs = ({ route }) => {
-  const navigation = useNavigation();
-
-  console.log("Received Route Params:", route.params);
-
+const RegisteredEventTopTabs = ({ route, navigation }) => {
   const params = route.params || {};
 
   return (
     <View style={styles.container}>
       <CustomHeader
-        title={params.eventName}
+        title={params.eventName || 'Event Details'}
         onBack={() => navigation.goBack()}
       />
 
       <TopTab.Navigator
         tabBar={props => <CustomTabBar {...props} />}
         screenOptions={{
-          // These styles will be overridden by our custom tab bar
-          // but they're needed for the navigator configuration
           tabBarActiveTintColor: '#5B8CDD',
           tabBarInactiveTintColor: 'A0B4D6',
           tabBarStyle: {
@@ -213,8 +207,16 @@ const RegisteredEventTopTabs = ({ route }) => {
           swipeEnabled: false
         }}
       >
-        <TopTab.Screen name="Details" component={RegisteredEventScreen} initialParams={params} />
-        <TopTab.Screen name="Quest" component={EventQuestsScreen} initialParams={params} />
+        <TopTab.Screen 
+          name="Details" 
+          component={RegisteredEventScreen} 
+          initialParams={params} 
+        />
+        <TopTab.Screen 
+          name="Quest" 
+          component={EventQuestsScreen} 
+          initialParams={params} 
+        />
       </TopTab.Navigator>
     </View>
   )
@@ -312,8 +314,8 @@ const AppTabs = () => (
             </View>
           );
         },
-        tabBarActiveTintColor: '#3B6FC9',
-        tabBarInactiveTintColor: '#A9BFE0',
+        tabBarActiveTintColor: '#6284bf',
+        tabBarInactiveTintColor: '#A9A9A9',
         tabBarShowLabel: true,
         tabBarStyle: styles.bottomBar,
         tabBarItemStyle: styles.tabBarItem,
@@ -409,11 +411,11 @@ const styles = StyleSheet.create({
   },
   indicator: {
     position: 'absolute',
-    bottom: -12,
+    bottom: -15,
     width: 18,
     height: 2,
     borderRadius: 1,
-    backgroundColor: '#3B6FC9',
+    backgroundColor: '#6284bf',
   },
   header: {
     flexDirection: 'row',

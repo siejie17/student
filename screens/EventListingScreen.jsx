@@ -26,8 +26,8 @@ import { getItem } from '../utils/asyncStorage';
 import { collection, getDocs, onSnapshot, orderBy, query, Timestamp, where } from "firebase/firestore";
 import { db } from '../utils/firebaseConfig';
 
-import EventCard from '../components/EventCard';
-import SearchBar from '../components/SearchBar';
+import EventCard from '../components/EventListing/EventCard';
+import SearchBar from '../components/EventListing/SearchBar';
 
 const CATEGORIES = [
   "All",
@@ -67,7 +67,7 @@ const EventListingScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [registeredEventIDs, setRegisteredEventIDs] = useState(new Set());
+  const [registeredEventIDs, setRegisteredEventIDs] = useState([]);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -79,86 +79,81 @@ const EventListingScreen = ({ navigation }) => {
   const fetchEventCatalogue = useCallback(async () => {
     try {
       setIsLoading(true);
-
+  
       const studentID = await getItem("studentID");
       if (!studentID) {
         setIsLoading(false);
         return;
       }
-
+  
+      // Clear previous subscriptions
       if (unsubscribeRegistrationRef.current) {
         unsubscribeRegistrationRef.current();
       }
-
       if (unsubscribeEventRef.current) {
         unsubscribeEventRef.current();
       }
-
       if (unsubscribeTotalParticipantsRef.current) {
         unsubscribeTotalParticipantsRef.current();
       }
-
+  
       const registrationRef = collection(db, "registration");
       const registrationQuery = query(registrationRef, where("studentID", "==", studentID));
-
-      const unsubscribeRegistration = onSnapshot(registrationQuery, (registrationSnap) => {
-        const updatedSet = new Set(registeredEventIDs);
-
-        registrationSnap.forEach((doc) => {
-          updatedSet.add(doc.data().eventID);
-        })
-
-        setRegisteredEventIDs(updatedSet);
+  
+      const unsubscribeRegistration = onSnapshot(registrationQuery, async (registrationSnap) => {
+        // Extract registered event IDs
+        const registeredEventIDs = registrationSnap.docs.map(doc => doc.data().eventID);
+        
+        // Get events where registration is still open
+        const eventsRef = collection(db, "event");
+        const eventsQuery = query(
+          eventsRef,
+          where("registrationClosingDate", ">", Timestamp.now()),
+          where("status", "not-in", ["Completed", "Cancelled"]),
+          orderBy("lastAdded", "desc")
+        );
+  
+        const unsubscribeEvent = onSnapshot(eventsQuery, async (eventSnap) => {
+          // Filter out events the student has already registered for
+          const filteredEvents = await Promise.all(
+            eventSnap.docs
+              .filter(doc => !registeredEventIDs.includes(doc.id))
+              .map(async (doc) => {
+                const event = { id: doc.id, ...doc.data() };
+                
+                // Fetch event images
+                const eventImagesRef = collection(db, "eventImages");
+                const eventImagesQuery = query(eventImagesRef, where("eventID", "==", event.id));
+                const eventImagesDoc = await getDocs(eventImagesQuery);
+  
+                let thumbnail = null;
+                eventImagesDoc.forEach((doc) => {
+                  const imageData = doc.data();
+                  if (imageData.images && imageData.images.length > 0) {
+                    thumbnail = imageData.images[0];
+                  }
+                });
+  
+                return { ...event, thumbnail };
+              })
+          );
+  
+          setEvents(filteredEvents);
+          setRegisteredEventIDs(registeredEventIDs);
+          
+          // Store unsubscribe functions
+          unsubscribeRegistrationRef.current = unsubscribeRegistration;
+          unsubscribeEventRef.current = unsubscribeEvent;
+          
+          setIsLoading(false);
+          setRefreshing(false);
+        });
       });
-
-      // Get events where registration is still open
-      const eventsRef = collection(db, "event");
-      const eventsQuery = query(
-        eventsRef,
-        where("registrationClosingDate", ">", Timestamp.now()),
-        where("status", "not-in", ["Completed", "Cancelled"]),
-        orderBy("lastAdded", "desc")
-      );
-
-      const unsubscribeEvent = onSnapshot(eventsQuery, async (eventSnap) => {
-        let filteredEvents = [];
-
-        await Promise.all(
-          eventSnap.docs.map(async (doc) => {
-            const event = { id: doc.id, ...doc.data() };
-
-            if (registeredEventIDs.has(event.id)) return;
-
-            filteredEvents.push(event);
-          })
-        );
-
-        const eventsWithImages = await Promise.all(
-          filteredEvents.map(async event => {
-            const eventImagesRef = collection(db, "eventImages");
-            const eventImagesQuery = query(eventImagesRef, where("eventID", "==", event.id));
-            const eventImagesDoc = await getDocs(eventImagesQuery);
-
-            let thumbnail = null;
-            eventImagesDoc.forEach((doc) => {
-              const imageData = doc.data();
-              if (imageData.images && imageData.images.length > 0) {
-                thumbnail = imageData.images[0];
-              }
-            });
-
-            return { ...event, thumbnail };
-          })
-        );
-
-        setEvents(eventsWithImages);
-        unsubscribeRegistrationRef.current = unsubscribeRegistration;
-        unsubscribeEventRef.current = unsubscribeEvent;
-        setIsLoading(false);
-        setRefreshing(false);
-      })
+  
     } catch (error) {
       console.error("Error fetching events:", error);
+      setIsLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -254,9 +249,7 @@ const EventListingScreen = ({ navigation }) => {
   }, [selectedCategory, handleCategoryPress]);
 
   const renderCard = useCallback(({ item }) => (
-    <TouchableOpacity onPress={() => navigation.navigate('EventDetails', { eventID: item.id })}>
-      <EventCard event={item} />
-    </TouchableOpacity>
+    <EventCard event={item} onPress={() => navigation.navigate('EventDetails', { eventID: item.id })} />
   ), [navigation]);
 
   const ListEmptyComponent = useMemo(() => (
@@ -307,7 +300,8 @@ const EventListingScreen = ({ navigation }) => {
       <View style={styles.listView}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0000ff" />
+            <ActivityIndicator size="large" color="#6284bf" />
+            <Text style={styles.loadingText}>Loading available events...</Text>
           </View>
         ) : (
           <FlatList
@@ -390,11 +384,19 @@ const styles = StyleSheet.create({
   },
   listView: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#364c87',
+    fontWeight: '500',
   },
   listContainer: {
     paddingBottom: 16,

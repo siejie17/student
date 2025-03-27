@@ -1,7 +1,7 @@
 import { View, Text, TouchableWithoutFeedback, KeyboardAvoidingView, StyleSheet, Modal, Image, TouchableOpacity } from 'react-native';
 import React, { useState, memo } from 'react';
-import Background from '../components/Background';
-import BackButton from '../components/BackButton';
+import Background from '../components/Authentication/Background';
+import BackButton from '../components/Authentication/BackButton';
 import Header from '../components/Authentication/Header';
 import TextInput from '../components/Authentication/TextInput';
 import { useNavigation } from '@react-navigation/native';
@@ -227,7 +227,7 @@ const SignUpScreen = () => {
               <View style={styles.modalBackground}>
                 <View style={styles.emailSentModal}>
                   <Image
-                    source={require('../assets/email-sent.png')}
+                    source={require('../assets/auth/email-sent.png')}
                     style={styles.emailSentImage}
                   />
 

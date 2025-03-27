@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { db } from '../utils/firebaseConfig';
-import { getItem } from '../utils/asyncStorage';
+import { db } from '../../utils/firebaseConfig';
+import { getItem } from '../../utils/asyncStorage';
 
 const EventQuestCard = ({ 
   questNumber,
@@ -105,18 +105,18 @@ const EventQuestCard = ({
               />
             </View>
             <Text style={styles.progressText}>
-              {!isLoading && (questType === "earlyBird" ? (isFailed ? 'Failed' : (isCompleted ? (isCompleted && rewardsClaimed) ? 'Rewards Claimed' : 'Complete' : 'In progress')) : (isCompleted ? (isCompleted && rewardsClaimed) ? 'Rewards Claimed' : 'Complete' : 'In progress'))}
+              {!isLoading && (questType === "earlyBird" ? (isFailed ? 'Failed' : (isCompleted ? (isCompleted && rewardsClaimed) ? 'Rewards Claimed' : 'Completed, Come to Claim Your Rewards' : 'In progress')) : (isCompleted ? (isCompleted && rewardsClaimed) ? 'Rewards Claimed' : 'Completed, Come to Claim Your Rewards' : 'In progress'))}
             </Text>
           </View>
 
           {/* Rewards */}
           <View style={styles.rewards}>
             <View style={styles.rewardItem}>
-              <Image source={require("../assets/icons/diamond.png")} style={styles.iconImage} />                
+              <Image source={require("../../assets/icons/diamond.png")} style={styles.iconImage} />                
               <Text style={styles.rewardValue}>{diamondsRewards}</Text>
             </View>
             <View style={styles.rewardItem}>
-              <Image source={require("../assets/icons/point.png")} style={styles.iconImage} />
+              <Image source={require("../../assets/icons/point.png")} style={styles.iconImage} />
               <Text style={styles.rewardValue}>{pointsRewards}</Text>
             </View>
           </View>
@@ -128,7 +128,7 @@ const EventQuestCard = ({
         <View 
           style={[
             styles.actionButton,
-            { backgroundColor: isCompleted ? '#4CAF50' : '#5B7FDE' }
+            { backgroundColor: (questType === "earlyBird" ? (isFailed ? '#FF6B6B' : (isCompleted ? '#4CAF50' : '#5E96CE')) : (isCompleted ? '#4CAF50' : '#5E96CE')) }
           ]}
         >
           <MaterialCommunityIcons 

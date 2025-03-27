@@ -8,7 +8,7 @@ import { theme } from '../core/theme';
 import { auth, db } from '../utils/firebaseConfig';
 
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import Background from '../components/Background';
+import Background from '../components/Authentication/Background';
 import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getItem, removeItem, setItem } from '../utils/asyncStorage';
 import { Asset } from 'expo-asset';
@@ -56,7 +56,7 @@ const SignInScreen = () => {
         const userSignedUpDataJSON = await getItem('@userSignedUpData');
         if (userSignedUpDataJSON) {
           const userSignedUpData = JSON.parse(userSignedUpDataJSON);
-          const imageAsset = Asset.fromModule(require('../assets/defaultProfilePic.png'));
+          const imageAsset = Asset.fromModule(require('../assets/auth/defaultProfilePic.png'));
           await imageAsset.downloadAsync();
 
           const ProfilePicBase64 = await FileSystem.readAsStringAsync(imageAsset.localUri, {
@@ -136,7 +136,7 @@ const SignInScreen = () => {
       <Background>
         <KeyboardAvoidingView style={styles.container} behavior='padding'>
           <Image source={require('../assets/logo.png')} style={styles.image} />
-          <Header>Welcome Back, Champion!</Header>
+          <Header>Welcome Back, Warrior!</Header>
           <TextInput
             label="Email"
             returnKeyType="next"
@@ -189,11 +189,11 @@ const SignInScreen = () => {
             <View style={styles.modalBackground}>
               <View style={styles.verificationModal}>
                 <Image
-                  source={require('../assets/email-send.png')}
+                  source={require('../assets/auth/email-send.png')}
                   style={styles.verificationImage}
                 />
 
-                <Text style={styles.verificationTitle}>Whoa there, Champion!</Text>
+                <Text style={styles.verificationTitle}>Whoa there, Warrior!</Text>
                 <Text style={styles.verificationText}>
                   Looks like you haven't verified your email yet! Check your inbox for the verification link.
                   Your quest awaits after verification! 🏆✨

@@ -1,11 +1,34 @@
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions, Image, TouchableOpacity, Modal } from 'react-native';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { 
+    View, 
+    Text, 
+    StyleSheet, 
+    ScrollView, 
+    ActivityIndicator, 
+    Dimensions, 
+    Image, 
+    TouchableOpacity } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
+import * as Notifications from 'expo-notifications';
 
-import { doc, getDoc, collection, query, where, getDocs, deleteDoc, Timestamp } from 'firebase/firestore';
+import { 
+    doc, 
+    onSnapshot, 
+    collection, 
+    query, 
+    where, 
+    deleteDoc,
+    Timestamp, 
+    getDocs, 
+    writeBatch } from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig';
+
 import { useNavigation } from '@react-navigation/native';
+import { getItem } from '../utils/asyncStorage';
+
+import PaymentProofModal from '../components/Modal/PaymentProofModal';
+import CancelRegistrationModal from '../components/Modal/CancelRegistrationModal';
 
 const { width } = Dimensions.get('window');
 
@@ -33,7 +56,7 @@ const ORGANISER_MAPPING = {
 }
 
 const RegisteredEventScreen = ({ route }) => {
-    const { registrationID } = route.params || {};
+    const { eventID, registrationID } = route.params || {};
 
     const [isLoading, setIsLoading] = useState(false);
     const [eventDetails, setEventDetails] = useState({});
@@ -47,92 +70,12 @@ const RegisteredEventScreen = ({ route }) => {
 
     const navigation = useNavigation();
 
-    useEffect(() => {
-        const fetchEventDetails = async () => {
-            try {
-                setIsLoading(true);
-
-                if (!registrationID) return;
-
-                const registrationRef = doc(db, "registration", registrationID);
-                const registrationSnap = await getDoc(registrationRef);
-
-                if (!registrationSnap.exists()) {
-                    console.log("No such registration!");
-                    setIsLoading(false);
-                    return;
-                }
-
-                const registrationData = registrationSnap.data();
-
-                // Query event collection by document ID
-                const eventRef = doc(db, "event", registrationData.eventID);
-                const eventSnap = await getDoc(eventRef);
-
-                if (!eventSnap.exists()) {
-                    console.log("No such event!");
-                    setIsLoading(false);
-                    return;
-                }
-
-                const eventData = eventSnap.data();
-
-                const eventImagesRef = collection(db, "eventImages");
-                const eventImagesQuery = query(eventImagesRef, where("eventID", "==", registrationData.eventID));
-                const eventImagesSnap = await getDocs(eventImagesQuery);
-
-                let images = [];
-                eventImagesSnap.forEach((doc) => {
-                    if (doc.data().images) {
-                        images = [...images, ...doc.data().images];
-                    }
-                });
-
-                // Set the state with the event data
-                const eventDetails = {
-                    name: eventData.eventName,
-                    description: eventData.eventDescription,
-                    startTime: eventData.eventStartDateTime,
-                    endTime: eventData.eventEndDateTime,
-                    registrationClosingDate: eventData.registrationClosingDate,
-                    locationName: eventData.locationName,
-                    locationLongitude: eventData.locationLongitude,
-                    locationLatitude: eventData.locationLatitude,
-                    requiresPaymentProof: eventData.paymentProofRequired,
-                    requiresCapacity: eventData.requiresCapacity,
-                    organiserID: eventData.organiserID,
-                    category: eventData.category,
-                    images
-                };
-
-                if (eventDetails.requiresCapacity) {
-                    eventDetails.capacity = eventData.capacity;
-                }
-
-                setRegistrationDetails(registrationData);
-                setEventDetails(eventDetails);
-                setIsLoading(false);
-            } catch (error) {
-                console.error("Error fetching registration and/or event data:", error);
-                setEventDetails({});
-                setIsLoading(false);
-            }
-        };
-
-        fetchEventDetails();
-    }, []);
-
-    const handleScroll = (event) => {
-        const contentOffsetX = event.nativeEvent.contentOffset.x;
-        const index = Math.round(contentOffsetX / width);
-    };
-
     const formatDateTime = (timestamp) => {
         if (!timestamp || !timestamp.seconds) return "Invalid Date";
 
         const date = new Date(timestamp.seconds * 1000);
 
-        // Format date (adjust format as needed)
+        // Format date
         return date.toLocaleString("en-US", {
             year: "numeric",
             month: "short",
@@ -142,21 +85,161 @@ const RegisteredEventScreen = ({ route }) => {
         });
     };
 
-    const handleCancelRegistration = async () => {
-        try {
-            const registrationRef = doc(db, "registration", registrationID);
+    const fetchEventData = useCallback(() => {
+        if (!registrationID) return () => {};
 
+        setIsLoading(true);
+        const registrationRef = doc(db, "registration", registrationID);
+
+        const unsubscribeRegistration = onSnapshot(registrationRef, async (registrationSnap) => {
+            if (!registrationSnap.exists()) {
+                console.log("No such registration!");
+                setIsLoading(false);
+                return;
+            }
+
+            const registrationData = registrationSnap.data();
+            const eventRef = doc(db, "event", registrationData.eventID);
+
+            const unsubscribeEvent = onSnapshot(eventRef, (eventSnap) => {
+                if (!eventSnap.exists()) {
+                    console.log("No such event!");
+                    setIsLoading(false);
+                    return;
+                }
+
+                const eventData = eventSnap.data();
+                const eventImagesRef = collection(db, "eventImages");
+                const eventImagesQuery = query(eventImagesRef, where("eventID", "==", registrationData.eventID));
+
+                const unsubscribeImages = onSnapshot(eventImagesQuery, (eventImagesSnap) => {
+                    const images = eventImagesSnap.docs.flatMap(doc => 
+                        doc.data().images ? doc.data().images : []
+                    );
+
+                    const processedEventDetails = {
+                        ...eventData,
+                        name: eventData.eventName,
+                        description: eventData.eventDescription,
+                        startTime: eventData.eventStartDateTime,
+                        endTime: eventData.eventEndDateTime,
+                        images,
+                        // Use optional chaining and nullish coalescing for safer access
+                        capacity: eventData.requiresCapacity ? eventData.capacity ?? 0 : undefined
+                    };
+
+                    setRegistrationDetails(registrationData);
+                    setEventDetails(processedEventDetails);
+                    setIsLoading(false);
+                });
+
+                return () => {
+                    unsubscribeImages();
+                };
+            });
+
+            return () => {
+                unsubscribeEvent();
+            };
+        });
+
+        return () => {
+            unsubscribeRegistration();
+        };
+    }, [registrationID]);
+
+    // Use effect with proper dependencies and cleanup
+    useEffect(() => {
+        const unsubscribe = fetchEventData();
+        return unsubscribe;
+    }, [fetchEventData]);
+
+    const handleScroll = (event) => {
+        const contentOffsetX = event.nativeEvent.contentOffset.x;
+        const index = Math.round(contentOffsetX / width);
+    };
+
+    // Memoized cancel registration handler to prevent unnecessary rerenders
+    const handleCancelRegistration = useCallback(async () => {
+        try {
+            setIsDeleting(true);
+            const registrationRef = doc(db, "registration", registrationID);
             await deleteDoc(registrationRef);
 
+            await deleteQuestProgress();
+
+            deleteNotifications();
+
             setCancelModalVisible(false);
-            setIsDeleting(false);
             navigation.goBack();
         } catch (error) {
             setError('Failed to delete. Please try again.');
+            console.error('Delete error:', error);
+        } finally {
             setIsDeleting(false);
-            console.error('Delete error:', err);
         }
-    };
+    }, [registrationID, navigation]);
+
+    const deleteNotifications = async () => {
+        const studentID = await getItem("studentID");
+        if (!studentID || !eventID) return;
+    
+        const notificationArr = [`${eventID}_${studentID}_1D`, `${eventID}_${studentID}_1H`];
+    
+        const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+    
+        notificationArr.forEach(async (notificationID) => {
+            const matchedNotification = scheduledNotifications.find(
+                notification => notification.content.data?.id === notificationID
+            );
+    
+            if (matchedNotification) {
+                // Cancel the specific notification using its identifier
+                await Notifications.cancelScheduledNotificationAsync(matchedNotification.identifier);
+                console.log(`Notification with unique ID ${notificationID} has been cancelled`);
+            }
+        });
+    };    
+
+    // Optimize quest progress deletion
+    const deleteQuestProgress = useCallback(async () => {
+        try {
+            const studentID = await getItem("studentID");
+            if (!studentID) return;
+
+            const questProgressRef = collection(db, "questProgress");
+            const questProgressQuery = query(
+                questProgressRef,
+                where("studentID", "==", studentID),
+                where("eventID", "==", eventID)
+            );
+
+            const questProgressSnap = await getDocs(questProgressQuery);
+            if (questProgressSnap.empty) return;
+
+            const questProgressDoc = questProgressSnap.docs[0];
+            const progressListRef = collection(db, "questProgress", questProgressDoc.id, "questProgressList");
+            const progressListSnapshots = await getDocs(progressListRef);
+
+            const batch = writeBatch(db);
+            progressListSnapshots.forEach((doc) => batch.delete(doc.ref));
+            
+            // Commit batch delete and delete main document
+            await Promise.all([
+                batch.commit(),
+                deleteDoc(questProgressDoc.ref)
+            ]);
+        } catch (error) {
+            console.error("Error deleting quest progress list:", error);
+        }
+    }, [eventID]);
+
+    // Performance optimization for rendering
+    const memoizedEventDetails = useMemo(() => ({
+        ...eventDetails,
+        startTime: eventDetails.startTime,
+        endTime: eventDetails.endTime
+    }), [eventDetails]);
 
     if (isLoading) {
         return (
@@ -186,10 +269,16 @@ const RegisteredEventScreen = ({ route }) => {
                         scrollEventThrottle={16}
                     >
                         {eventDetails.images && eventDetails.images.map((image, index) => (
-                            <View key={index} style={styles.imageWrapper}>
+                            <View 
+                                key={index} 
+                                style={styles.imageWrapper}
+                                accessibilityLabel={`Event Image ${index + 1}`}
+                            >
                                 <Image
                                     source={{ uri: `data:image/png;base64,${image}` }}
                                     style={styles.image}
+                                    defaultSource={require('../assets/images/image-not-found.png')}
+                                    onError={(e) => console.log(`Image ${index} load error`, e.nativeEvent.error)}
                                 />
                                 <View style={styles.indicator}>
                                     <Text style={styles.indicatorText}>
@@ -228,7 +317,7 @@ const RegisteredEventScreen = ({ route }) => {
 
                 <View style={styles.infoCard}>
                     <View style={styles.infoHeader}>
-                        <MaterialIcons name="person" size={22} color="black" />
+                        <MaterialIcons name="person" size={22} color="#A9A9A9" />
                         <Text style={styles.infoHeaderText}>Registration Status</Text>
                     </View>
 
@@ -327,7 +416,7 @@ const RegisteredEventScreen = ({ route }) => {
 
                 <View style={styles.infoCard}>
                     <View style={styles.infoHeader}>
-                        <MaterialIcons name="description" size={22} color="#4789d6" />
+                        <MaterialIcons name="description" size={22} color="#A9A9A9" />
                         <Text style={styles.infoHeaderText}>Description</Text>
                     </View>
                     <View style={styles.infoContent}>
@@ -337,7 +426,7 @@ const RegisteredEventScreen = ({ route }) => {
 
                 <View style={styles.infoCard}>
                     <View style={styles.infoHeader}>
-                        <Ionicons name="location" size={22} color="#4789d6" />
+                        <Ionicons name="location" size={22} color="#A9A9A9" />
                         <Text style={styles.infoHeaderText}>Location</Text>
                     </View>
                     <View style={styles.infoContent}>
@@ -367,85 +456,36 @@ const RegisteredEventScreen = ({ route }) => {
                     </View>
                 </View>
 
-                {eventDetails.requiresPaymentProof && registrationDetails.paymentProofBase64 && (
-                    <Modal
-                        visible={paymentProofModalVisible}
-                        transparent={true}
-                        animationType="fade"
-                        onRequestClose={() => setPaymentProofModalVisible(false)}
-                    >
-                        <View style={styles.modalOverlay}>
-                            <View style={styles.modalContent}>
-                                <View style={styles.modalHeader}>
-                                    <Text style={styles.modalTitle}>Payment Proof</Text>
-                                    <TouchableOpacity
-                                        onPress={() => setPaymentProofModalVisible(false)}
-                                        style={styles.closeButton}
-                                    >
-                                        <MaterialIcons name="close" size={24} color="#333" />
-                                    </TouchableOpacity>
-                                </View>
-                                <View style={styles.modalBody}>
-                                    <Image
-                                        source={{ uri: `data:image/jpeg;base64,${registrationDetails.paymentProofBase64}` }}
-                                        style={styles.paymentProofImage}
-                                        resizeMode="contain"
-                                    />
-                                </View>
-                            </View>
-                        </View>
-                    </Modal>
-                )}
+                <PaymentProofModal
+                    visible={paymentProofModalVisible}
+                    paymentProofBase64={registrationDetails.paymentProofBase64}
+                    onClose={() => setPaymentProofModalVisible(false)}
+                />
+
+                <CancelRegistrationModal
+                    visible={cancelModalVisible}
+                    onCancel={() => setCancelModalVisible(false)}
+                    onConfirm={handleCancelRegistration}
+                    isDeleting={isDeleting}
+                    error={error}
+                />
             </ScrollView>
 
-            {(eventDetails?.startTime && eventDetails.startTime.seconds - Timestamp.now().seconds > 3600) &&
+            {/* Footer for Cancel Registration */}
+            {(eventDetails?.startTime && 
+              eventDetails.startTime.seconds - Timestamp.now().seconds > 3600) && (
                 <View style={styles.footer}>
-                    <TouchableOpacity style={styles.cancelRegistrationButton} onPress={() => setCancelModalVisible(true)}>
-                        <Text style={styles.cancelRegistrationText}>Cancel Registration</Text>
+                    <TouchableOpacity 
+                        style={styles.cancelRegistrationButton} 
+                        onPress={() => setCancelModalVisible(true)}
+                        accessibilityLabel="Cancel Event Registration"
+                    >
+                        <Text style={styles.cancelRegistrationText}>
+                            Cancel Registration
+                        </Text>
                     </TouchableOpacity>
                 </View>
-            }
-
-            <Modal
-                animationType="fade"
-                transparent={true}
-                visible={cancelModalVisible}
-                onRequestClose={() => setCancelModalVisible(false)}
-            >
-                <View style={styles.cancelCenteredView}>
-                    <View style={styles.cancelModalView}>
-                        <Text style={styles.cancelModalTitle}>Confirm Registration Cancellation?</Text>
-
-                        <Text style={styles.cancelModalText}>
-                            Are you sure you want to cancel this event registration? This action cannot be undone.
-                        </Text>
-
-                        {error && <Text style={styles.errorText}>{error}</Text>}
-
-                        <View style={styles.buttonContainer}>
-                            <TouchableOpacity
-                                style={[styles.button, styles.cancelButton]}
-                                onPress={() => setModalVisible(false)}
-                                disabled={isDeleting}
-                            >
-                                <Text style={styles.buttonText}>Cancel</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.button, styles.confirmButton]}
-                                onPress={handleCancelRegistration}
-                                disabled={isDeleting}
-                            >
-                                {isDeleting ? (
-                                    <ActivityIndicator size="small" color="#ffffff" />
-                                ) : (
-                                    <Text style={styles.buttonText}>Confirm</Text>
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+            )}
         </View>
     )
 }
@@ -453,10 +493,6 @@ const RegisteredEventScreen = ({ route }) => {
 export default RegisteredEventScreen;
 
 const styles = StyleSheet.create({
-    backgroundImage: {
-        resizeMode: 'repeat',
-        opacity: 0.15
-    },
     background: {
         flex: 1,
         width: '100%',
@@ -647,44 +683,6 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginLeft: 6,
     },
-    modalOverlay: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    },
-    modalContent: {
-        width: '85%',
-        backgroundColor: 'white',
-        borderRadius: 16,
-        overflow: 'hidden',
-        maxHeight: '80%',
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F5',
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#333',
-    },
-    closeButton: {
-        padding: 4,
-    },
-    modalBody: {
-        padding: 16,
-        alignItems: 'center',
-    },
-    paymentProofImage: {
-        width: '100%',
-        height: 400,
-        borderRadius: 8,
-    },
     mapContainer: {
         height: 150,
         borderRadius: 8,
@@ -703,7 +701,7 @@ const styles = StyleSheet.create({
     },
     cancelRegistrationButton: {
         backgroundColor: '#ff4d4f',
-        paddingVertical: 14,
+        paddingVertical: 16,
         borderRadius: 8,
         alignItems: 'center',
     },
@@ -711,62 +709,5 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 18,
         fontWeight: '600',
-    },
-    cancelCenteredView: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    cancelModalView: {
-        backgroundColor: 'white',
-        borderRadius: 10,
-        padding: 20,
-        width: '80%',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
-    },
-    cancelModalTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        marginBottom: 10,
-        textAlign: 'center',
-    },
-    cancelModalText: {
-        fontSize: 16,
-        marginBottom: 20,
-        textAlign: 'center',
-    },
-    buttonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    button: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 5,
-        marginHorizontal: 5,
-        alignItems: 'center',
-    },
-    cancelButton: {
-        backgroundColor: '#C0C0C0',
-    },
-    confirmButton: {
-        backgroundColor: '#ff4d4f',
-    },
-    buttonText: {
-        fontWeight: 'bold',
-        color: 'white',
-    },
-    errorText: {
-        color: '#ff4d4f',
-        marginBottom: 10,
-        textAlign: 'center',
     },
 });

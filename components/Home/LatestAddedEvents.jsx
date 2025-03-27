@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
-import { db } from '../utils/firebaseConfig';
+import { db } from '../../utils/firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
@@ -23,7 +23,7 @@ const ORGANISER_MAPPING = {
   10: "Faculty of Social Sciences & Humanities",
 };
 
-const LatestEvents = ({ setIsLoading }) => {
+const LatestAddedEvents = ({ setIsLoading }) => {
   const [latestEvents, setLatestEvents] = useState([]);
   const [localLoading, setLocalLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -116,7 +116,7 @@ const LatestEvents = ({ setIsLoading }) => {
               source={{ uri: `data:image/png;base64,${item.thumbnail}` }}
               style={styles.image}
               resizeMode="cover"
-              defaultSource={require('../assets/placeholder.png')}
+              defaultSource={require('../../assets/home/placeholder.png')}
             />
           ) : (
             <View style={styles.noImageContainer}>
@@ -190,7 +190,7 @@ const LatestEvents = ({ setIsLoading }) => {
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <View style={styles.headerTitleContainer}>
-          <MaterialIcons name="event" size={20} color="#007AFF" />
+          <MaterialIcons name="event" size={20} color="#A9A9A9" />
           <Text style={styles.sectionTitle}>Latest Events</Text>
         </View>
         <TouchableOpacity 
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     marginLeft: 8,
     color: '#333',
@@ -385,4 +385,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LatestEvents;
+export default LatestAddedEvents;

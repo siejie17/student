@@ -3,12 +3,12 @@ import React, { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { db } from '../utils/firebaseConfig';
-import { doc, onSnapshot, query, where, getDocs, collection, orderBy } from "firebase/firestore";
-import { getItem } from '../utils/asyncStorage';
+import { db } from '../../utils/firebaseConfig';
+import { doc, onSnapshot, query, where, collection, orderBy } from "firebase/firestore";
+import { getItem } from '../../utils/asyncStorage';
 import { useNavigation } from '@react-navigation/native';
 
-const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigation }) => {
+const MerchandiseLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigation }) => {
     const [diamonds, setDiamonds] = useState(0);
     const [diamondsLoading, setDiamondsLoading] = useState(false);
     const [rank, setRank] = useState(0);
@@ -150,13 +150,13 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
                 android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
             >
                 <LinearGradient
-                    colors={['#F6F8FD', '#EDF0F7']}
+                    colors={['#F6FCFD', '#EDF4F7']}
                     style={styles.cardGradient}
                 >
                     <View style={styles.cardHeader}>
                         <View style={styles.iconContainer}>
                             <Image
-                                source={require('../assets/icons/diamond.png')}
+                                source={require('../../assets/icons/diamond.png')}
                                 style={styles.icon}
                             />
                         </View>
@@ -171,7 +171,7 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
 
                     <View style={styles.cardFooter}>
                         <Text style={styles.actionText}>Browse Merchandise</Text>
-                        <Ionicons name="chevron-forward" size={16} color="#6c63ff" />
+                        <Ionicons name="chevron-forward" size={16} color="#7084cf" />
                     </View>
                 </LinearGradient>
             </Pressable>
@@ -185,13 +185,13 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
                 android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
             >
                 <LinearGradient
-                    colors={['#F6F8FD', '#EDF0F7']}
+                    colors={['#F6FCFD', '#EDF4F7']}
                     style={styles.cardGradient}
                 >
                     <View style={styles.cardHeader}>
                         <View style={[styles.iconContainer, styles.trophyContainer]}>
                             <Image
-                                source={require('../assets/icons/trophy.png')}
+                                source={require('../../assets/icons/trophy.png')}
                                 style={styles.icon}
                             />
                         </View>
@@ -212,7 +212,7 @@ const MerchLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigatio
 
                     <View style={styles.cardFooter}>
                         <Text style={styles.actionText}>View Leaderboard</Text>
-                        <Ionicons name="chevron-forward" size={16} color="#6c63ff" />
+                        <Ionicons name="chevron-forward" size={16} color="#7084cf" />
                     </View>
                 </LinearGradient>
             </Pressable>
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     },
     diamondNumber: {
         fontWeight: '700',
-        color: '#638aff',
+        color: '#333',
     },
     subtitle: {
         fontSize: 12,
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     actionText: {
         fontSize: 13,
         fontWeight: '500',
-        color: '#638aff',
+        color: '#7084cf',
     },
     rankBadgeContainer: {
         flexDirection: 'row',
@@ -333,4 +333,4 @@ const styles = StyleSheet.create({
     }
 });
 
-export default MerchLeaderboardCards;
+export default MerchandiseLeaderboardCards;

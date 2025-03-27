@@ -6,6 +6,7 @@ import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import * as ImagePicker from 'expo-image-picker';
 import { GestureHandlerRootView, TextInput } from 'react-native-gesture-handler';
 import { AlertTriangle, CircleX } from 'lucide-react-native';
+import * as Notifications from 'expo-notifications';
 
 import { db } from '../utils/firebaseConfig';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot } from "firebase/firestore";
@@ -13,6 +14,15 @@ import { getItem } from '../utils/asyncStorage';
 import { useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
+
+// Configure notifications
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+    }),
+});
 
 const EventDetailsScreen = ({ route }) => {
     const { eventID } = route.params;
@@ -288,16 +298,124 @@ const EventDetailsScreen = ({ route }) => {
 
             await addDoc(collection(db, "registration"), registrationData);
 
+            addQuest(studentID);
+
+            schedulePushNotification(studentID);
+
             navigation.goBack();
         } catch (error) {
             console.error("Error registering for event:", error);
         }
     };
 
+    const addQuest = async (studentID) => {
+        try {
+            const eventQuestRef = collection(db, "quest");
+            const eventQuestQuery = query(eventQuestRef, where("eventID", "==", eventID));
+            const eventQuestSnap = await getDocs(eventQuestQuery);
+
+            if (eventQuestSnap.empty) {
+                throw new Error("There is no matching event quests with the event ID.")
+            }
+
+            const eventQuestDoc = eventQuestSnap.docs[0];
+            const eventQuestID = eventQuestDoc.id;
+
+            const questListRef = collection(db, "quest", eventQuestID, "questList");
+            const questListSnapshots = await getDocs(questListRef);
+
+            const questListData = questListSnapshots.docs.map(doc => ({
+                questID: doc.id,
+            }));
+
+            const questProgressRef = collection(db, "questProgress");
+            const questProgressDoc = await addDoc(questProgressRef, {
+                studentID,
+                eventID
+            });
+
+            // Get the newly created document ID
+            const questProgressID = questProgressDoc.id;
+
+            // Reference to the "questProgressList" subcollection within "questProgress"
+            const questProgressListRef = collection(db, "questProgress", questProgressID, "questProgressList");
+
+            // Batch insert each quest item into the "questProgressList" subcollection
+            for (const quest of questListData) {
+                await addDoc(questProgressListRef, {
+                    questID: quest.questID,
+                    isCompleted: false,
+                    progress: 0,
+                    rewardsClaimed: false,
+                });
+            }
+
+            console.log("Quest progress successfully created with ID:", questProgressID);
+        } catch (error) {
+            console.error("Error adding quest progress:", error.message);
+        }
+    }
+
+    const schedulePushNotification = async (studentID) => {
+        try {
+            if (!studentID || !eventID || !eventDetails.name) {
+                throw new Error('Incomplete data to schedule the notification');
+            }
+
+            const { status } = await Notifications.requestPermissionsAsync();
+            if (status !== 'granted') {
+                alert('Notification permissions required');
+                return;
+            }
+
+            // Scenario 1: A day before the event start date time
+            const dayBeforeEventDate = new Date(eventDetails.startTime.seconds * 1000);
+            dayBeforeEventDate.setDate(dayBeforeEventDate.getDate() - 1);
+
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: "Get Ready! 🎉",
+                    body: `${eventDetails.name} is just around the corner - 1 day to go!`,
+                    sound: true,
+                    data: {
+                        id: `${eventID}_${studentID}_1D`
+                    }
+                }, 
+                trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DATE,
+                    date: dayBeforeEventDate,
+                    repeats: false,
+                }
+            })
+
+            // Scenario 2: A hour before the event start date time
+            const HourBeforeEventDate = new Date(eventDetails.startTime.seconds * 1000);
+            HourBeforeEventDate.setHours(HourBeforeEventDate.getHours() - 1);
+
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: "Don't Miss This! 😉",
+                    body: `${eventDetails.name} is awaiting us, warrior! 1 hour to go!`,
+                    sound: true,
+                    data: {
+                        id: `${eventID}_${studentID}_1H`
+                    }
+                }, 
+                trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DATE,
+                    date: HourBeforeEventDate,
+                    repeats: false,
+                }
+            })
+        } catch (error) {
+            console.error("Error setting up the notification:", error);
+        }
+    }
+
     if (isLoading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#3b82f6" />
+                <ActivityIndicator size="large" color="#4A6FA5" />
                 <Text style={styles.loadingText}>Loading the event details...</Text>
             </View>
         )
@@ -568,9 +686,9 @@ const styles = StyleSheet.create({
         backgroundColor: "white",
     },
     loadingText: {
-        marginTop: 12,
+        marginTop: 14,
         fontSize: 16,
-        color: '#1e3a8a',
+        color: '#36454F',
         fontWeight: '500',
     },
     header: {

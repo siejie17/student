@@ -25,29 +25,29 @@ const HeroBanner = () => {
       id: '1',
       title: 'Hello, UniEXP',
       subtitle: 'Discover events, earn rewards & build your network',
-      image: require('../assets/logo.png'),
-      color: ['#6495ED', '#ADD8E6'],
+      image: require('../../assets/home/banner_1.png'),
+      color: ['#6284bf', '#9ed6e8'],
     },
     {
       id: '2',
       title: 'Level Up Campus Life',
       subtitle: 'Complete quests, unlock rewards & explore',
-      image: require('../assets/banner2.png'),
-      color: ['#6495ED', '#ADD8E6'],
+      image: require('../../assets/home/banner_2.png'),
+      color: ['#6284bf', '#9ed6e8'],
     },
     {
       id: '3',
       title: 'Join. Play. Win.',
       subtitle: 'Climb leaderboards & earn recognition',
-      image: require('../assets/banner3.png'),
-      color: ['#6495ED', '#ADD8E6'],
+      image: require('../../assets/home/banner_3.png'),
+      color: ['#6284bf', '#9ed6e8'],
     },
     {
       id: '4',
       title: 'Your Achievements',
       subtitle: 'Track progress and collect badges as you go',
-      image: require('../assets/banner4.png'),
-      color: ['#6495ED', '#ADD8E6'],
+      image: require('../../assets/home/banner_4.png'),
+      color: ['#6284bf', '#9ed6e8'],
     },
   ];
 
@@ -203,14 +203,18 @@ const styles = StyleSheet.create({
   },
   dotContainer: {
     flexDirection: 'row',
-    top: 40,
-    alignSelf: 'center',
+    position: 'absolute', // Use absolute positioning
+    bottom: 10, // Position from the bottom
+    left: 0,
+    right: 0, // Ensure it spans the full width
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
     marginHorizontal: 4,
   },
   activeDot: {

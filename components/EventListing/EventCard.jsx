@@ -4,19 +4,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
-const organiserMapping = {
-    1: "Faculty of Applied & Creative Arts",
-    2: "Faculty of Built Environment",
-    3: "Faculty of Cognitive Sciences & Human Development",
-    4: "Faculty of Computer Science & Information Technology",
-    5: "Faculty of Economics & Business",
-    6: "Faculty of Education, Language & Communication",
-    7: "Faculty of Engineering",
-    8: "Faculty of Medicine & Health Sciences",
-    9: "Faculty of Resource Science & Technology",
-    10: "Faculty of Social Sciences & Humanities",
-};
-
 const FACULTY_SHORT_MAPPING = {
   1: "FACA",
   2: "FBE",
@@ -33,16 +20,16 @@ const FACULTY_SHORT_MAPPING = {
 // Helper function to get faculty accent color
 const getFacultyColor = (id) => {
     const colors = {
-        1: "#FF5252", // Arts - Red
-        2: "#8BC34A", // Built Environment - Green
-        3: "#AB47BC", // Cognitive Sciences - Purple
-        4: "#2196F3", // Computer Science - Blue
-        5: "#FFC107", // Economics - Amber
-        6: "#FF9800", // Education - Orange
-        7: "#607D8B", // Engineering - Blue Grey
-        8: "#F44336", // Medicine - Red
-        9: "#4CAF50", // Resource Science - Green
-        10: "#9C27B0", // Social Sciences - Purple
+        1: "rgba(255, 82, 82, 0.3)", // Arts - Red
+        2: "rgba(139, 195, 74, 0.3)", // Built Environment - Green
+        3: "rgba(171, 71, 188, 0.3)", // Cognitive Sciences - Purple
+        4: "rgba(33, 150, 243, 0.3)", // Computer Science - Blue
+        5: "rgba(255, 193, 7, 0.3)", // Economics - Amber
+        6: "rgba(127, 0, 255, 0.3)", // Education - Violet
+        7: "rgba(102, 153, 204, 0.3)", // Engineering - Blue Grey
+        8: "rgba(222, 205, 53, 0.3)", // Medicine - Yellow
+        9: "rgba(240, 46, 198, 0.3)", // Resource Science - Pink
+        10: "rgba(150, 75, 0, 0.3)", // Social Sciences - Brown
     };
     return colors[id] || "#757575"; // Default grey if not found
 };
@@ -71,9 +58,17 @@ const EventCard = ({ event, onPress }) => {
             time: date.toLocaleTimeString('en-US', timeOptions)
         };
     };
+
+    const startDT = new Date(event.eventStartDateTime.seconds * 1000);
+    const endDT = new Date(event.eventEndDateTime.seconds * 1000);
+
+    const startDateStr = startDT.toISOString().split('T')[0];
+    const endDateStr = endDT.toISOString().split('T')[0];
     
     const startDateTime = formatDate(event.eventStartDateTime);
-    const endDateTime = formatDate(event.eventEndDateTime);
+    const endDateTime = startDateStr === endDateStr
+    ? endDT.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true })
+    : endDT.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true }) + " (" + endDT.toLocaleDateString("en-GB") + ")";
     const registrationDeadline = formatDate(event.registrationClosingDate);
     
     const facultyColor = getFacultyColor(event.organiserID);
@@ -127,7 +122,7 @@ const EventCard = ({ event, onPress }) => {
                 <View style={styles.timeRow}>
                     <MaterialCommunityIcons name="clock-outline" size={16} color="#757575" />
                     <Text style={styles.timeText}>
-                        {startDateTime.time} - {endDateTime.time}
+                        {startDateTime.time} - {endDateTime}
                     </Text>
                 </View>
                 
@@ -185,7 +180,7 @@ const styles = StyleSheet.create({
         zIndex: 1,
     },
     facultyTagText: {
-        color: '#fff',
+        color: '#322D31',
         fontSize: 12,
         fontWeight: '600',
     },
@@ -276,6 +271,6 @@ const styles = StyleSheet.create({
     deadlineText: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#FF5252',
+        color: '#333030',
     },
 });
