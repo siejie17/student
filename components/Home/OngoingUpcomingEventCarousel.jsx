@@ -24,16 +24,16 @@ const ORGANISER_MAPPING = {
 
 // Faculty color mapping
 const FACULTY_COLORS = {
-    1: ['#FF9AA2', '#FFB7B2'], // Arts - Soft pink
-    2: ['#BDB2FF', '#A0C4FF'], // Built Environment - Lavender
-    3: ['#FFE7AA', '#FFDAC1'], // Cognitive Sciences - Light orange
-    4: ['#A5F1E9', '#7BDFF2'], // Computer Science - Cyan
-    5: ['#B5EAD7', '#C7F9CC'], // Economics - Mint green
-    6: ['#E2F0CB', '#CEEDC7'], // Education - Light green
-    7: ['#E7C6FF', '#DCB0FF'], // Engineering - Light purple
-    8: ['#FF9AA2', '#FFB7B2'], // Medicine - Soft pink
-    9: ['#D8E2DC', '#ECE4DB'], // Resource Science - Light gray
-    10: ['#FFCFD2', '#FFC8DD'], // Social Sciences - Pink
+    1: ['rgba(255, 154, 162, 0.3)', 'rgba(255, 183, 178, 0.3)'], // Arts - Soft pink
+    2: ['rgba(189, 178, 255, 0.3)', 'rgba(160, 196, 255, 0.3)'], // Built Environment - Lavender
+    3: ['rgba(255, 231, 170, 0.3)', 'rgba(255, 218, 193, 0.3)'], // Cognitive Sciences - Light orange
+    4: ['rgba(165, 241, 233, 0.3)', 'rgba(123, 223, 242, 0.3)'], // Computer Science - Cyan
+    5: ['rgba(181, 234, 215, 0.3)', 'rgba(199, 249, 204, 0.3)'], // Economics - Mint green
+    6: ['rgba(226, 240, 203, 0.3)', 'rgba(206, 237, 199, 0.3)'], // Education - Light green
+    7: ['rgba(231, 198, 255, 0.3)', 'rgba(220, 176, 255, 0.3)'], // Engineering - Light purple
+    8: ['rgba(255, 154, 162, 0.3)', 'rgba(255, 183, 178, 0.3)'], // Medicine - Soft pink
+    9: ['rgba(216, 226, 220, 0.3)', 'rgba(236, 228, 219, 0.3)'], // Resource Science - Light gray
+    10: ['rgba(255, 207, 210, 0.3)', 'rgba(255, 200, 221, 0.3)'], // Social Sciences - Pink
 };
 
 const OngoingUpcomingEventCarousel = ({ setIsLoading, navigation }) => {

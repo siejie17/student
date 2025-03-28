@@ -8,7 +8,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import QRCode from 'react-native-qrcode-svg';
 import CryptoJS from 'react-native-crypto-js';
 import NetworkScannedModal from '../Modal/NetworkScannedModal';
-import QuestCompletedModal from '../Modal/QuestCompleteModal';
+import QuestCompletedModal from '../Modal/QuestCompletedModal';
+import NetworkingFailureModal from '../Modal/NetworkingFailureModal';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -42,6 +43,12 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
     const [claimed, setClaimed] = useState(false);
     const [scannedModalVisible, setScannedModalVisible] = useState(false);
     const [completedModalVisible, setCompletedModalVisible] = useState(false);
+    const [networkingFailureModalVisible, setNetworkingFailureModalVisible] = useState(false);
+    const [networkingFailureModalContent, setNetworkingFailureModalContent] = useState({
+        title: '',
+        subtitle: '',
+    })
+
 
     // Camera and scanning states
     const [permission, requestPermission] = useCameraPermissions();
@@ -70,6 +77,7 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
 
     useEffect(() => {
         setIsLoading(true);
+        setScanned(false);
         generateNetworkQR();
 
         // Animate QR code entrance
@@ -131,8 +139,6 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                 facultyID: studentSnapData.facultyID
             }
 
-            // console.log(studentData);
-
             setUserDetails(studentData);
         } catch (error) {
             console.error("Error when fetching user details:", error);
@@ -175,7 +181,7 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                     <>
                         <View style={styles.profileInfoContainer}>
                             <Text style={[styles.nameText, { color: "#000000" }]}>
-                            {userDetails.firstName || 'User'} {userDetails.lastName || ''}
+                                {userDetails.firstName || 'User'} {userDetails.lastName || ''}
                             </Text>
                         </View>
                         <View style={styles.academicInfo}>
@@ -236,8 +242,6 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
 
         let userNetworkStudentIDList = [];
 
-        // console.log(data);
-
         try {
             const decryptedBytes = CryptoJS.AES.decrypt(data, secretKey);
             const decryptedText = decryptedBytes.toString(CryptoJS.enc.Utf8);
@@ -245,6 +249,47 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
 
             if (parsedData.networkID && parsedData.eventID) {
                 const studentID = await getItem("studentID");
+
+                const allUserRef = collection(db, "user");
+                const allUserSnapshots = await getDocs(allUserRef);
+
+                const allUserIDs = allUserSnapshots.docs.map(doc => doc.id);
+
+                const userIdExists = allUserIDs.includes(parsedData.networkID);
+
+                if (!userIdExists) {
+                    setNetworkingFailureModalContent({
+                        title: '🕵️ Mystery User Detected',
+                        subtitle: 'Oops! Looks like this digital explorer hasn\'t joined the UniEXP universe yet. They\'re off the grid! 🌐❓'
+                    })
+                    setNetworkingFailureModalVisible(true);
+                    setMode('display');
+                    setScanned(false);
+                    return;
+                }
+
+                if (studentID === parsedData.networkID) {
+                    setNetworkingFailureModalContent({
+                        title: '🤨 Nice Try, Time Bender!',
+                        subtitle: 'Whoa there! Trying to scan yourself? Networking quests are about connecting with others, not your own reflection. 🪞✨'
+                    })
+                    setNetworkingFailureModalVisible(true);
+                    setMode('display');
+                    setScanned(false);
+                    return;
+                }
+
+                if (eventID !== parsedData.eventID) {
+                    setNetworkingFailureModalContent({
+                        title: '🌪️ Event Mismatch Alert',
+                        subtitle: 'Whoa, time traveler! You seem to be trying to scan into a different event dimension. Are we on the same mission? 🚀🗓️'
+                    })
+                    setNetworkingFailureModalVisible(true);
+                    setMode('display');
+                    setScanned(false);
+                    return;
+                }
+
                 if (!studentID) return;
 
                 const networkRef = collection(db, "network");
@@ -296,10 +341,20 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                         setScanned(false);
                     }
                 }
+            } else {
+                setNetworkingFailureModalContent({
+                    title: '🧩 Incomplete Connection Puzzle',
+                    subtitle: 'Oops! The QR code seems to have lost its way. Key details are missing from this digital whisper. 🌫️📡'
+                })
+                setNetworkingFailureModalVisible(true);
             }
         } catch (error) {
             console.error('Error processing QR code:', error);
-            Alert.alert('Error', 'Invalid QR code. Please try again.');
+            setNetworkingFailureModalContent({
+                title: '🧩 Incomplete Connection Puzzle',
+                subtitle: 'Oops! The QR code seems to have lost its way. Key details are missing from this digital whisper. 🌫️📡'
+            })
+            setNetworkingFailureModalVisible(true);
         }
     }
 
@@ -363,11 +418,10 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
 
     const updateQuestProgress = async (studentID) => {
         try {
-            
+
             const questProgressQuery = query(collection(db, "questProgress"), where("eventID", "==", eventID), where("studentID", "==", studentID));
             const questProgressSnap = await getDocs(questProgressQuery);
-
-            console.log(questProgressSnap.empty);
+            
             questProgressSnap.forEach(async (questProgress) => {
                 const questProgressID = questProgress.id;
 
@@ -499,7 +553,6 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
         setTimeout(() => {
             setAnimatingDiamonds(false);
             updateDatabase();
-            // addDiamondsToDatabase();
         }, 1500);
     }
 
@@ -576,133 +629,133 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
             <Text style={styles.description}>{selectedQuest.description}</Text>
 
             {/* Network Counter */}
-                <View style={styles.networkContainer}>
-                    <View style={styles.networkCard}>
-                        <View style={styles.progressBarContainer}>
-                            <View
-                                style={[
-                                    styles.progressBar,
-                                    { width: `${networkPercentage}%` }
-                                ]}
-                            />
-                        </View>
-                        <Text style={styles.networkText}>
-                            <Text style={styles.currentNetworkNumber}>{selectedQuest.progress}</Text>
-                            <Text style={styles.slashText}> / </Text>
-                            <Text style={styles.requiredNetworkNumber}>{selectedQuest.completionNum}</Text>
-                        </Text>
-                        <Text style={styles.networkLabel}>Networks Made</Text>
+            <View style={styles.networkContainer}>
+                <View style={styles.networkCard}>
+                    <View style={styles.progressBarContainer}>
+                        <View
+                            style={[
+                                styles.progressBar,
+                                { width: `${networkPercentage}%` }
+                            ]}
+                        />
                     </View>
+                    <Text style={styles.networkText}>
+                        <Text style={styles.currentNetworkNumber}>{selectedQuest.progress}</Text>
+                        <Text style={styles.slashText}> / </Text>
+                        <Text style={styles.requiredNetworkNumber}>{selectedQuest.completionNum}</Text>
+                    </Text>
+                    <Text style={styles.networkLabel}>Networks Made</Text>
                 </View>
+            </View>
 
-                <View style={styles.networkContainer}>
-                    <View style={styles.networkCard}>
-                        {mode === 'display' ? renderDisplayMode() : renderScanMode()}
-                    </View>
+            <View style={styles.networkContainer}>
+                <View style={styles.networkCard}>
+                    {mode === 'display' ? renderDisplayMode() : renderScanMode()}
                 </View>
+            </View>
 
-                {/* Rewards Section */}
-                <View style={styles.rewardsSection}>
-                    <Text style={styles.cardTitle}>Rewards</Text>
-                    <View style={styles.rewardsContainer}>
-                        <View style={styles.rewardItem}>
-                            <View style={styles.iconContainer}>
-                                <Image source={require("../../assets/icons/diamond.png")} style={styles.iconImage} />
-                            </View>
-                            <View style={styles.rewardTextContainer}>
-                                <Text style={styles.rewardValue}>{selectedQuest.diamondsRewards}</Text>
-                                <Text style={styles.rewardType}>diamonds</Text>
-                            </View>
+            {/* Rewards Section */}
+            <View style={styles.rewardsSection}>
+                <Text style={styles.cardTitle}>Rewards</Text>
+                <View style={styles.rewardsContainer}>
+                    <View style={styles.rewardItem}>
+                        <View style={styles.iconContainer}>
+                            <Image source={require("../../assets/icons/diamond.png")} style={styles.iconImage} />
                         </View>
-                        <View style={styles.separator} />
-                        <View style={styles.rewardItem}>
-                            <View style={[styles.iconContainer, styles.pointsIconContainer]}>
-                                <Image source={require("../../assets/icons/point.png")} style={styles.iconImage} />
-                            </View>
-                            <View style={styles.rewardTextContainer}>
-                                <Text style={styles.rewardValue}>{selectedQuest.pointsRewards}</Text>
-                                <Text style={styles.rewardType}>points</Text>
-                            </View>
+                        <View style={styles.rewardTextContainer}>
+                            <Text style={styles.rewardValue}>{selectedQuest.diamondsRewards}</Text>
+                            <Text style={styles.rewardType}>diamonds</Text>
                         </View>
                     </View>
+                    <View style={styles.separator} />
+                    <View style={styles.rewardItem}>
+                        <View style={[styles.iconContainer, styles.pointsIconContainer]}>
+                            <Image source={require("../../assets/icons/point.png")} style={styles.iconImage} />
+                        </View>
+                        <View style={styles.rewardTextContainer}>
+                            <Text style={styles.rewardValue}>{selectedQuest.pointsRewards}</Text>
+                            <Text style={styles.rewardType}>points</Text>
+                        </View>
+                    </View>
                 </View>
-                
-                {!selectedQuest.isCompleted && (mode === 'scan' ? (
-                    <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('display')}>
-                        <Text style={styles.showQRButtonText}>Show My Network QR</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('scan')}>
-                        <Text style={styles.showQRButtonText}>Scan Other's QR</Text>
-                    </TouchableOpacity>
-                ))}
+            </View>
 
-                {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
-                    <TouchableOpacity
-                        style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
-                        disabled={claimed}
-                        onPress={claimRewards}
-                    >
-                        <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
-                    </TouchableOpacity>
-                )}
-
-                {/* Animated diamonds */}
-                {diamondAnims.map((anim, index) => (
-                    <Animated.View
-                        key={`diamond-${index}`}
-                        style={[
-                            styles.animatedDiamond,
-                            {
-                                transform: [
-                                    { translateX: anim.translateX },
-                                    { translateY: anim.translateY },
-                                    { scale: anim.scale },
-                                    {
-                                        rotate: anim.rotate.interpolate({
-                                            inputRange: [0, 360],
-                                            outputRange: ['0deg', '360deg']
-                                        })
-                                    },
-                                ],
-                                opacity: anim.opacity,
-                            },
-                        ]}
-                    >
-                        <Image source={require('../../assets/icons/diamond.png')} style={styles.diamondImage} />
-                    </Animated.View>
-                ))}
-
-                {/* Animated diamonds */}
-                {pointAnims.map((anim, index) => (
-                    <Animated.View
-                        key={`diamond-${index}`}
-                        style={[
-                            styles.animatedPoint,
-                            {
-                                transform: [
-                                    { translateX: anim.translateX },
-                                    { translateY: anim.translateY },
-                                    { scale: anim.scale },
-                                    {
-                                        rotate: anim.rotate.interpolate({
-                                            inputRange: [0, 360],
-                                            outputRange: ['0deg', '360deg']
-                                        })
-                                    },
-                                ],
-                                opacity: anim.opacity,
-                            },
-                        ]}
-                    >
-                        <Image source={require('../../assets/icons/point.png')} style={styles.pointImage} />
-                    </Animated.View>
-                ))}
-
-                {/* Cancel Button */}
-                <TouchableOpacity style={[styles.cancelButton, { marginTop: 5 }]} onPress={onCancel}>
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
+            {!selectedQuest.isCompleted && (mode === 'scan' ? (
+                <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('display')}>
+                    <Text style={styles.showQRButtonText}>Show My Network QR</Text>
                 </TouchableOpacity>
+            ) : (
+                <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('scan')}>
+                    <Text style={styles.showQRButtonText}>Scan Other's QR</Text>
+                </TouchableOpacity>
+            ))}
+
+            {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
+                <TouchableOpacity
+                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
+                    disabled={claimed}
+                    onPress={claimRewards}
+                >
+                    <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
+                </TouchableOpacity>
+            )}
+
+            {/* Animated diamonds */}
+            {diamondAnims.map((anim, index) => (
+                <Animated.View
+                    key={`diamond-${index}`}
+                    style={[
+                        styles.animatedDiamond,
+                        {
+                            transform: [
+                                { translateX: anim.translateX },
+                                { translateY: anim.translateY },
+                                { scale: anim.scale },
+                                {
+                                    rotate: anim.rotate.interpolate({
+                                        inputRange: [0, 360],
+                                        outputRange: ['0deg', '360deg']
+                                    })
+                                },
+                            ],
+                            opacity: anim.opacity,
+                        },
+                    ]}
+                >
+                    <Image source={require('../../assets/icons/diamond.png')} style={styles.diamondImage} />
+                </Animated.View>
+            ))}
+
+            {/* Animated diamonds */}
+            {pointAnims.map((anim, index) => (
+                <Animated.View
+                    key={`diamond-${index}`}
+                    style={[
+                        styles.animatedPoint,
+                        {
+                            transform: [
+                                { translateX: anim.translateX },
+                                { translateY: anim.translateY },
+                                { scale: anim.scale },
+                                {
+                                    rotate: anim.rotate.interpolate({
+                                        inputRange: [0, 360],
+                                        outputRange: ['0deg', '360deg']
+                                    })
+                                },
+                            ],
+                            opacity: anim.opacity,
+                        },
+                    ]}
+                >
+                    <Image source={require('../../assets/icons/point.png')} style={styles.pointImage} />
+                </Animated.View>
+            ))}
+
+            {/* Cancel Button */}
+            <TouchableOpacity style={[styles.cancelButton, { marginTop: 5 }]} onPress={onCancel}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
 
             <NetworkScannedModal
                 isVisible={scannedModalVisible}
@@ -715,6 +768,15 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                     onClose={() => setCompletedModalVisible(false)}
                     questName={selectedQuest.questName}
                     autoDismissTime={2000}
+                />
+            )}
+
+            {networkingFailureModalVisible && (
+                <NetworkingFailureModal
+                    isVisible={networkingFailureModalVisible}
+                    onClose={() => setNetworkingFailureModalVisible(false)}
+                    title={networkingFailureModalContent.title}
+                    subtitle={networkingFailureModalContent.subtitle}
                 />
             )}
         </View>

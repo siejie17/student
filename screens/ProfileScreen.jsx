@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import {
   StyleSheet,
   View,
@@ -7,14 +7,18 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Platform,
   Alert,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { getItem, removeItem } from '../utils/asyncStorage';
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../utils/firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
 import { signOut } from 'firebase/auth';
+import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as ImagePicker from 'expo-image-picker';
 
 const FACULTY_MAPPING = {
   1: "FACA",
@@ -48,48 +52,60 @@ const ProfileScreen = () => {
   const [badgeProgressList, setBadgeProgressList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [isProfilePicSheetVisible, setIsProfilePicSheetVisible] = useState(false);
+  const snapPoints = useMemo(() => ['10%'], []);
+  const bottomSheetRef = useRef(null);
+
   const navigation = useNavigation();
 
   useEffect(() => {
-    const handleFetchUserData = async () => {
+    let unsubscribe = () => {};
+
+    const fetchUserInfo = async () => {
       try {
         setIsLoading(true);
+        const studentID = await getItem("studentID");
 
-        const userData = await fetchUserInfo();
-        setUserData(userData);
+        if (!studentID) {
+          console.warn("No student ID found.");
+          setIsLoading(false);
+          return;
+        }
 
-        // Then, fetch badge progress
-        const badgeProgress = await fetchUserBadgeProgress();
-        setBadgeProgressList(badgeProgress);
+        const userRef = doc(db, "user", studentID);
+
+        // Firestore real-time listener
+        unsubscribe = onSnapshot(userRef, async (userSnap) => {
+          if (userSnap.exists()) {
+            setUserData(userSnap.data());
+
+            try {
+              const badgeProgress = await fetchUserBadgeProgress();
+              setBadgeProgressList(badgeProgress);
+            } catch (error) {
+              console.error("Error fetching badge progress:", error);
+              setBadgeProgressList([]);
+            }
+          } else {
+            console.warn("User not found.");
+            setUserData(null);
+            setBadgeProgressList([]);
+          }
+          setIsLoading(false);
+        }, (error) => {
+          console.error("Error listening to user data:", error);
+          setIsLoading(false);
+        });
+
+        return unsubscribe; // Cleanup function
       } catch (error) {
-        console.error("Error in data fetching sequence:", error);
-        setUserData(null);
-        setBadgeProgressList([]);
-      } finally {
+        console.error("Error fetching user information:", error);
         setIsLoading(false);
       }
-    }
+    };
 
-    handleFetchUserData();
+    fetchUserInfo();
   }, []);
-
-  const fetchUserInfo = async () => {
-    try {
-      const studentID = await getItem("studentID");
-      const userRef = doc(db, "user", studentID);
-      const userSnap = await getDoc(userRef);
-
-      if (userSnap.exists()) {
-        return userSnap.data();
-      } else {
-        console.warn("User not found.");
-        return null;
-      }
-    } catch (error) {
-      console.error("Error fetching user information:", error);
-      throw error;
-    }
-  };
 
   // Then fetch badge progress info
   const fetchUserBadgeProgress = async () => {
@@ -144,10 +160,53 @@ const ProfileScreen = () => {
     }
   };
 
-  const calculateBadgeColumns = () => {
-    const screenWidth = Dimensions.get('window').width;
-    const badgeWidth = 80; // Estimated badge width
-    return Math.floor(screenWidth / badgeWidth);
+  const handleSheetClose = (index) => {
+    setIsProfilePicSheetVisible(index > 0);
+  };
+
+  const handleClosePress = useCallback(() => {
+    bottomSheetRef.current?.close();
+  }, []);
+
+  const pickImage = async () => {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to upload images!');
+        return;
+      }
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.3, // Lower quality to help keep size down
+      base64: true
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      if (result.assets[0].fileSize > 50 * 1024) {
+        Alert.alert('Image size exceeds 50KB limit. Please choose a smaller image.');
+        return;
+      }
+
+      const studentID = await getItem("studentID");
+      if (!studentID) {
+        console.warn("No student ID found.");
+        return;
+      }
+
+      const studentRef = doc(db, "user", studentID);
+      const studentSnap = await getDoc(studentRef);
+
+      if (studentSnap.exists()) {
+        await updateDoc(studentRef, {
+          profilePicture: result.assets[0].base64,
+        })
+      }
+    }
+
+    handleClosePress();
   };
 
   const renderBadge = (badge) => {
@@ -191,8 +250,8 @@ const ProfileScreen = () => {
   };
 
   const handleEditProfilePicture = () => {
-    console.log('Edit profile picture');
-    // Implement image picker functionality here
+    setIsProfilePicSheetVisible(true);
+    bottomSheetRef.current?.expand();
   };
 
   if (isLoading) {
@@ -223,7 +282,7 @@ const ProfileScreen = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
       </View>
@@ -316,11 +375,31 @@ const ProfileScreen = () => {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Text style={styles.signOutText}>Sign Out</Text>
+        <TouchableOpacity style={styles.button} onPress={handleSignOut}>
+          <Text style={styles.buttonText}>Sign Out</Text>
         </TouchableOpacity>
       </ScrollView>
-    </View>
+
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={isProfilePicSheetVisible ? 1 : -1}
+        enablePanDownToClose
+        snapPoints={snapPoints}
+        onChange={handleSheetClose}
+        handleIndicatorStyle={styles.handleIndicatorStyle}
+        handleStyle={styles.handleStyle}
+        style={styles.bottomSheetStyles}
+        backgroundStyle={{ backgroundColor: '#F5F5F5', borderTopLeftRadius: 34, borderTopRightRadius: 34, borderWidth: 0.4 }}
+        enableHandlePanningGesture
+        enableOverDrag={false}
+      >
+        <BottomSheetView>
+          <TouchableOpacity style={[styles.button, { marginHorizontal: 24 }]} onPress={pickImage}>
+            <Text style={styles.buttonText}>Change Profile Picture</Text>
+          </TouchableOpacity>
+        </BottomSheetView>
+      </BottomSheet>
+    </GestureHandlerRootView>
   )
 }
 
@@ -546,7 +625,7 @@ const styles = StyleSheet.create({
   chevronContainer: {
     padding: 4,
   },
-  signOutButton: {
+  button: {
     marginBottom: 24,
     backgroundColor: '#6284bf',
     borderRadius: 8,
@@ -558,7 +637,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  signOutText: {
+  buttonText: {
     fontSize: 16,
     color: '#FFFFFF',
     fontWeight: '600',
@@ -602,5 +681,31 @@ const styles = StyleSheet.create({
   },
   lockedBadgeName: {
     color: '#899499',
+  },
+  bottomSheetStyles: {
+    flex: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 40,
+    // backgroundColor: "rgba(74, 111, 165, 0.2)",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  handleIndicatorStyle: {
+    width: 40,
+    height: 4,
+    backgroundColor: 'black',
+    borderRadius: 2,
+  },
+  handleStyle: {
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    // backgroundColor: "transparent"
+  },
+  backgroundStyle: {
+    // backgroundColor: 'transparent',
   },
 });

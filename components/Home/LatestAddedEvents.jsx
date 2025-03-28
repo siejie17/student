@@ -1,9 +1,10 @@
 import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native'
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query, Timestamp, where } from 'firebase/firestore';
 import { db } from '../../utils/firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
+import { getItem } from '../../utils/asyncStorage';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.8;
@@ -39,7 +40,9 @@ const LatestAddedEvents = ({ setIsLoading }) => {
 
         // Query latest events
         const latestEventsQuery = query(
-          collection(db, "event"), 
+          collection(db, "event"),
+          where("registrationClosingDate", ">", Timestamp.now()),
+          where("status", "not-in", ["Completed", "Cancelled"]), 
           orderBy("lastAdded", "desc"), 
           limit(5)
         );
@@ -50,7 +53,15 @@ const LatestAddedEvents = ({ setIsLoading }) => {
           return;
         }
 
-        const latestEventsData = latestEventsSnap.docs.map((doc) => ({
+        const studentID = await getItem('studentID');
+
+        const registrationRef = collection(db, "registration");
+        const registrationQuery = query(registrationRef, where("studentID", "==", studentID));
+        const registrationSnapshots = await getDocs(registrationQuery);
+
+        const registeredEventIDs = registrationSnapshots.docs.map(doc => doc.data().eventID);
+
+        const latestEventsData = latestEventsSnap.docs.filter(doc => !registeredEventIDs.includes(doc.id)).map((doc) => ({
           id: doc.id,
           name: doc.data().eventName,
           organiserID: doc.data().organiserID,

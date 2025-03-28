@@ -5,7 +5,7 @@ import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/f
 import { db } from '../../utils/firebaseConfig';
 import { getItem } from '../../utils/asyncStorage';
 
-const EventQuestCard = ({ 
+const EventQuestCard = ({
   questNumber,
   title,
   isCompleted,
@@ -22,7 +22,7 @@ const EventQuestCard = ({
 
   useEffect(() => {
     const fetchEarlyBirdStatus = async () => {
-      try{
+      try {
         setIsLoading(true);
         const studentID = await getItem("studentID");
 
@@ -34,7 +34,6 @@ const EventQuestCard = ({
           setIsFailed(false);
           const earlyBirdiesData = earlyBirdiesSnap.docs.map(doc => doc.data());
           const currentStudentExists = earlyBirdiesData.some(item => item.studentID === studentID);
-          console.log(!currentStudentExists, earlyBirdiesSnap.size, maxEarlyBird)
           if (!currentStudentExists && earlyBirdiesSnap.size >= maxEarlyBird) {
             setIsFailed(true);
           }
@@ -53,29 +52,29 @@ const EventQuestCard = ({
       fetchEarlyBirdStatus();
     }
   }, []);
-  
+
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.container}
       onPress={onPress}
       activeOpacity={0.7}
     >
       {/* Status Indicator */}
-      <View 
+      <View
         style={[
           styles.statusIndicator,
           { backgroundColor: isCompleted ? '#E8F5E9' : '#FFF8F8' }
         ]}
       >
-        <View 
+        <View
           style={[
             styles.statusDot,
             { backgroundColor: !isLoading && (questType === "earlyBird" ? (isFailed ? '#FF6B6B' : (isCompleted ? '#4CAF50' : '#5E96CE')) : (isCompleted ? '#4CAF50' : '#5E96CE')) }
-          ]} 
+          ]}
         />
         {/* {console.log(isFailed, ";")} */}
       </View>
-      
+
       {/* Content Area */}
       <View style={styles.contentArea}>
         {/* Header with Quest Number and Title */}
@@ -83,25 +82,25 @@ const EventQuestCard = ({
           <Text style={styles.questNumber}>
             {questNumber}
           </Text>
-          <Text 
-            style={styles.title} 
+          <Text
+            style={styles.title}
             numberOfLines={2}
           >
             {title}
           </Text>
         </View>
-        
+
         {/* Main Content */}
         <View style={styles.mainContent}>
           {/* Progress Indicator */}
           <View style={styles.progressContainer}>
             <View style={styles.progressBarContainer}>
-              <View 
+              <View
                 style={[
                   styles.progressBar,
                   { width: isCompleted ? '100%' : '0%' },
                   { backgroundColor: isCompleted ? '#4CAF50' : '#5B7FDE' }
-                ]} 
+                ]}
               />
             </View>
             <Text style={styles.progressText}>
@@ -112,7 +111,7 @@ const EventQuestCard = ({
           {/* Rewards */}
           <View style={styles.rewards}>
             <View style={styles.rewardItem}>
-              <Image source={require("../../assets/icons/diamond.png")} style={styles.iconImage} />                
+              <Image source={require("../../assets/icons/diamond.png")} style={styles.iconImage} />
               <Text style={styles.rewardValue}>{diamondsRewards}</Text>
             </View>
             <View style={styles.rewardItem}>
@@ -122,19 +121,19 @@ const EventQuestCard = ({
           </View>
         </View>
       </View>
-      
+
       {/* Action Area */}
       <View style={styles.actionArea}>
-        <View 
+        <View
           style={[
             styles.actionButton,
             { backgroundColor: (questType === "earlyBird" ? (isFailed ? '#FF6B6B' : (isCompleted ? '#4CAF50' : '#5E96CE')) : (isCompleted ? '#4CAF50' : '#5E96CE')) }
           ]}
         >
-          <MaterialCommunityIcons 
-            name={isCompleted ? "check" : "chevron-right"} 
-            size={20} 
-            color="#FFFFFF" 
+          <MaterialCommunityIcons
+            name={isCompleted ? "check" : "chevron-right"}
+            size={20}
+            color="#FFFFFF"
           />
         </View>
       </View>
@@ -159,7 +158,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     overflow: 'hidden',
   },
-  
+
   // Status indicator on the left
   statusIndicator: {
     width: 4,
@@ -172,13 +171,13 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 2,
   },
-  
+
   // Content area
   contentArea: {
     flex: 1,
     padding: 16,
   },
-  
+
   // Header section
   header: {
     flexDirection: 'row',
@@ -199,14 +198,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     lineHeight: 22,
   },
-  
+
   // Main content with progress and rewards
   mainContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  
+
   // Progress section
   progressContainer: {
     flex: 1,
@@ -228,7 +227,7 @@ const styles = StyleSheet.create({
     color: '#757575',
     fontWeight: '500',
   },
-  
+
   // Rewards section
   rewards: {
     flexDirection: 'row',
@@ -249,7 +248,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#424242',
   },
-  
+
   // Action area on the right
   actionArea: {
     width: 56,

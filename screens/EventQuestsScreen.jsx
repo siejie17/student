@@ -11,9 +11,10 @@ import FeedbackQuestSheet from '../components/Quests/FeedbackQuestSheet';
 import QuestionAnswerQuestSheet from '../components/Quests/QuestionAnswerQuestSheet';
 import NetworkingQuestSheet from '../components/Quests/NetworkingQuestSheet';
 import AttendanceQuestSheet from '../components/Quests/AttendanceQuestSheet';
+import EventQuestsTimeRestrictedEmptyState from '../components/QuestCard/EventQuestsTimeRestrictedEmptyState';
 
 const EventQuestsScreen = ({ route, navigation }) => {
-  const { eventID, categoryID, latitude, longitude, registrationID } = route.params || {};
+  const { eventID, categoryID, eventStart, latitude, longitude, registrationID } = route.params || {};
 
   const [selectedQuest, setSelectedQuest] = useState(null);
   const [userQuestsList, setUserQuestsList] = useState([]);
@@ -22,7 +23,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isQuestSheetVisible, setIsQuestSheetVisible] = useState(false);
 
-  const snapPoints = useMemo(() => ['50%', '75%', '110%'], []);
+  const snapPoints = useMemo(() => ['50%'], []);
 
   const bottomSheetRef = useRef(null);
 
@@ -152,14 +153,35 @@ const EventQuestsScreen = ({ route, navigation }) => {
   // Use inside useEffect
   useEffect(() => {
     let unsubscribe = () => { };
+    let timer;
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    const timeUntilQuestsAvailable = eventStart.seconds - 3600 - currentTimestamp;
 
-    fetchUserQuests().then((cleanup) => {
-      if (typeof cleanup === "function") {
-        unsubscribe = cleanup;
+    const checkQuestAvailability = () => {
+      const now = Math.floor(Date.now() / 1000);
+
+      if (now >= eventStart.seconds - 3600) {
+        // Quests are now available
+        fetchUserQuests();
+        // Clear the timer since we no longer need to wait
+        if (timer) clearTimeout(timer);
       }
-    });
+    };
+
+    if (timeUntilQuestsAvailable > 0) {
+      // If quests are not yet available, set a timer
+      timer = setTimeout(checkQuestAvailability, timeUntilQuestsAvailable * 1000);
+    } else {
+      fetchUserQuests().then((cleanup) => {
+        if (typeof cleanup === "function") {
+          unsubscribe = cleanup;
+        }
+      });
+    }
+
 
     return () => {
+      if (timer) clearTimeout(timer);
       unsubscribe();
     };
   }, []);
@@ -210,6 +232,9 @@ const EventQuestsScreen = ({ route, navigation }) => {
         data={userQuestsList}
         renderItem={renderQuestCard}
         keyExtractor={item => item.questID}
+        ListEmptyComponent={() => {
+          return <EventQuestsTimeRestrictedEmptyState />;
+        }}
       />
 
       <BottomSheet
@@ -221,6 +246,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
         handleIndicatorStyle={styles.handleIndicatorStyle}
         handleStyle={styles.handleStyle}
         style={styles.bottomSheetStyles}
+        backgroundStyle={styles.backgroundStyle}
         enableHandlePanningGesture
         enableOverDrag={false}
       >
@@ -320,6 +346,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent"
   },
   backgroundStyle: {
-    backgroundColor: 'transparent',
+    borderWidth: 0.3,
+    backgroundColor: '#F5F5F5'
   }
 })

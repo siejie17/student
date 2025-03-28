@@ -7,7 +7,7 @@ import Constants from 'expo-constants';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import CryptoJS from 'react-native-crypto-js';
 import * as Location from 'expo-location';
-import QuestCompletedModal from '../Modal/QuestCompleteModal';
+import QuestCompletedModal from '../Modal/QuestCompletedModal';
 import { getDistance } from 'geolib';
 import { Ionicons } from '@expo/vector-icons';
 import AttendanceFailureModal from '../Modal/AttendanceFailureModal';
@@ -143,14 +143,14 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
                         title: 'Distance Denied!',
                         subtitle: 'Halt, valiant warrior! Your current position is too far from the quest zone. Teleport closer or prepare for an epic trek! 🗺️'
                     });
-                    setAttendanceFailureModalContent(true);
+                    setAttendanceFailureModalVisible(true);
                 }
             } else {
                 setAttendanceFailureModalContent({
                     title: "Time Warp Warning!",
                     subtitle: "Whoa, brave adventurer! The QR code has expired! 🕰️"
                 });
-                setAttendanceFailureModalContent(true);
+                setAttendanceFailureModalVisible(true);
             }
             setScanned(false);
             setMode('display');
@@ -169,7 +169,6 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
             const questProgressQuery = query(collection(db, "questProgress"), where("eventID", "==", eventID), where("studentID", "==", studentID));
             const questProgressSnap = await getDocs(questProgressQuery);
 
-            console.log(questProgressSnap.empty);
             questProgressSnap.forEach(async (questProgress) => {
                 const questProgressID = questProgress.id;
 

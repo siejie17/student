@@ -9,8 +9,9 @@ import {
     StatusBar,
     Alert
 } from 'react-native';
+import QuestCompletedModal from '../components/Modal/QuestCompletedModal';
 import { getItem } from '../utils/asyncStorage';
-import { addDoc, collection, doc, getDoc, getDocs, increment, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, increment, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig';
 
 const FeedbackFormScreen = ({ route, navigation }) => {
@@ -38,7 +39,6 @@ const FeedbackFormScreen = ({ route, navigation }) => {
                 if (!studentID && !eventID) return;
 
                 let feedbackBadge;
-                let badgeProgressID;
 
                 const questProgressListQuery = query(
                     collection(db, "questProgress"),
@@ -47,18 +47,16 @@ const FeedbackFormScreen = ({ route, navigation }) => {
                 );
 
                 const questProgressSnapshots = await getDocs(questProgressListQuery);
-    
+
                 questProgressSnapshots.forEach(async (questList) => {
                     let questListID = questList.id;
-            
+
                     const questRef = doc(db, "questProgress", questListID, "questProgressList", questProgressID);
-            
+
                     await updateDoc(questRef, {
                         isCompleted: true,
                         progress: increment(1),
                     })
-
-                    setCompletedModalVisible(true);
                 })
 
                 const feedbackRef = await addDoc(collection(db, "feedback"), {
@@ -72,22 +70,27 @@ const FeedbackFormScreen = ({ route, navigation }) => {
                 const feedbackBadgeQuery = query(collection(db, "badge"), where("badgeType", "==", questType));
                 const feedbackBadgeSnap = await getDocs(feedbackBadgeQuery);
 
-                feedbackBadgeSnap.forEach((badge) => {
-                    feedbackBadge = { 
-                        id: badge.id,
-                        ...badge.data(),
-                    }
-                });
+                // Ensure at least one badge is found
+                if (!feedbackBadgeSnap.empty) {
+                    feedbackBadgeSnap.forEach((badge) => {
+                        feedbackBadge = {
+                            id: badge.id,
+                            ...badge.data(),
+                        };
+                    });
+                } else {
+                    console.error("No badge found for the given questType:", questType);
+                    return; // Stop execution if no badge is found
+                }
 
                 const badgeProgressQuery = query(
                     collection(db, "badgeProgress"),
                     where("studentID", "==", studentID)
                 );
-
                 const badgeProgressSnap = await getDocs(badgeProgressQuery);
 
-                badgeProgressSnap.forEach(async (badgeProgress) => {
-                    badgeProgressID = badgeProgress.id;
+                for (const badgeProgress of badgeProgressSnap.docs) {
+                    const badgeProgressID = badgeProgress.id;
 
                     const userFeedbackBadgeRef = doc(db, "badgeProgress", badgeProgressID, "userBadgeProgress", feedbackBadge.id);
                     const userFeedbackBadgeSnap = await getDoc(userFeedbackBadgeRef);
@@ -96,11 +99,9 @@ const FeedbackFormScreen = ({ route, navigation }) => {
                         let userFeedbackBadgeProgress = userFeedbackBadgeSnap.data();
 
                         if (!userFeedbackBadgeProgress.isUnlocked) {
-                            let userProgress = userFeedbackBadgeProgress.progress;
+                            const userProgress = userFeedbackBadgeProgress.progress;
 
-                            userProgress++;
-
-                            if (userProgress === feedbackBadge.unlockProgress) {
+                            if (userProgress + 1 === feedbackBadge.unlockProgress) {
                                 await updateDoc(userFeedbackBadgeRef, {
                                     isUnlocked: true,
                                     progress: increment(1),
@@ -114,16 +115,11 @@ const FeedbackFormScreen = ({ route, navigation }) => {
                             }
                         }
                     } else {
-                        console.error("No user feedback badge progress has been found");
+                        console.error("No user feedback badge progress found for studentID:", studentID);
                     }
-                })
+                }
 
-                Alert.alert("Success", "Your feedback has been submitted. Thank you!");
-                // Reset form after submission
-                setQ1Rating(0);
-                setQ2Rating(0);
-                setAdditionalFeedback('');
-                navigation.goBack();
+                setCompletedModalVisible(true);
             } catch (error) {
                 console.error("Error when uploading feedback form details:", error);
             }
@@ -131,6 +127,15 @@ const FeedbackFormScreen = ({ route, navigation }) => {
             Alert.alert("Error", "Please complete all required fields.");
         }
     };
+
+    const closeCompletedModal = () => {
+        // Reset form after submission
+        setQ1Rating(0);
+        setQ2Rating(0);
+        setAdditionalFeedback('');
+        setCompletedModalVisible(false);
+        navigation.goBack();
+    }
 
     const RequiredAsterisk = () => (
         <Text style={styles.requiredAsterisk}>*</Text>
@@ -240,9 +245,9 @@ const FeedbackFormScreen = ({ route, navigation }) => {
             </View>
 
             {completedModalVisible && (
-                <QuestCompletedModal 
+                <QuestCompletedModal
                     isVisible={completedModalVisible}
-                    onClose={() => setCompletedModalVisible(false)}
+                    onClose={closeCompletedModal}
                     questName={questName}
                     autoDismissTime={2000} // Optional: custom auto-dismiss time
                 />

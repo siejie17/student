@@ -9,9 +9,10 @@ import { AlertTriangle, CircleX } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 
 import { db } from '../utils/firebaseConfig';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, writeBatch } from "firebase/firestore";
 import { getItem } from '../utils/asyncStorage';
-import { useNavigation } from '@react-navigation/native';
+import ClashScheduleModal from '../components/Modal/ClashScheduleModal';
+import RegistrationModal from '../components/Modal/RegistrationModal';
 
 const { width } = Dimensions.get('window');
 
@@ -24,7 +25,7 @@ Notifications.setNotificationHandler({
     }),
 });
 
-const EventDetailsScreen = ({ route }) => {
+const EventDetailsScreen = ({ navigation, route }) => {
     const { eventID } = route.params;
 
     const CATEGORY_MAPPING = {
@@ -64,11 +65,11 @@ const EventDetailsScreen = ({ route }) => {
     const [isLoading, setIsLoading] = useState(true);
 
     const [isRegistrationFormVisible, setIsRegistrationFormVisible] = useState(false);
+    const [clashModalVisible, setClashModalVisible] = useState(false);
+    const [registeredModalVisible, setRegisteredModalVisible] = useState(false);
 
     const scrollViewRef = useRef(null);
     const registrationFormRef = useRef(null);
-
-    const navigation = useNavigation();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -247,10 +248,14 @@ const EventDetailsScreen = ({ route }) => {
 
     const handleSheetClose = (index) => {
         setIsRegistrationFormVisible(index > 0);
+        setReceiptImage('');
+        setImageError('');
     };
 
     const handleClosePress = useCallback(() => {
         registrationFormRef.current?.close();
+        setReceiptImage('');
+        setImageError('');
     }, []);
 
     const pickImage = async () => {
@@ -281,135 +286,197 @@ const EventDetailsScreen = ({ route }) => {
         }
     };
 
+    const handleRegistration = () => {
+        if (hasClash) {
+            console.log("Hello", hasClash)
+            setClashModalVisible(true);
+        } else {
+            submitRegistration();
+        }
+    }
+
+    const handleClashRegistration = () => {
+        setHasClash(false);
+        submitRegistration();
+    }
+
     const submitRegistration = async () => {
         try {
+            // Validate input data
+            if (!eventID || !eventDetails) {
+                throw new Error("Missing event details");
+            }
+
             const studentID = await getItem("studentID");
+            if (!studentID) {
+                throw new Error("studentID does not existed.");
+            }
 
             const registrationData = {
-                studentID: studentID,
-                eventID: eventID,
-                isVerified: eventDetails.requiresPaymentProof ? false : true,
+                studentID,
+                eventID,
+                isVerified: !eventDetails.requiresPaymentProof,
                 isAttended: false,
             }
 
             if (eventDetails.requiresPaymentProof) {
+                if (!receiptImage) {
+                    throw new Error("Payment proof is required");
+                }
                 registrationData.paymentProofBase64 = receiptImage;
+                registrationData.isVerified = false;
             }
 
-            await addDoc(collection(db, "registration"), registrationData);
+            const registrationDocRef = await addDoc(collection(db, "registration"), registrationData);
 
-            addQuest(studentID);
+            await Promise.all([
+                addQuest(studentID),
+                schedulePushNotification(studentID),
+            ]);
 
-            schedulePushNotification(studentID);
+            setRegisteredModalVisible(true);
 
-            navigation.goBack();
+            return registrationDocRef.id;
         } catch (error) {
-            console.error("Error registering for event:", error);
+            console.error("Event Registration Error:", error);
+            // Provide user-friendly error handling
+            Alert.alert(
+                "Registration Failed",
+                error.message || "Unable to complete event registration. Please try again."
+            );
+            throw error;
         }
     };
 
     const addQuest = async (studentID) => {
+        const batch = writeBatch(db);
+
         try {
+            // Validate inputs
+            if (!studentID || !eventID) {
+                throw new Error("Missing student or event ID");
+            }
+
+            // Find event quest
             const eventQuestRef = collection(db, "quest");
             const eventQuestQuery = query(eventQuestRef, where("eventID", "==", eventID));
             const eventQuestSnap = await getDocs(eventQuestQuery);
 
             if (eventQuestSnap.empty) {
-                throw new Error("There is no matching event quests with the event ID.")
+                throw new Error("No quests found for this event");
             }
 
             const eventQuestDoc = eventQuestSnap.docs[0];
             const eventQuestID = eventQuestDoc.id;
 
+            // Fetch quest list
             const questListRef = collection(db, "quest", eventQuestID, "questList");
             const questListSnapshots = await getDocs(questListRef);
 
-            const questListData = questListSnapshots.docs.map(doc => ({
-                questID: doc.id,
-            }));
+            if (questListSnapshots.empty) {
+                throw new Error("No quest items found");
+            }
 
-            const questProgressRef = collection(db, "questProgress");
-            const questProgressDoc = await addDoc(questProgressRef, {
+            // Create quest progress document
+            const questProgressRef = doc(collection(db, "questProgress"));
+            batch.set(questProgressRef, {
                 studentID,
-                eventID
+                eventID,
             });
 
-            // Get the newly created document ID
-            const questProgressID = questProgressDoc.id;
-
-            // Reference to the "questProgressList" subcollection within "questProgress"
-            const questProgressListRef = collection(db, "questProgress", questProgressID, "questProgressList");
-
-            // Batch insert each quest item into the "questProgressList" subcollection
-            for (const quest of questListData) {
-                await addDoc(questProgressListRef, {
-                    questID: quest.questID,
+            // Prepare quest progress list batch writes
+            const questProgressListRef = collection(questProgressRef, "questProgressList");
+            questListSnapshots.docs.forEach(questDoc => {
+                const questProgressListDocRef = doc(questProgressListRef);
+                batch.set(questProgressListDocRef, {
+                    questID: questDoc.id,
                     isCompleted: false,
                     progress: 0,
                     rewardsClaimed: false,
                 });
-            }
+            });
 
-            console.log("Quest progress successfully created with ID:", questProgressID);
+            // Commit batch write
+            await batch.commit();
+
+            console.log("Quest progress successfully created");
+            return questProgressRef.id;
         } catch (error) {
-            console.error("Error adding quest progress:", error.message);
+            console.error("Quest Progress Creation Error:", error);
+            throw error;
         }
     }
 
     const schedulePushNotification = async (studentID) => {
         try {
-            if (!studentID || !eventID || !eventDetails.name) {
-                throw new Error('Incomplete data to schedule the notification');
+            // Validate inputs
+            if (!studentID || !eventDetails?.name || !eventDetails?.startTime) {
+                throw new Error('Insufficient data for notification scheduling');
             }
 
-            const { status } = await Notifications.requestPermissionsAsync();
-            if (status !== 'granted') {
-                alert('Notification permissions required');
-                return;
+            const { status: existingStatus } = await Notifications.getPermissionsAsync();
+            let finalStatus = existingStatus;
+
+            // If no existing permission, request
+            if (existingStatus !== 'granted') {
+                const { status } = await Notifications.requestPermissionsAsync();
+                finalStatus = status;
             }
 
-            // Scenario 1: A day before the event start date time
-            const dayBeforeEventDate = new Date(eventDetails.startTime.seconds * 1000);
-            dayBeforeEventDate.setDate(dayBeforeEventDate.getDate() - 1);
+            // Handle permission denial
+            if (finalStatus !== 'granted') {
+                throw new Error('Notification permissions not granted');
+            }
 
-            await Notifications.scheduleNotificationAsync({
-                content: {
-                    title: "Get Ready! 🎉",
-                    body: `${eventDetails.name} is just around the corner - 1 day to go!`,
-                    sound: true,
-                    data: {
-                        id: `${eventID}_${studentID}_1D`
+            // Convert Firestore timestamp to Date object
+            const eventStartTime = eventDetails.startTime.toDate();
+
+            // Notification scenarios
+            const notificationScenarios = [
+                {
+                    title: "Event Countdown Begins! 🚀",
+                    body: `Only 24 hours left until ${eventDetails.name}! Are you ready for an amazing experience?`,
+                    trigger: new Date(eventStartTime.getTime() - 24 * 60 * 60 * 1000),
+                    id: `${eventID}_${studentID}_1D`
+                },
+                {
+                    title: "Almost Time! ⏰",
+                    body: `${eventDetails.name} starts in just 1 hour! Get your gear ready and let's make memories!`,
+                    trigger: new Date(eventStartTime.getTime() - 60 * 60 * 1000),
+                    id: `${eventID}_${studentID}_1H`
+                },
+            ];
+
+            // Schedule notifications
+            for (const notification of notificationScenarios) {
+                await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: notification.title,
+                        body: notification.body,
+                        sound: true,
+                        data: { id: notification.id }
+                    },
+                    trigger: {
+                        type: Notifications.SchedulableTriggerInputTypes.DATE,
+                        date: notification.trigger,
                     }
-                }, 
-                trigger: {
-                    type: Notifications.SchedulableTriggerInputTypes.DATE,
-                    date: dayBeforeEventDate,
-                    repeats: false,
-                }
-            })
+                });
+            }
 
-            // Scenario 2: A hour before the event start date time
-            const HourBeforeEventDate = new Date(eventDetails.startTime.seconds * 1000);
-            HourBeforeEventDate.setHours(HourBeforeEventDate.getHours() - 1);
-
-            await Notifications.scheduleNotificationAsync({
-                content: {
-                    title: "Don't Miss This! 😉",
-                    body: `${eventDetails.name} is awaiting us, warrior! 1 hour to go!`,
-                    sound: true,
-                    data: {
-                        id: `${eventID}_${studentID}_1H`
-                    }
-                }, 
-                trigger: {
-                    type: Notifications.SchedulableTriggerInputTypes.DATE,
-                    date: HourBeforeEventDate,
-                    repeats: false,
-                }
-            })
+            console.log("Notifications scheduled successfully");
         } catch (error) {
-            console.error("Error setting up the notification:", error);
+            console.error("Notification Scheduling Error:", error);
+            // Optional: Fallback notification or user alert
+            Alert.alert(
+                "Notification Setup Failed",
+                "Unable to set up event reminders. You might miss event updates."
+            );
         }
+    }
+
+    const handleRegistrationModalClose = () => {
+        setRegisteredModalVisible(false);
+        navigation.goBack();
     }
 
     if (isLoading) {
@@ -561,6 +628,22 @@ const EventDetailsScreen = ({ route }) => {
                             </View>
                         </View>
                     </View>
+
+                    {clashModalVisible && (
+                        <ClashScheduleModal
+                            isVisible={clashModalVisible}
+                            onConfirm={handleClashRegistration}
+                            onCancel={() => setClashModalVisible(false)}
+                        />
+                    )}
+
+                    {registeredModalVisible && (
+                        <RegistrationModal
+                            eventName={eventDetails.name}
+                            isVisible={registeredModalVisible}
+                            onClose={handleRegistrationModalClose}
+                        />
+                    )}
                 </ScrollView>
 
                 <View style={styles.footer}>
@@ -569,14 +652,9 @@ const EventDetailsScreen = ({ route }) => {
                             <CircleX color="#FF002F" size={24} />
                             <Text style={styles.maxCapacityText}>Maximum Capacity</Text>
                         </View> :
-                        hasClash ?
-                            <View style={styles.clashedContainer}>
-                                <AlertTriangle color="#FF9800" size={24} />
-                                <Text style={styles.clashedText}>Schedule Conflict</Text>
-                            </View> :
-                            <TouchableOpacity style={styles.registerButton} onPress={openRegistrationForm}>
-                                <Text style={styles.registerButtonText}>Register Now</Text>
-                            </TouchableOpacity>
+                        <TouchableOpacity style={styles.registerButton} onPress={openRegistrationForm}>
+                            <Text style={styles.registerButtonText}>Register Now</Text>
+                        </TouchableOpacity>
                     }
                 </View>
 
@@ -656,10 +734,14 @@ const EventDetailsScreen = ({ route }) => {
                             ]}
                             disabled={eventDetails.requiresPaymentProof && !receiptImage}
                             onPress={() => {
-                                submitRegistration();
-                                Alert.alert('Success', 'Form submitted successfully!');
-                                handleClosePress();
-                                navigation.goBack();
+                                if (!hasClash) {
+                                    handleRegistration();
+                                    handleClosePress();
+                                } else {
+                                    // If there's a clash, just trigger the registration logic
+                                    // which will show the clash modal
+                                    handleRegistration();
+                                }
                             }}
                         >
                             <Text style={styles.submitButtonText}>Submit</Text>
@@ -934,6 +1016,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F5F5F5',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
+        borderWidth: 0.4,
     },
     formContainer: {
         marginTop: 20,

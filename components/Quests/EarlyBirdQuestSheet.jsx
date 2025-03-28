@@ -289,10 +289,6 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
                     const existingEntryDoc = leaderboardEntrySnapshot.docs[0]; // Get the first match
                     const existingEntryRef = doc(db, "leaderboard", leaderboardID, "leaderboardEntries", existingEntryDoc.id);
 
-                    const existingEntrySnap = await getDoc(existingEntryRef);
-
-                    console.log(existingEntrySnap.data());
-
                     await updateDoc(existingEntryRef, {
                         points: increment(selectedQuest.pointsRewards), // Increment points
                         lastUpdated: new Date(),

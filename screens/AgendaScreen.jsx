@@ -71,6 +71,7 @@ const AgendaScreen = () => {
             latitude: eventInfo.locationLatitude,
             longitude: eventInfo.locationLongitude,
             eventDate: startDateTime.toDateString(),
+            eventStart: eventInfo.eventStartDateTime,
             startTime: startDateTime.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true }),
             endTime: startDateStr === endDateStr
               ? endDateTime.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true })
@@ -128,13 +129,13 @@ const AgendaScreen = () => {
 
   const getCategoryColor = (categoryId) => {
     const colors = {
-      1: '#AA4A44', // Burgundy
-      2: '#FF7F50', // Coral
-      3: '#FFD700', // Gold
-      4: '#5F8575', // Sage Green
-      5: '#89CFF0', // Baby Blue
-      6: '#7F00FF', // Violet
-      7: '#800080', // Purple
+      1: 'rgba(170, 74, 68, 0.2)', // Burgundy
+      2: 'rgba(255, 127, 80, 0.2)', // Coral
+      3: 'rgba(232, 196, 5, 0.2)', // Gold
+      4: 'rgba(95, 133, 117, 0.2)', // Sage Green
+      5: 'rgba(137, 207, 240, 0.2)', // Baby Blue
+      6: 'rgba(127, 0, 255, 0.2)', // Violet
+      7: 'rgba(128, 0, 128, 0.2)', // Purple
     };
     return colors[categoryId] || '#5B7FFF'; // Default to primary blue if category not found
   };
@@ -167,6 +168,7 @@ const AgendaScreen = () => {
                 eventName: item.eventName,
                 eventID: item.eventID,
                 categoryID: item.category,
+                eventStart: item.eventStart,
                 longitude: item.longitude,
                 latitude: item.latitude,
               });

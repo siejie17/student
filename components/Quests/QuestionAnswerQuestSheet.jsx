@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, Image, TextInput } from 'react-native';
-import { collection, setDoc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc, where, getDoc, doc } from 'firebase/firestore';
+import { collection, setDoc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc, where, getDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../utils/firebaseConfig';
 import { getItem } from '../../utils/asyncStorage';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import QuestCompletedModal from '../Modal/QuestCompleteModal';
+import QuestCompletedModal from '../Modal/QuestCompletedModal';
 
 const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatus, registrationID, navigation }) => {
     const [animatingDiamonds, setAnimatingDiamonds] = useState(false);
@@ -91,20 +91,19 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
 
                 const badgeProgressSnap = await getDocs(badgeProgressQuery);
 
-                badgeProgressSnap.forEach(async (badgeProgress) => {
-                    badgeProgressID = badgeProgress.id;
-
+                for (const badgeProgress of badgeProgressSnap.docs) {
+                    const badgeProgressID = badgeProgress.id;
                     const userQABadgeRef = doc(db, "badgeProgress", badgeProgressID, "userBadgeProgress", qaBadge.id);
                     const userQABadgeSnap = await getDoc(userQABadgeRef);
-
+                
                     if (userQABadgeSnap.exists()) {
                         let userQABadgeProgress = userQABadgeSnap.data();
-
+                
                         if (!userQABadgeProgress.isUnlocked) {
                             let userProgress = userQABadgeProgress.progress;
-
+                
                             userProgress++;
-
+                
                             if (userProgress === qaBadge.unlockProgress) {
                                 await updateDoc(userQABadgeRef, {
                                     isUnlocked: true,
@@ -121,7 +120,7 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
                     } else {
                         console.error("No user Q&A badge progress has been found");
                     }
-                })
+                }                
                 
                 setAnswer('');
             } catch (error) {
