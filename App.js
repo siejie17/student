@@ -38,7 +38,6 @@ const HomeStack = createNativeStackNavigator();
 const EventsStack = createNativeStackNavigator();
 const CalendarStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
-const ShopStack = createNativeStackNavigator();
 
 const Tab = createBottomTabNavigator();
 
@@ -107,6 +106,7 @@ const AppStack = () => (
     <MainStack.Screen name="FeedbackForm" component={FeedbackFormScreen} options={{ headerShown: false }} />
     <MainStack.Screen name="BadgeDetails" component={BadgeScreen} options={{ headerShown: false }} />
     <MainStack.Screen name="NetworkList" component={NetworkScreen} options={{ headerShown: false }} />
+    <MainStack.Screen name="MerchandiseDetails" component={MerchandiseDetailsScreen} options={{ headerShown: false }} />
   </MainStack.Navigator>
 )
 
@@ -245,19 +245,12 @@ const MerchandiseTopTabs = () => {
           swipeEnabled: false
         }}
       >
-        <TopTab.Screen name="Shop" component={ShopStackScreen} />
+        <TopTab.Screen name="Shop" component={MerchandiseListingScreen} />
         <TopTab.Screen name="Redemption" component={RedemptionListingScreen} />
       </TopTab.Navigator>
     </View>
   )
 };
-
-const ShopStackScreen = () => (
-  <ShopStack.Navigator>
-    <ShopStack.Screen name="MerchandiseListing" component={MerchandiseListingScreen} options={{ headerShown: false }} />
-    <ShopStack.Screen name="MerchandiseDetails" component={MerchandiseDetailsScreen} options={{ title: "Merchandise Details" }} />
-  </ShopStack.Navigator>
-);
 
 const EventsStackScreen = () => (
   <EventsStack.Navigator>

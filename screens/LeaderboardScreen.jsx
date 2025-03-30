@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, Image, Dimensions, ActivityIndicator, FlatList, RefreshControl, Animated, Modal, Pressable, StatusBar } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Image, Dimensions, ActivityIndicator, FlatList, RefreshControl, Animated, Modal, Pressable, StatusBar, TouchableOpacity } from 'react-native'
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { MaterialIcons, FontAwesome5, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -49,6 +49,11 @@ const LeaderboardScreen = () => {
   // Create animation values
   const modalAnimation = useMemo(() => new Animated.Value(0), []);
   const headerScaleAnim = useMemo(() => new Animated.Value(1), []);
+
+  // Animation references
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
 
   const fetchRankings = useCallback(async () => {
     try {
@@ -169,6 +174,56 @@ const LeaderboardScreen = () => {
       }
     };
   }, [fetchRankings]);
+
+  // Animate on mount
+  useEffect(() => {
+    // Entrance animation
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      })
+    ]).start();
+
+    // Pulse animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      ])
+    ).start();
+  }, []);
+
+  // Handle ranking changes
+  useEffect(() => {
+    // Pulse animation when rank changes
+    Animated.sequence([
+      Animated.timing(pulseAnim, {
+        toValue: 1.2,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      })
+    ]).start();
+  }, [currentUserRank]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -507,17 +562,46 @@ const LeaderboardScreen = () => {
   const FloatingRankIndicator = useCallback(() => {
     if (!currentUserRank) return null;
 
+    // Determine badge color based on rank
+    let badgeText = "Ranked";
+    let badgeColors = ['#6284bf', '#4A6EB5'];
+
+    if (currentUserRank <= 3) {
+      badgeText = "Top 3";
+      badgeColors = ['#FFD700', '#FFA500']; // Gold gradient
+    } else if (currentUserRank <= 10) {
+      badgeText = "Top 10";
+      badgeColors = ['#C0C0C0', '#A9A9A9']; // Silver gradient
+    } else if (currentUserRank <= 20) {
+      badgeText = "Top 20";
+      badgeColors = ['#CD7F32', '#8B4513']; // Bronze gradient
+    }
+
     return (
-      <Animated.View style={styles.floatingRankContainer}>
+      <Animated.View
+        style={[
+          styles.floatingRankContainer,
+          {
+            transform: [
+              { translateY: slideAnim },
+              { scale: pulseAnim }
+            ],
+            opacity: opacityAnim
+          }
+        ]}
+      >
         <LinearGradient
-          colors={['#a1c2f7', '#71a3f5']}
-          start={[0, 0]}
-          end={[1, 0]}
+          colors={badgeColors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
           style={styles.floatingRankGradient}
         >
           <View style={styles.floatingRankContent}>
-            <Text style={styles.floatingRankText}>Your Rank:</Text>
-            <Text style={styles.floatingRankNumber}>#{currentUserRank}</Text>
+            <MaterialIcons name="leaderboard" size={20} color="white" style={styles.icon} />
+            <Text style={styles.floatingRankText}>Your Rank</Text>
+            <View style={styles.rankNumberContainer}>
+              <Text style={styles.floatingRankNumber}>#{currentUserRank}</Text>
+            </View>
           </View>
         </LinearGradient>
       </Animated.View>
@@ -540,20 +624,24 @@ const LeaderboardScreen = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Leaderboard</Text>
-        <View style={styles.facultyContainer}>
-          <View style={styles.facultyCard}>
-            <View style={styles.facultyNameContainer}>
-              <Text style={styles.facultyText} numberOfLines={1}>
-                {facultyName}
-              </Text>
+        <View style={styles.cardContainer}>
+          <LinearGradient
+            colors={['#6284bf', '#3a5ca8']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.cardGradient}
+          >
+            <View style={styles.headerSection}>
+              <Text style={styles.facultyName}>{facultyName}</Text>
             </View>
-            <View style={styles.refreshDateContainer}>
-              <Feather name="refresh-cw" size={12} color="#4A6B9E" style={styles.refreshIcon} />
-              <Text style={styles.refreshDateText}>
-                Next Reset: {refreshDate.toDate().toLocaleDateString()}
-              </Text>
+
+            <View style={styles.separator} />
+
+            <View style={styles.infoSection}>
+              <Feather name="refresh-cw" size={14} color="#ffffff" style={styles.icon} />
+              <Text style={styles.resetText}>Next Reset: {refreshDate.toDate().toLocaleDateString()}</Text>
             </View>
-          </View>
+          </LinearGradient>
         </View>
       </View>
 
@@ -563,7 +651,7 @@ const LeaderboardScreen = () => {
       {/* FlatList with pull-to-refresh */}
       <View style={styles.listWrapper}>
         <LinearGradient
-          colors={['rgba(59, 130, 246, 0.1)', 'rgba(255, 255, 255, 0)']}
+          colors={['rgba(98, 132, 191, 0.08)', 'rgba(255, 255, 255, 0)']}
           style={styles.listGradient}
         >
           <FlatList
@@ -628,49 +716,47 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 12,
   },
-  facultyContainer: {
+  cardContainer: {
     width: '90%',
-    borderRadius: 10,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+    marginVertical: 8,
   },
-  facultyCard: {
-    backgroundColor: '#F5F7FA',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    borderWidth: 0.5,
-    borderColor: 'rgba(98, 132, 191, 0.2)',
+  cardGradient: {
+    borderRadius: 16,
+    padding: 16,
+    overflow: 'hidden',
   },
-  facultyNameContainer: {
-    borderBottomWidth: 0.5,
-    borderColor: '#6284bf',
-    paddingBottom: 6,
-    marginBottom: 6,
-    width: '100%',
-    alignItems: 'center',
+  headerSection: {
+    // marginBottom: 8,
   },
-  facultyText: {
+  facultyName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#4A6B9E',
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
   },
-  refreshDateContainer: {
+  separator: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    marginVertical: 8,
+  },
+  infoSection: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  refreshIcon: {
+  icon: {
     marginRight: 8,
   },
-  refreshDateText: {
+  resetText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#4A6B9E',
+    color: '#ffffff',
   },
   podiumSection: {
     paddingTop: 20,
@@ -739,7 +825,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#CD7F32',
   },
   image: {
-    // position: 'absolute',
     width: width * 0.035,
     height: width * 0.035,
     borderRadius: width * 0.06,
@@ -947,24 +1032,28 @@ const styles = StyleSheet.create({
   },
   floatingRankContainer: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 15,
     alignSelf: 'center',
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 5,
   },
   floatingRankGradient: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    borderRadius: 24,
   },
   floatingRankContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+  },
+  icon: {
+    marginRight: 6,
   },
   floatingRankText: {
     fontSize: 14,
@@ -972,10 +1061,26 @@ const styles = StyleSheet.create({
     color: 'white',
     marginRight: 8,
   },
+  rankNumberContainer: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
   floatingRankNumber: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: 'white',
+  },
+  tooltipContainer: {
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  tooltipText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 10,
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,

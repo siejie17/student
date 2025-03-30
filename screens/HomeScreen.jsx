@@ -11,7 +11,7 @@ import {
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
-import { collection, deleteDoc, getDocs, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore'
+import { collection, writeBatch, getDocs, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore'
 
 // Components
 import HeroBanner from '../components/Home/HeroBanner';
@@ -55,50 +55,55 @@ const HomeScreen = () => {
           const { refreshDateTime } = leaderboardDoc.data();
           const currentTime = Timestamp.now(); // Use actual timestamp
   
-          if (refreshDateTime && refreshDateTime.toMillis() <= currentTime.toMillis()) {
+          if (!refreshDateTime || !refreshDateTime.toMillis) {
+            console.warn("refreshDateTime is missing or invalid.");
+            return;
+        }
+
+        if (refreshDateTime.toMillis() <= currentTime.toMillis()) {
             const leaderboardEntriesRef = collection(leaderboardDocRef, "leaderboardEntries");
             const leaderboardEntriesQuery = query(leaderboardEntriesRef, orderBy("points", "desc"));
-  
             const leaderboardEntriesSnapshot = await getDocs(leaderboardEntriesQuery);
+
             let rankings = leaderboardEntriesSnapshot.docs.map((doc, index) => ({
-              studentID: doc.data().studentID,
-              rank: index + 1,
+                studentID: doc.data().studentID,
+                rank: index + 1,
             }));
-  
+
             // Assign rewards based on ranking
             for (const stud of rankings) {
-              let diamonds = 0;
-  
-              if (stud.rank === 1) diamonds = 1000;
-              else if (stud.rank === 2) diamonds = 750;
-              else if (stud.rank === 3) diamonds = 500;
-              else if (stud.rank === 4) diamonds = 400;
-              else if (stud.rank === 5) diamonds = 350;
-              else if (stud.rank === 6) diamonds = 300;
-              else if (stud.rank === 7) diamonds = 250;
-              else if (stud.rank === 8) diamonds = 200;
-              else if (stud.rank === 9) diamonds = 150;
-              else if (stud.rank === 10) diamonds = 100;
-              else if (stud.rank >= 11 && stud.rank <= 20) diamonds = 50;
-              else if (stud.rank >= 21 && stud.rank <= 30) diamonds = 25;
-              else if (stud.rank >= 31 && stud.rank <= 40) diamonds = 10;
-              else if (stud.rank >= 41 && stud.rank <= 50) diamonds = 5;
-              else diamonds = 1;
-  
-              await setItem(`showLeaderboardModal_${stud.studentID}`, true);
-              await setItem(`previousRanking_${stud.studentID}`, String(stud.rank));
-              await setItem(`diamonds_${stud.studentID}`, diamonds);
+                let diamonds = 0;
+                if (stud.rank === 1) diamonds = 1000;
+                else if (stud.rank === 2) diamonds = 750;
+                else if (stud.rank === 3) diamonds = 500;
+                else if (stud.rank === 4) diamonds = 400;
+                else if (stud.rank === 5) diamonds = 350;
+                else if (stud.rank === 6) diamonds = 300;
+                else if (stud.rank === 7) diamonds = 250;
+                else if (stud.rank === 8) diamonds = 200;
+                else if (stud.rank === 9) diamonds = 150;
+                else if (stud.rank === 10) diamonds = 100;
+                else if (stud.rank >= 11 && stud.rank <= 20) diamonds = 50;
+                else if (stud.rank >= 21 && stud.rank <= 30) diamonds = 25;
+                else if (stud.rank >= 31 && stud.rank <= 40) diamonds = 10;
+                else if (stud.rank >= 41 && stud.rank <= 50) diamonds = 5;
+                else diamonds = 1;
+
+                await setItem(`showLeaderboardModal_${stud.studentID}`, "true");
+                await setItem(`previousRanking_${stud.studentID}`, String(stud.rank));
+                await setItem(`diamonds_${stud.studentID}`, String(diamonds));
             }
-  
-            // Delete old leaderboard entries
-            const deletePromises = leaderboardEntriesSnapshot.docs.map(entryDoc => deleteDoc(entryDoc.ref));
-            await Promise.all(deletePromises);
-  
+
+            // Efficiently delete old leaderboard entries
+            const batch = writeBatch(db);
+            leaderboardEntriesSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+            await batch.commit();
+
             // Set new refresh date
             let currentRefreshDateTime = refreshDateTime.toDate();
             currentRefreshDateTime.setMonth(currentRefreshDateTime.getMonth() + 1);
             let newRefreshDateTime = Timestamp.fromDate(currentRefreshDateTime);
-  
+
             await updateDoc(leaderboardDocRef, { refreshDateTime: newRefreshDateTime });
           }
         }

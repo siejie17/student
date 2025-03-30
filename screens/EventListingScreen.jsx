@@ -50,17 +50,6 @@ const CATEGORIES_MAPPING = {
   "Others": 7,
 };
 
-const CATEGORY_COLORS = {
-  "All": ['#6C63FF', '#4A45B2'],
-  "Academic": ['#4ECDC4', '#1A9988'],
-  "Volunteering": ['#FF6B6B', '#C82C2C'],
-  "Entertainment": ['#FFD166', '#DBA628'],
-  "Cultural": ['#9649CB', '#6C33A0'],
-  "Sports": ['#06D6A0', '#05A47A'],
-  "Health & Wellness": ['#118AB2', '#0B5D77'],
-  "Others": ['#073B4C', '#052A37'],
-};
-
 const EventListingScreen = ({ navigation }) => {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,13 +68,13 @@ const EventListingScreen = ({ navigation }) => {
   const fetchEventCatalogue = useCallback(async () => {
     try {
       setIsLoading(true);
-  
+
       const studentID = await getItem("studentID");
       if (!studentID) {
         setIsLoading(false);
         return;
       }
-  
+
       // Clear previous subscriptions
       if (unsubscribeRegistrationRef.current) {
         unsubscribeRegistrationRef.current();
@@ -96,14 +85,14 @@ const EventListingScreen = ({ navigation }) => {
       if (unsubscribeTotalParticipantsRef.current) {
         unsubscribeTotalParticipantsRef.current();
       }
-  
+
       const registrationRef = collection(db, "registration");
       const registrationQuery = query(registrationRef, where("studentID", "==", studentID));
-  
+
       const unsubscribeRegistration = onSnapshot(registrationQuery, async (registrationSnap) => {
         // Extract registered event IDs
         const registeredEventIDs = registrationSnap.docs.map(doc => doc.data().eventID);
-        
+
         // Get events where registration is still open
         const eventsRef = collection(db, "event");
         const eventsQuery = query(
@@ -112,7 +101,7 @@ const EventListingScreen = ({ navigation }) => {
           where("status", "not-in", ["Completed", "Cancelled"]),
           orderBy("lastAdded", "desc")
         );
-  
+
         const unsubscribeEvent = onSnapshot(eventsQuery, async (eventSnap) => {
           // Filter out events the student has already registered for
           const filteredEvents = await Promise.all(
@@ -120,12 +109,12 @@ const EventListingScreen = ({ navigation }) => {
               .filter(doc => !registeredEventIDs.includes(doc.id))
               .map(async (doc) => {
                 const event = { id: doc.id, ...doc.data() };
-                
+
                 // Fetch event images
                 const eventImagesRef = collection(db, "eventImages");
                 const eventImagesQuery = query(eventImagesRef, where("eventID", "==", event.id));
                 const eventImagesDoc = await getDocs(eventImagesQuery);
-  
+
                 let thumbnail = null;
                 eventImagesDoc.forEach((doc) => {
                   const imageData = doc.data();
@@ -133,23 +122,23 @@ const EventListingScreen = ({ navigation }) => {
                     thumbnail = imageData.images[0];
                   }
                 });
-  
+
                 return { ...event, thumbnail };
               })
           );
-  
+
           setEvents(filteredEvents);
           setRegisteredEventIDs(registeredEventIDs);
-          
+
           // Store unsubscribe functions
           unsubscribeRegistrationRef.current = unsubscribeRegistration;
           unsubscribeEventRef.current = unsubscribeEvent;
-          
+
           setIsLoading(false);
           setRefreshing(false);
         });
       });
-  
+
     } catch (error) {
       console.error("Error fetching events:", error);
       setIsLoading(false);
@@ -219,7 +208,6 @@ const EventListingScreen = ({ navigation }) => {
 
   const renderCategoryItem = useCallback(({ item }) => {
     const isSelected = selectedCategory === item;
-    const colors = CATEGORY_COLORS[item] || ['#6C63FF', '#4A45B2'];
 
     return (
       <TouchableOpacity
@@ -227,7 +215,7 @@ const EventListingScreen = ({ navigation }) => {
         activeOpacity={0.7}
       >
         <LinearGradient
-          colors={isSelected ? colors : ['#FFFFFF', '#F8F8F8']}
+          colors={isSelected ? ['#6284bf', '#4A6EB5'] : ['#FFFFFF', '#F8F8F8']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[
@@ -284,16 +272,14 @@ const EventListingScreen = ({ navigation }) => {
             style={styles.searchBar}
           />
 
-          <View style={styles.categoriesContainer}>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={CATEGORIES}
-              renderItem={renderCategoryItem}
-              keyExtractor={item => item}
-              contentContainerStyle={styles.categoriesList}
-            />
-          </View>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={CATEGORIES}
+            renderItem={renderCategoryItem}
+            keyExtractor={item => item}
+            contentContainerStyle={styles.categoriesList}
+          />
         </View>
       </TouchableWithoutFeedback>
 
@@ -350,10 +336,6 @@ const styles = StyleSheet.create({
   searchBar: {
     marginHorizontal: 10,
     marginBottom: 5,
-  },
-  categoriesContainer: {
-    // borderBottomWidth: 1,
-    // borderBottomColor: '#eee',
   },
   categoriesList: {
     paddingHorizontal: 15,

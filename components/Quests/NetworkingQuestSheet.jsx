@@ -572,38 +572,33 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
             const leaderboardQuery = query(leaderboardRef, where("facultyID", "==", facultyID));
             const leaderboardSnapshot = await getDocs(leaderboardQuery);
 
-            leaderboardSnapshot.forEach(async (snapDoc) => {
+            for (const snapDoc of leaderboardSnapshot.docs) {
                 const leaderboardID = snapDoc.id;
-
                 const leaderboardEntryRef = collection(db, "leaderboard", leaderboardID, "leaderboardEntries");
                 const leaderboardEntryQuery = query(leaderboardEntryRef, where("studentID", "==", studentID));
                 const leaderboardEntrySnapshot = await getDocs(leaderboardEntryQuery);
-
+            
                 if (leaderboardEntrySnapshot.empty) {
-                    // 🔹 No entry exists, create a new one
+                    // 🔹 Create a new leaderboard entry
                     const newEntryRef = doc(leaderboardEntryRef); // Auto-generate ID
                     await setDoc(newEntryRef, {
                         studentID: studentID,
-                        points: selectedQuest.pointsRewards, // Initial points for the new student
+                        points: selectedQuest.pointsRewards,
                         lastUpdated: new Date(),
                     });
                     console.log("New leaderboard entry created.");
                 } else {
-                    // 🔹 Entry exists, update the points
-                    const existingEntryDoc = leaderboardEntrySnapshot.docs[0]; // Get the first match
+                    // 🔹 Update existing entry
+                    const existingEntryDoc = leaderboardEntrySnapshot.docs[0]; // Get first matched entry
                     const existingEntryRef = doc(db, "leaderboard", leaderboardID, "leaderboardEntries", existingEntryDoc.id);
-
-                    const existingEntrySnap = await getDoc(existingEntryRef);
-
-                    console.log(existingEntrySnap.data());
-
+                    
                     await updateDoc(existingEntryRef, {
-                        points: increment(selectedQuest.pointsRewards), // Increment points
+                        points: increment(selectedQuest.pointsRewards),
                         lastUpdated: new Date(),
                     });
                     console.log("Leaderboard entry updated.");
                 }
-            });
+            }
 
             updateQuestStatus();
         } catch (error) {

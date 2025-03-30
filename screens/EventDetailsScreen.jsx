@@ -849,8 +849,8 @@ const styles = StyleSheet.create({
         borderColor: '#e0e0e0',
     },
     detailsContainer: {
-        marginHorizontal: 7,
-    },
+       marginHorizontal: 7,
+    }, 
     titleContainer: {
         paddingHorizontal: 10,
     },
@@ -910,6 +910,7 @@ const styles = StyleSheet.create({
         padding: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#F0F0F5',
+        backgroundColor: '#fafbfc',
     },
     infoHeaderText: {
         fontSize: 16,

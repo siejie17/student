@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     },
     diamondNumber: {
         fontWeight: '700',
-        color: '#333',
+        color: '#4A6EB5',
     },
     subtitle: {
         fontSize: 12,
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
     rankText: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#333',
+        color: '#4A6EB5',
     },
     rankStart: {
         fontSize: 18,
