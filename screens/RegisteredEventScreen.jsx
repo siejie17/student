@@ -1,30 +1,32 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { 
-    View, 
-    Text, 
-    StyleSheet, 
-    ScrollView, 
-    ActivityIndicator, 
-    Dimensions, 
-    Image, 
-    TouchableOpacity } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    ActivityIndicator,
+    Dimensions,
+    Image,
+    TouchableOpacity
+} from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
 import * as Notifications from 'expo-notifications';
 
-import { 
-    doc, 
-    onSnapshot, 
-    collection, 
-    query, 
-    where, 
+import {
+    doc,
+    onSnapshot,
+    collection,
+    query,
+    where,
     deleteDoc,
-    Timestamp, 
-    getDocs, 
-    writeBatch } from 'firebase/firestore';
+    Timestamp,
+    getDocs,
+    writeBatch
+} from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig';
 
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { getItem } from '../utils/asyncStorage';
 
 import PaymentProofModal from '../components/Modal/PaymentProofModal';
@@ -58,16 +60,17 @@ const ORGANISER_MAPPING = {
 const RegisteredEventScreen = ({ route }) => {
     const { eventID, registrationID } = route.params || {};
 
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const [eventDetails, setEventDetails] = useState({});
     const [registrationDetails, setRegistrationDetails] = useState({});
+
     const [paymentProofModalVisible, setPaymentProofModalVisible] = useState(false);
     const [cancelModalVisible, setCancelModalVisible] = useState(false);
+
     const [isDeleting, setIsDeleting] = useState(false);
     const [error, setError] = useState(null);
 
     const scrollViewRef = useRef(null);
-
     const navigation = useNavigation();
 
     const formatDateTime = (timestamp) => {
@@ -86,12 +89,19 @@ const RegisteredEventScreen = ({ route }) => {
     };
 
     const fetchEventData = useCallback(() => {
-        if (!registrationID) return () => {};
+        if (!registrationID) return () => { };
 
         setIsLoading(true);
+        setError(null);
+
+        let isActive = true;
+        const unsubscribeFunctions = [];
+
         const registrationRef = doc(db, "registration", registrationID);
 
         const unsubscribeRegistration = onSnapshot(registrationRef, async (registrationSnap) => {
+            if (!isActive) return;
+
             if (!registrationSnap.exists()) {
                 console.log("No such registration!");
                 setIsLoading(false);
@@ -99,9 +109,15 @@ const RegisteredEventScreen = ({ route }) => {
             }
 
             const registrationData = registrationSnap.data();
-            const eventRef = doc(db, "event", registrationData.eventID);
 
+            if (isActive) {
+                setRegistrationDetails(registrationData);
+            }
+
+            const eventRef = doc(db, "event", registrationData.eventID);
             const unsubscribeEvent = onSnapshot(eventRef, (eventSnap) => {
+                if (!isActive) return;
+
                 if (!eventSnap.exists()) {
                     console.log("No such event!");
                     setIsLoading(false);
@@ -113,46 +129,57 @@ const RegisteredEventScreen = ({ route }) => {
                 const eventImagesQuery = query(eventImagesRef, where("eventID", "==", registrationData.eventID));
 
                 const unsubscribeImages = onSnapshot(eventImagesQuery, (eventImagesSnap) => {
-                    const images = eventImagesSnap.docs.flatMap(doc => 
+                    if (!isActive) return;
+
+                    const images = eventImagesSnap.docs.flatMap(doc =>
                         doc.data().images ? doc.data().images : []
                     );
 
-                    const processedEventDetails = {
-                        ...eventData,
-                        name: eventData.eventName,
-                        description: eventData.eventDescription,
-                        startTime: eventData.eventStartDateTime,
-                        endTime: eventData.eventEndDateTime,
-                        images,
-                        // Use optional chaining and nullish coalescing for safer access
-                        capacity: eventData.requiresCapacity ? eventData.capacity ?? 0 : undefined
-                    };
+                    if (isActive) {
+                        const processedEventDetails = {
+                            ...eventData,
+                            name: eventData.eventName,
+                            description: eventData.eventDescription,
+                            startTime: eventData.eventStartDateTime,
+                            endTime: eventData.eventEndDateTime,
+                            images,
+                        };
 
-                    setRegistrationDetails(registrationData);
-                    setEventDetails(processedEventDetails);
-                    setIsLoading(false);
+                        if (processedEventDetails.requiresCapacity) {
+                            processedEventDetails.capacity = eventData.capacity;
+                        }
+
+                        setRegistrationDetails(registrationData);
+                        setEventDetails(processedEventDetails);
+                        setIsLoading(false);
+                    }
                 });
 
-                return () => {
-                    unsubscribeImages();
-                };
+                unsubscribeFunctions.push(unsubscribeImages);
             });
 
-            return () => {
-                unsubscribeEvent();
-            };
+            unsubscribeFunctions.push(unsubscribeEvent);
         });
 
         return () => {
-            unsubscribeRegistration();
+            isActive = false;
+            unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
         };
     }, [registrationID]);
 
     // Use effect with proper dependencies and cleanup
-    useEffect(() => {
-        const unsubscribe = fetchEventData();
-        return unsubscribe;
-    }, [fetchEventData]);
+    useFocusEffect(
+        useCallback(() => {
+            const unsubscribe = fetchEventData();
+            return () => {
+                unsubscribe();
+                // Reset states when screen loses focus to prevent stale data
+                setEventDetails({});
+                setRegistrationDetails({});
+                setIsLoading(false);
+            };
+        }, [fetchEventData])
+    );
 
     const handleScroll = (event) => {
         const contentOffsetX = event.nativeEvent.contentOffset.x;
@@ -183,23 +210,23 @@ const RegisteredEventScreen = ({ route }) => {
     const deleteNotifications = async () => {
         const studentID = await getItem("studentID");
         if (!studentID || !eventID) return;
-    
+
         const notificationArr = [`${eventID}_${studentID}_1D`, `${eventID}_${studentID}_1H`];
-    
+
         const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-    
+
         notificationArr.forEach(async (notificationID) => {
             const matchedNotification = scheduledNotifications.find(
                 notification => notification.content.data?.id === notificationID
             );
-    
+
             if (matchedNotification) {
                 // Cancel the specific notification using its identifier
                 await Notifications.cancelScheduledNotificationAsync(matchedNotification.identifier);
                 console.log(`Notification with unique ID ${notificationID} has been cancelled`);
             }
         });
-    };    
+    };
 
     // Optimize quest progress deletion
     const deleteQuestProgress = useCallback(async () => {
@@ -223,7 +250,7 @@ const RegisteredEventScreen = ({ route }) => {
 
             const batch = writeBatch(db);
             progressListSnapshots.forEach((doc) => batch.delete(doc.ref));
-            
+
             // Commit batch delete and delete main document
             await Promise.all([
                 batch.commit(),
@@ -269,8 +296,8 @@ const RegisteredEventScreen = ({ route }) => {
                         scrollEventThrottle={16}
                     >
                         {eventDetails.images && eventDetails.images.map((image, index) => (
-                            <View 
-                                key={index} 
+                            <View
+                                key={index}
                                 style={styles.imageWrapper}
                                 accessibilityLabel={`Event Image ${index + 1}`}
                             >
@@ -472,20 +499,20 @@ const RegisteredEventScreen = ({ route }) => {
             </ScrollView>
 
             {/* Footer for Cancel Registration */}
-            {(eventDetails?.startTime && 
-              eventDetails.startTime.seconds - Timestamp.now().seconds > 3600) && (
-                <View style={styles.footer}>
-                    <TouchableOpacity 
-                        style={styles.cancelRegistrationButton} 
-                        onPress={() => setCancelModalVisible(true)}
-                        accessibilityLabel="Cancel Event Registration"
-                    >
-                        <Text style={styles.cancelRegistrationText}>
-                            Cancel Registration
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            )}
+            {(eventDetails?.startTime &&
+                eventDetails.startTime.seconds - Timestamp.now().seconds > 3600) && (
+                    <View style={styles.footer}>
+                        <TouchableOpacity
+                            style={styles.cancelRegistrationButton}
+                            onPress={() => setCancelModalVisible(true)}
+                            accessibilityLabel="Cancel Event Registration"
+                        >
+                            <Text style={styles.cancelRegistrationText}>
+                                Cancel Registration
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
         </View>
     )
 }

@@ -125,7 +125,7 @@ const AgendaScreen = () => {
         unsubscribeRef.current(); // Cleanup listener on unmount
       }
     };
-  }, []);
+  }, [fetchRegisteredEventsRealtime]);
 
   const getCategoryColor = (categoryId) => {
     const colors = {
@@ -152,6 +152,19 @@ const AgendaScreen = () => {
     return statusConfig[status.toLowerCase()] || statusConfig.default;
   };
 
+  const handleCardPress = useCallback((item) => {
+    console.log('Navigating to event:', item.eventName);
+    navigation.navigate("RegisteredEventsTopTabs", {
+      registrationID: item.id,
+      eventID: item.eventID,
+      eventName: item.eventName,
+      categoryID: item.category,
+      eventStart: item.eventStart,
+      latitude: item.latitude,
+      longitude: item.longitude,
+    })
+  }, [navigation]);
+
   const renderItem = (item) => {
     const categoryColor = getCategoryColor(item.category);
     const statusInfo = getStatusAttributes(item.eventStatus);
@@ -160,27 +173,7 @@ const AgendaScreen = () => {
       <TouchableOpacity
         style={styles.eventCard}
         activeOpacity={0.7}
-        onPress={() => {
-          if (item && item.id) {
-            try {
-              navigation.navigate("RegisteredEventsTopTabs", {
-                registrationID: item.id,
-                eventName: item.eventName,
-                eventID: item.eventID,
-                categoryID: item.category,
-                eventStart: item.eventStart,
-                longitude: item.longitude,
-                latitude: item.latitude,
-              });
-            } catch (error) {
-              console.error("Navigation Error:", error);
-              Alert.alert("Navigation Error", "Could not navigate to event details");
-            }
-          } else {
-            console.warn("Missing event details for navigation");
-            Alert.alert("Error", "Event details are incomplete");
-          }
-        }}
+        onPress={() => handleCardPress(item)}
       >
         <View style={[styles.categoryIndicator, { backgroundColor: categoryColor }]} />
         <View style={styles.eventContent}>

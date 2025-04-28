@@ -199,12 +199,14 @@ const RegisteredEventTopTabs = ({ route, navigation }) => {
         tabBar={props => <CustomTabBar {...props} />}
         screenOptions={{
           tabBarActiveTintColor: '#5B8CDD',
-          tabBarInactiveTintColor: 'A0B4D6',
+          tabBarInactiveTintColor: '#A0B4D6',
           tabBarStyle: {
             elevation: 0,
             shadowOpacity: 0,
           },
-          swipeEnabled: false
+          swipeEnabled: false,
+          lazy: true,
+          lazyPreloadDistance: 1,
         }}
       >
         <TopTab.Screen 
