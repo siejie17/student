@@ -462,22 +462,22 @@ const RegisteredEventScreen = ({ route }) => {
                         <View style={styles.mapContainer}>
                             <MapView
                                 style={styles.map}
-                                initialRegion={{
+                                region={{
                                     latitude: eventDetails.locationLatitude,
                                     longitude: eventDetails.locationLongitude,
-                                    latitudeDelta: 0.01,
-                                    longitudeDelta: 0.01,
+                                    latitudeDelta: 0.005,
+                                    longitudeDelta: 0.005,
                                 }}
-                                scrollEnabled={false}
-                                pitchEnabled={false}
                             >
-                                <Marker
-                                    coordinate={{
-                                        latitude: eventDetails.locationLatitude,
-                                        longitude: eventDetails.locationLongitude,
-                                    }}
-                                    title={eventDetails.locationName}
-                                />
+                                {eventDetails.locationLatitude != null && eventDetails.locationLongitude != null && (
+                                    <Marker
+                                        coordinate={{
+                                            latitude: eventDetails.locationLatitude,
+                                            longitude: eventDetails.locationLongitude,
+                                        }}
+                                        title={eventDetails.locationName}
+                                    />
+                                )}
                             </MapView>
                         </View>
                     </View>

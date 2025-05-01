@@ -20,7 +20,7 @@ const EVENT_TYPE_MAPPING = {
     6: "health_wellness",
 }
 
-const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, latitude, longitude, updateQuestStatus, registrationID }) => {
+const AttendanceQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, latitude, longitude, updateQuestStatus, registrationID }) => {
     // Mode state: 'display' for showing QR, 'scan' for scanning QR
     const [mode, setMode] = useState('display');
 
@@ -47,7 +47,7 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
     const [scanned, setScanned] = useState(false);
 
     // Get encryption key
-    const secretKey = Constants.expoConfig?.extra?.encryptionKey || 'UniEXP2025';
+    const secretKey = Constants.expoConfig?.extra?.encryptionKey;
 
     const diamondAnims = useRef([...Array(30)].map(() => ({
         translateX: new Animated.Value(0),
@@ -359,7 +359,8 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
             const studentRef = doc(db, "user", studentID);
 
             await updateDoc(studentRef, {
-                diamonds: increment(selectedQuest.diamondsRewards)
+                diamonds: increment(selectedQuest.diamondsRewards),
+                totalPointsGained: increment(selectedQuest.pointsRewards)
             });
 
             const leaderboardRef = collection(db, "leaderboard");
@@ -885,4 +886,4 @@ const styles = StyleSheet.create({
     }
 });
 
-export default NetworkingQuestSheet;
+export default AttendanceQuestSheet;

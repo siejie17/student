@@ -100,7 +100,6 @@ const SignInScreen = () => {
           await removeItem('@userSignedUpData');
         }
       } else {
-        console.log(user.uid, userDocSnap.data().facultyID);
         await setItem('studentID', user.uid);
         await setItem('facultyID', userDocSnap.data().facultyID);
       }

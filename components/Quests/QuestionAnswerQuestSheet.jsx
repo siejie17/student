@@ -95,15 +95,15 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
                     const badgeProgressID = badgeProgress.id;
                     const userQABadgeRef = doc(db, "badgeProgress", badgeProgressID, "userBadgeProgress", qaBadge.id);
                     const userQABadgeSnap = await getDoc(userQABadgeRef);
-                
+
                     if (userQABadgeSnap.exists()) {
                         let userQABadgeProgress = userQABadgeSnap.data();
-                
+
                         if (!userQABadgeProgress.isUnlocked) {
                             let userProgress = userQABadgeProgress.progress;
-                
+
                             userProgress++;
-                
+
                             if (userProgress === qaBadge.unlockProgress) {
                                 await updateDoc(userQABadgeRef, {
                                     isUnlocked: true,
@@ -120,8 +120,8 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
                     } else {
                         console.error("No user Q&A badge progress has been found");
                     }
-                }                
-                
+                }
+
                 setAnswer('');
             } catch (error) {
                 console.log("Error when updating user's question and answer quest progress:", error);
@@ -252,7 +252,8 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
             const studentRef = doc(db, "user", studentID);
 
             await updateDoc(studentRef, {
-                diamonds: increment(selectedQuest.diamondsRewards)
+                diamonds: increment(selectedQuest.diamondsRewards),
+                totalPointsGained: increment(selectedQuest.pointsRewards)
             });
 
             const leaderboardRef = collection(db, "leaderboard");
@@ -264,7 +265,7 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
                 const leaderboardEntryRef = collection(db, "leaderboard", leaderboardID, "leaderboardEntries");
                 const leaderboardEntryQuery = query(leaderboardEntryRef, where("studentID", "==", studentID));
                 const leaderboardEntrySnapshot = await getDocs(leaderboardEntryQuery);
-            
+
                 if (leaderboardEntrySnapshot.empty) {
                     // 🔹 Create a new leaderboard entry
                     const newEntryRef = doc(leaderboardEntryRef); // Auto-generate ID
@@ -278,14 +279,14 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
                     // 🔹 Update existing entry
                     const existingEntryDoc = leaderboardEntrySnapshot.docs[0]; // Get first matched entry
                     const existingEntryRef = doc(db, "leaderboard", leaderboardID, "leaderboardEntries", existingEntryDoc.id);
-                    
+
                     await updateDoc(existingEntryRef, {
                         points: increment(selectedQuest.pointsRewards),
                         lastUpdated: new Date(),
                     });
                     console.log("Leaderboard entry updated.");
                 }
-            }            
+            }
 
             updateQuestStatus();
         } catch (error) {
@@ -406,8 +407,8 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
             )}
 
             {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
-                <TouchableOpacity 
-                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]} 
+                <TouchableOpacity
+                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
                     disabled={claimed}
                     onPress={claimRewards}
                 >

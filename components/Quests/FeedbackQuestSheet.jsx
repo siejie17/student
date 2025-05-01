@@ -145,7 +145,8 @@ const FeedbackQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatu
             const studentRef = doc(db, "user", studentID);
 
             await updateDoc(studentRef, {
-                diamonds: increment(selectedQuest.diamondsRewards)
+                diamonds: increment(selectedQuest.diamondsRewards),
+                totalPointsGained: increment(selectedQuest.pointsRewards)
             });
 
             const leaderboardRef = collection(db, "leaderboard");
@@ -157,7 +158,7 @@ const FeedbackQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatu
                 const leaderboardEntryRef = collection(db, "leaderboard", leaderboardID, "leaderboardEntries");
                 const leaderboardEntryQuery = query(leaderboardEntryRef, where("studentID", "==", studentID));
                 const leaderboardEntrySnapshot = await getDocs(leaderboardEntryQuery);
-            
+
                 if (leaderboardEntrySnapshot.empty) {
                     // 🔹 Create a new leaderboard entry
                     const newEntryRef = doc(leaderboardEntryRef); // Auto-generate ID
@@ -171,14 +172,14 @@ const FeedbackQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatu
                     // 🔹 Update existing entry
                     const existingEntryDoc = leaderboardEntrySnapshot.docs[0]; // Get first matched entry
                     const existingEntryRef = doc(db, "leaderboard", leaderboardID, "leaderboardEntries", existingEntryDoc.id);
-                    
+
                     await updateDoc(existingEntryRef, {
                         points: increment(selectedQuest.pointsRewards),
                         lastUpdated: new Date(),
                     });
                     console.log("Leaderboard entry updated.");
                 }
-            }            
+            }
 
             updateQuestStatus();
         } catch (error) {
@@ -233,20 +234,20 @@ const FeedbackQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatu
             </View>
 
             {selectedQuest.progress !== selectedQuest.completionNum && !selectedQuest.isCompleted && (
-                <TouchableOpacity style={[styles.feedbackFormButton, { marginBottom: 5 }]} onPress={() => navigation.navigate("FeedbackForm", { 
-                    eventID: eventID, 
-                    questProgressID: selectedQuest.id, 
-                    registrationID: registrationID, 
+                <TouchableOpacity style={[styles.feedbackFormButton, { marginBottom: 5 }]} onPress={() => navigation.navigate("FeedbackForm", {
+                    eventID: eventID,
+                    questProgressID: selectedQuest.id,
+                    registrationID: registrationID,
                     questName: selectedQuest.questName,
-                    questType: selectedQuest.questType 
+                    questType: selectedQuest.questType
                 })}>
                     <Text style={styles.feedbackFormButtonText}>Fill in Feedback Form</Text>
                 </TouchableOpacity>
             )}
 
             {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
-                <TouchableOpacity 
-                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]} 
+                <TouchableOpacity
+                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
                     disabled={claimed}
                     onPress={claimRewards}
                 >

@@ -50,7 +50,8 @@ const DEFAULT_PROFILE_IMAGE = require('../assets/auth/defaultProfilePic.png'); /
 const ProfileScreen = () => {
   const [userData, setUserData] = useState(null);
   const [badgeProgressList, setBadgeProgressList] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [attendedEventsLength, setAttendedEventsLength] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isProfilePicSheetVisible, setIsProfilePicSheetVisible] = useState(false);
   const snapPoints = useMemo(() => ['10%'], []);
@@ -58,33 +59,41 @@ const ProfileScreen = () => {
 
   const navigation = useNavigation();
 
+  let unsub = [];
+  
   useEffect(() => {
-    let unsubscribe = () => {};
-
-    const fetchUserInfo = async () => {
+    let userUnsub = null;
+    let registrationUnsub = null;
+  
+    (async () => {
       try {
         setIsLoading(true);
         const studentID = await getItem("studentID");
-
+  
         if (!studentID) {
           console.warn("No student ID found.");
           setIsLoading(false);
           return;
         }
-
+  
         const userRef = doc(db, "user", studentID);
-
-        // Firestore real-time listener
-        unsubscribe = onSnapshot(userRef, async (userSnap) => {
+  
+        userUnsub = onSnapshot(userRef, async (userSnap) => {
           if (userSnap.exists()) {
             setUserData(userSnap.data());
-
+  
             try {
-              const badgeProgress = await fetchUserBadgeProgress();
+              const badgeProgress = await fetchUserBadgeProgress(studentID);
               setBadgeProgressList(badgeProgress);
             } catch (error) {
               console.error("Error fetching badge progress:", error);
               setBadgeProgressList([]);
+            }
+  
+            try {
+              registrationUnsub = await fetchNumOfAttendedEvents(studentID);
+            } catch (error) {
+              console.error("Error fetching attended events:", error);
             }
           } else {
             console.warn("User not found.");
@@ -96,69 +105,85 @@ const ProfileScreen = () => {
           console.error("Error listening to user data:", error);
           setIsLoading(false);
         });
-
-        return unsubscribe; // Cleanup function
+  
       } catch (error) {
         console.error("Error fetching user information:", error);
         setIsLoading(false);
       }
+    })();
+  
+    return () => {
+      if (userUnsub) userUnsub();
+      if (registrationUnsub) registrationUnsub();
     };
+  }, []);  
 
-    fetchUserInfo();
-  }, []);
-
-  // Then fetch badge progress info
-  const fetchUserBadgeProgress = async () => {
+  const fetchUserBadgeProgress = async (studentID) => {
     try {
-      const studentID = await getItem("studentID");
-
       const badgeProgressQuery = query(
         collection(db, "badgeProgress"),
         where("studentID", "==", studentID)
       );
-
+  
       const badgeProgressSnapshot = await getDocs(badgeProgressQuery);
-
-      if (badgeProgressSnapshot.empty) {
-        console.log("No badge progress found for this student.");
-        return [];
-      }
-
+      if (badgeProgressSnapshot.empty) return [];
+  
       const badgeProgressDoc = badgeProgressSnapshot.docs[0];
       const userBadgeProgressRef = collection(badgeProgressDoc.ref, "userBadgeProgress");
-
+  
       const userBadgeProgressSnapshot = await getDocs(userBadgeProgressRef);
-      if (userBadgeProgressSnapshot.empty) {
-        console.log("No badge progress records found.");
-        return [];
-      }
-
+      if (userBadgeProgressSnapshot.empty) return [];
+  
       const badgeDocs = userBadgeProgressSnapshot.docs.map((doc) => ({
         badgeDocID: doc.id,
         ...doc.data(),
       }));
-
+  
       const badgeDetailPromises = badgeDocs.map(async (badge) => {
         const badgeRef = doc(db, "badge", badge.badgeDocID);
         const badgeSnapshot = await getDoc(badgeRef);
-
+  
         return badgeSnapshot.exists()
           ? {
-            id: badge.badgeDocID,
-            progress: badge.progress,
-            isUnlocked: badge.isUnlocked,
-            dateUpdated: badge.dateUpdated,
-            ...badgeSnapshot.data(),
-          }
+              id: badge.badgeDocID,
+              progress: badge.progress,
+              isUnlocked: badge.isUnlocked,
+              dateUpdated: badge.dateUpdated,
+              ...badgeSnapshot.data(),
+            }
           : null;
       });
-
+  
       return (await Promise.all(badgeDetailPromises)).filter(Boolean);
     } catch (error) {
       console.error("Error fetching badge progress:", error);
       throw error;
     }
-  };
+  };  
+
+  const fetchNumOfAttendedEvents = async (studentID) => {
+    try {
+      const registrationQuery = query(
+        collection(db, "registration"),
+        where("studentID", "==", studentID),
+        where("isAttended", "==", true),
+        where("attendanceScannedTime", "!=", null)
+      );
+  
+      const unsubscribe = onSnapshot(registrationQuery, (registrationSnapshots) => {
+        if (!registrationSnapshots.empty) {
+          setAttendedEventsLength(registrationSnapshots.docs.length);
+        } else {
+          setAttendedEventsLength(0);
+        }
+      });
+  
+      return unsubscribe;
+    } catch (error) {
+      console.error("Error fetching number of attended events:", error);
+      throw error;
+    }
+  };  
 
   const handleSheetClose = (index) => {
     setIsProfilePicSheetVisible(index > 0);
@@ -292,41 +317,76 @@ const ProfileScreen = () => {
         contentContainerStyle={{ flexGrow: 1 }}
       >
         <View style={styles.profileContainer}>
-          <View style={styles.profileImageContainer}>
-            <Image
-              alt="Profile Picture"
-              source={
-                userData.profilePicture
-                  ? { uri: `data:image/png;base64,${userData.profilePicture}` }
-                  : DEFAULT_PROFILE_IMAGE
-              }
-              style={styles.profileImage}
-            />
-            <TouchableOpacity
-              style={styles.editProfileButton}
-              onPress={handleEditProfilePicture}
-            >
-              <Feather name="edit-2" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
+          <View style={styles.profileTopSection}>
+            <View style={styles.profileImageContainer}>
+              <Image
+                alt="Profile Picture"
+                source={
+                  userData.profilePicture
+                    ? { uri: `data:image/png;base64,${userData.profilePicture}` }
+                    : DEFAULT_PROFILE_IMAGE
+                }
+                style={styles.profileImage}
+              />
+              <TouchableOpacity
+                style={styles.editProfileButton}
+                onPress={handleEditProfilePicture}
+              >
+                <Feather name="edit-2" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.userDetailsContainer}>
+              <Text style={styles.profileName}>{`${userData.firstName || ''} ${userData.lastName || ''}`}</Text>
+              <Text style={styles.profileHandle}>
+                {userData.email || 'No email provided'}
+              </Text>
+              <View style={styles.academicInfo}>
+                {userData.yearOfStudy && (
+                  <View style={styles.infoItem}>
+                    <Ionicons name="book-outline" size={18} color="#121212" />
+                    <Text style={styles.infoText}>Year {userData.yearOfStudy}</Text>
+                  </View>
+                )}
+                {userData.facultyID && FACULTY_MAPPING[userData.facultyID] && (
+                  <View style={styles.infoItem}>
+                    <Ionicons name="school-outline" size={18} color="#121212" />
+                    <Text style={styles.infoText}>{FACULTY_MAPPING[userData.facultyID]}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
-          <View style={styles.userDetailsContainer}>
-            <Text style={styles.profileName}>{`${userData.firstName || ''} ${userData.lastName || ''}`}</Text>
-            <Text style={styles.profileHandle}>
-              {userData.email || 'No email provided'}
-            </Text>
-            <View style={styles.academicInfo}>
-              {userData.yearOfStudy && (
-                <View style={styles.infoItem}>
-                  <Ionicons name="book-outline" size={18} color="#121212" />
-                  <Text style={styles.infoText}>Year {userData.yearOfStudy}</Text>
-                </View>
-              )}
-              {userData.facultyID && FACULTY_MAPPING[userData.facultyID] && (
-                <View style={styles.infoItem}>
-                  <Ionicons name="school-outline" size={18} color="#121212" />
-                  <Text style={styles.infoText}>{FACULTY_MAPPING[userData.facultyID]}</Text>
-                </View>
-              )}
+
+          {/* Divider */}
+          <View style={styles.dividerContainer}>
+            <View style={styles.divider} />
+          </View>
+
+          {/* Points and Events Section */}
+          <View style={styles.statsSection}>
+            {/* Points Side */}
+            <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="star" size={20} color="#6284bf" />
+              </View>
+              <View>
+                <Text style={styles.statValue}>{userData.totalPointsGained || 0}</Text>
+                <Text style={styles.statLabel}>Total Points Gained</Text>
+              </View>
+            </View>
+
+            {/* Vertical Divider */}
+            <View style={styles.verticalDivider} />
+
+            {/* Events Side */}
+            <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="calendar" size={20} color="#6284bf" />
+              </View>
+              <View>
+                <Text style={styles.statValue}>{attendedEventsLength || 0}</Text>
+                <Text style={styles.statLabel}>Events Attended</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -429,13 +489,13 @@ const styles = StyleSheet.create({
   },
   profileContainer: {
     padding: 12,
+    paddingBottom: 16,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(169, 169, 169, 0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
+    // Remove flexDirection: 'row' to allow vertical stacking
+    alignItems: 'flex-start',
     marginBottom: 18,
     shadowColor: '#BFCFE7',
     shadowOffset: { width: 4, height: 4 },
@@ -567,7 +627,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   sectionContainer: {
-    marginBottom: 24,
+    paddingVertical: 16,
   },
   optionItem: {
     flexDirection: 'row',
@@ -688,7 +748,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.5,
     shadowRadius: 40,
-    // backgroundColor: "rgba(74, 111, 165, 0.2)",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
@@ -703,9 +762,64 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    // backgroundColor: "transparent"
   },
-  backgroundStyle: {
-    // backgroundColor: 'transparent',
+  profileTopSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  dividerContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 14,
+  },
+  divider: {
+    width: '96%',
+    height: 1,
+    backgroundColor: 'rgba(169, 169, 169, 0.2)',
+  },
+  statsSection: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  statIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#7F8C9A',
+    fontWeight: '500',
+  },
+  rankText: {
+    fontSize: 13,
+    color: '#6284bf',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  verticalDivider: {
+    width: 1,
+    height: '80%',
+    backgroundColor: 'rgba(169, 169, 169, 0.2)',
+    marginHorizontal: 6,
   },
 });

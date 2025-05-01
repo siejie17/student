@@ -7,6 +7,9 @@
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "extra": {
+      "encryptionKey": "UniEXP_2025"
+    },
     "splash": {
       "image": "./assets/logo.png",
       "resizeMode": "contain",

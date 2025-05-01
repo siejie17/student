@@ -4,14 +4,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import DiamondBalance from '../components/Merchandise/DiamondBalance';
 import MerchandiseCard from '../components/Merchandise/MerchandiseCard';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../utils/firebaseConfig';
 import { getItem } from '../utils/asyncStorage';
 
 const MerchandiseListingScreen = ({ navigation }) => {
   const [currentDiamonds, setCurrentDiamonds] = useState(0);
   const [merchandises, setMerchandises] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [selectedCategory, setSelectedCategory] = useState('All');
 
@@ -75,7 +75,7 @@ const MerchandiseListingScreen = ({ navigation }) => {
   const fetchMerchandises = async () => {
     setIsLoading(true);
     try {
-      const merchRef = collection(db, "merchandise");
+      const merchRef = query(collection(db, "merchandise"), where("available", "==", true));
 
       // Set up real-time listener for merchandise collection
       const unsubscribeMerch = onSnapshot(merchRef, (querySnapshot) => {

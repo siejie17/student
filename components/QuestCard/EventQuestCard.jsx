@@ -72,7 +72,6 @@ const EventQuestCard = ({
             { backgroundColor: !isLoading && (questType === "earlyBird" ? (isFailed ? '#FF6B6B' : (isCompleted ? '#4CAF50' : '#5E96CE')) : (isCompleted ? '#4CAF50' : '#5E96CE')) }
           ]}
         />
-        {/* {console.log(isFailed, ";")} */}
       </View>
 
       {/* Content Area */}

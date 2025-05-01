@@ -288,7 +288,6 @@ const EventDetailsScreen = ({ navigation, route }) => {
 
     const handleRegistration = () => {
         if (hasClash) {
-            console.log("Hello", hasClash)
             setClashModalVisible(true);
         } else {
             submitRegistration();
@@ -607,22 +606,22 @@ const EventDetailsScreen = ({ navigation, route }) => {
                                 <View style={styles.mapContainer}>
                                     <MapView
                                         style={styles.map}
-                                        initialRegion={{
+                                        region={{
                                             latitude: eventDetails.locationLatitude,
                                             longitude: eventDetails.locationLongitude,
-                                            latitudeDelta: 0.01,
-                                            longitudeDelta: 0.01,
+                                            latitudeDelta: 0.005,
+                                            longitudeDelta: 0.005,
                                         }}
-                                        scrollEnabled={false}
-                                        pitchEnabled={false}
                                     >
-                                        <Marker
-                                            coordinate={{
-                                                latitude: eventDetails.locationLatitude,
-                                                longitude: eventDetails.locationLongitude,
-                                            }}
-                                            title={eventDetails.locationName}
-                                        />
+                                        {eventDetails.locationLatitude != null && eventDetails.locationLongitude != null && (
+                                            <Marker
+                                                coordinate={{
+                                                    latitude: eventDetails.locationLatitude,
+                                                    longitude: eventDetails.locationLongitude,
+                                                }}
+                                                title={eventDetails.locationName}
+                                            />
+                                        )}
                                     </MapView>
                                 </View>
                             </View>
@@ -849,8 +848,8 @@ const styles = StyleSheet.create({
         borderColor: '#e0e0e0',
     },
     detailsContainer: {
-       marginHorizontal: 7,
-    }, 
+        marginHorizontal: 7,
+    },
     titleContainer: {
         paddingHorizontal: 10,
     },

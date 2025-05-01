@@ -8,7 +8,7 @@ import EmptyListComponent from '../components/Merchandise/EmptyListComponent';
 
 const RedemptionListingScreen = () => {
   const [redemptions, setRedemptions] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let unsubscribe; // Store unsubscribe function
@@ -55,8 +55,6 @@ const RedemptionListingScreen = () => {
             collectionLocationName: merchandiseData[item.merchandiseID]?.collectionLocationName || "Unknown",
             category: merchandiseData[item.merchandiseID]?.category || "Unknown",
           }));
-
-          console.log(mergedData.length);
 
           setRedemptions(mergedData);
           setIsLoading(false);

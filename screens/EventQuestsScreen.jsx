@@ -106,6 +106,24 @@ const EventQuestsScreen = ({ route, navigation }) => {
 
             allQuests = [...allQuests, ...updatedQuests];
 
+            allQuests.sort((a, b) => {
+              const order = ["attendance", "earlyBird", "q&a", "networking", "feedback"];
+              const aIndex = order.indexOf(a.questType);
+              const bIndex = order.indexOf(b.questType);
+  
+              if (aIndex !== bIndex) return aIndex - bIndex;
+  
+              if (a.questType === "q&a" && b.questType === "q&a") {
+                const getNumber = (name) => {
+                  const match = name.match(/\[#(\d+)\]/);
+                  return match ? parseInt(match[1], 10) : 0;
+                };
+                return getNumber(a.questName) - getNumber(b.questName);
+              }
+  
+              return 0;
+            });
+
             setQuests(allQuests); // Update state
           });
         });

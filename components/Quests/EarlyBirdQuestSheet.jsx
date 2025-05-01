@@ -261,7 +261,8 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
             const studentRef = doc(db, "user", studentID);
 
             await updateDoc(studentRef, {
-                diamonds: increment(selectedQuest.diamondsRewards)
+                diamonds: increment(selectedQuest.diamondsRewards),
+                totalPointsGained: increment(selectedQuest.pointsRewards)
             });
 
             const leaderboardRef = collection(db, "leaderboard");
@@ -273,7 +274,7 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
                 const leaderboardEntryRef = collection(db, "leaderboard", leaderboardID, "leaderboardEntries");
                 const leaderboardEntryQuery = query(leaderboardEntryRef, where("studentID", "==", studentID));
                 const leaderboardEntrySnapshot = await getDocs(leaderboardEntryQuery);
-            
+
                 if (leaderboardEntrySnapshot.empty) {
                     // 🔹 Create a new leaderboard entry
                     const newEntryRef = doc(leaderboardEntryRef); // Auto-generate ID
@@ -287,14 +288,14 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
                     // 🔹 Update existing entry
                     const existingEntryDoc = leaderboardEntrySnapshot.docs[0]; // Get first matched entry
                     const existingEntryRef = doc(db, "leaderboard", leaderboardID, "leaderboardEntries", existingEntryDoc.id);
-                    
+
                     await updateDoc(existingEntryRef, {
                         points: increment(selectedQuest.pointsRewards),
                         lastUpdated: new Date(),
                     });
                     console.log("Leaderboard entry updated.");
                 }
-            }            
+            }
 
             updateEarlyBirdBadge();
             updateQuestStatus();
@@ -370,8 +371,8 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
             </View>
 
             {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
-                <TouchableOpacity 
-                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]} 
+                <TouchableOpacity
+                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
                     disabled={claimed}
                     onPress={claimRewards}
                 >

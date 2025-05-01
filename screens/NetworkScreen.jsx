@@ -10,7 +10,7 @@ import EmptyNetworkState from '../components/Network/EmptyNetworkState';
 
 const NetworkScreen = () => {
     const [networks, setNetworks] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     const animatedValues = networks.map(() => new Animated.Value(0.95));
 

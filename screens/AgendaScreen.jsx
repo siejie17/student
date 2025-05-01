@@ -10,7 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 
 const AgendaScreen = () => {
   const [registeredEvents, setRegisteredEvents] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -71,11 +71,28 @@ const AgendaScreen = () => {
             latitude: eventInfo.locationLatitude,
             longitude: eventInfo.locationLongitude,
             eventDate: startDateTime.toDateString(),
+            eventEndDate: endDateTime.toDateString(),
             eventStart: eventInfo.eventStartDateTime,
-            startTime: startDateTime.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true }),
+            startTime: startDateTime.toLocaleString(undefined, {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: false,
+            }),
             endTime: startDateStr === endDateStr
-              ? endDateTime.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true })
-              : endDateTime.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) + ", " + endDateTime.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true }),
+              ? endDateTime.toLocaleTimeString(undefined, {
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: false,
+              })
+              : endDateTime.toLocaleString(undefined, {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: false,
+              }),
             isVerified: reg.isVerified,
             isAttended: reg.isAttended,
           });
@@ -85,14 +102,24 @@ const AgendaScreen = () => {
       // Categorize events by date
       let categorizedEvents = {};
       eventData.forEach(event => {
-        const date = new Date(event.eventDate);
-        const eventDateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        const startDate = new Date(event.eventDate);
+        const endDate = new Date(event.eventEndDate);
 
-        if (!categorizedEvents[eventDateKey]) {
-          categorizedEvents[eventDateKey] = [];
+        let currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+          const eventDateKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+
+          if (!categorizedEvents[eventDateKey]) {
+            categorizedEvents[eventDateKey] = [];
+          }
+
+          categorizedEvents[eventDateKey].push(event);
+
+          // Move to next day
+          currentDate.setDate(currentDate.getDate() + 1);
         }
-        categorizedEvents[eventDateKey].push(event);
       });
+
 
       setRegisteredEvents(categorizedEvents);
       setIsLoading(false);
@@ -153,7 +180,6 @@ const AgendaScreen = () => {
   };
 
   const handleCardPress = useCallback((item) => {
-    console.log('Navigating to event:', item.eventName);
     navigation.navigate("RegisteredEventsTopTabs", {
       registrationID: item.id,
       eventID: item.eventID,
@@ -298,7 +324,8 @@ const AgendaScreen = () => {
             showClosingKnob={true}
             refreshing={refreshing}
             onRefresh={onRefresh}
-            hideExtraDays={false}
+            hideExtraDays={true}
+            showOnlySelectedDayItems
           />
         </View>
       </View>

@@ -55,7 +55,7 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
     const [scanned, setScanned] = useState(false);
 
     // Get encryption key
-    const secretKey = Constants.expoConfig?.extra?.encryptionKey || 'UniEXP2025';
+    const secretKey = Constants.expoConfig?.extra?.encryptionKey;
 
     const diamondAnims = useRef([...Array(30)].map(() => ({
         translateX: new Animated.Value(0),
@@ -421,7 +421,7 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
 
             const questProgressQuery = query(collection(db, "questProgress"), where("eventID", "==", eventID), where("studentID", "==", studentID));
             const questProgressSnap = await getDocs(questProgressQuery);
-            
+
             questProgressSnap.forEach(async (questProgress) => {
                 const questProgressID = questProgress.id;
 
@@ -565,7 +565,8 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
             const studentRef = doc(db, "user", studentID);
 
             await updateDoc(studentRef, {
-                diamonds: increment(selectedQuest.diamondsRewards)
+                diamonds: increment(selectedQuest.diamondsRewards),
+                totalPointsGained: increment(selectedQuest.pointsRewards)
             });
 
             const leaderboardRef = collection(db, "leaderboard");
@@ -577,7 +578,7 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                 const leaderboardEntryRef = collection(db, "leaderboard", leaderboardID, "leaderboardEntries");
                 const leaderboardEntryQuery = query(leaderboardEntryRef, where("studentID", "==", studentID));
                 const leaderboardEntrySnapshot = await getDocs(leaderboardEntryQuery);
-            
+
                 if (leaderboardEntrySnapshot.empty) {
                     // 🔹 Create a new leaderboard entry
                     const newEntryRef = doc(leaderboardEntryRef); // Auto-generate ID
@@ -591,7 +592,7 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                     // 🔹 Update existing entry
                     const existingEntryDoc = leaderboardEntrySnapshot.docs[0]; // Get first matched entry
                     const existingEntryRef = doc(db, "leaderboard", leaderboardID, "leaderboardEntries", existingEntryDoc.id);
-                    
+
                     await updateDoc(existingEntryRef, {
                         points: increment(selectedQuest.pointsRewards),
                         lastUpdated: new Date(),
