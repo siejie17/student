@@ -7,7 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { getItem } from '../../utils/asyncStorage';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width * 0.8;
+const CARD_WIDTH = width * 0.875;
 const CARD_HEIGHT = 220;
 
 // Organizer mapping defined outside component

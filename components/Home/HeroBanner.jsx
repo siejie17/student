@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderRadius: 16,
     marginHorizontal: 20,
-    marginBottom: 30,
+    marginBottom: 24,
     overflow: 'hidden',
     elevation: 6,
     shadowColor: '#000',

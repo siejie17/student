@@ -40,14 +40,15 @@ const SignInScreen = () => {
       const userCredential = await signInWithEmailAndPassword(auth, email.value, password.value);
       const user = userCredential.user;
 
+      const userSignedUpDataJSON = await getItem('@userSignedUpData');
+      console.log(JSON.parse(userSignedUpDataJSON));
+
       if (!user.emailVerified) {
-        // Email not verified - show verification modal
         setLoading(false);
         setIsVerificationModalVisible(true);
-
-        // Sign out unverified user
         await auth.signOut();
-      }
+        return; // Exit the function here
+      }      
 
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
@@ -95,8 +96,12 @@ const SignInScreen = () => {
 
           await Promise.all(batchPromises);
 
+          console.log("Completed");
+
           await setItem('studentID', user.uid);
           await setItem('facultyID', userSignedUpData.facultyID.value);
+          await auth.signOut();
+          await signInWithEmailAndPassword(auth, email.value, password.value)
           await removeItem('@userSignedUpData');
         }
       } else {

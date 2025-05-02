@@ -10,16 +10,16 @@ import RankingRewardsModal from '../components/Leaderboard/RankingRewardsModal';
 const { width } = Dimensions.get('window');
 
 const FACULTY_MAPPING = {
-  1: "Faculty of Applied & Creative Arts",
-  2: "Faculty of Built Environment",
-  3: "Faculty of Cognitive Sciences & Human Development",
-  4: "Faculty of Computer Science & Information Technology",
-  5: "Faculty of Economics & Business",
-  6: "Faculty of Education, Language & Communication",
-  7: "Faculty of Engineering",
-  8: "Faculty of Medicine & Health Sciences",
-  9: "Faculty of Resource Science & Technology",
-  10: "Faculty of Social Sciences & Humanities",
+  1: "FACA's",
+  2: "FBE's",
+  3: "FCSHD's",
+  4: "FCSIT's",
+  5: "FEB's",
+  6: "FELC's",
+  7: "FENG's",
+  8: "FMHS's",
+  9: "FRST's",
+  10: "FSSH's",
 };
 
 const LeaderboardScreen = () => {
@@ -31,7 +31,7 @@ const LeaderboardScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [currentUserRank, setCurrentUserRank] = useState(null);
   const [refreshDate, setRefreshDate] = useState(new Date());
-  const [facultyName, setFacultyName] = useState("");
+  const [facultyCode, setFacultyCode] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   // const [rewardsModalVisible, setRewardsModalVisible] = useState(true);
   const [rewardsModalVisible, setRewardsModalVisible] = useState(false);
@@ -67,7 +67,7 @@ const LeaderboardScreen = () => {
 
       const facultyID = await getItem("facultyID");
       const currentStudentID = await getItem("studentID");
-      setFacultyName(FACULTY_MAPPING[facultyID] || "");
+      setFacultyCode(FACULTY_MAPPING[facultyID] || "");
 
       const leaderboardRef = collection(db, "leaderboard");
       const leaderboardQuery = query(leaderboardRef, where("facultyID", "==", facultyID));
@@ -340,9 +340,9 @@ const LeaderboardScreen = () => {
                 />
               </View>
             </View>
-            <Text style={styles.podiumName} numberOfLines={1}>{secondPlace?.firstName || "—"}</Text>
+            <Text style={styles.podiumName} numberOfLines={1}>{secondPlace?.firstName || "Silver's open!"}</Text>
             <Text style={[styles.podiumPoints, styles.secondPoints]}>
-              {secondPlace?.points ? `${secondPlace.points} pts` : "—"}
+              {secondPlace?.points ? `${secondPlace.points} pts` : "Join the race!"}
             </Text>
           </View>
 
@@ -366,10 +366,10 @@ const LeaderboardScreen = () => {
               </View>
             </View>
             <Text style={[styles.podiumName, styles.firstName]} numberOfLines={1}>
-              {firstPlace?.firstName || "—"}
+              {firstPlace?.firstName || "Be the champ!"}
             </Text>
             <Text style={[styles.podiumPoints, styles.firstPoints]}>
-              {firstPlace?.points ? `${firstPlace.points} pts` : "—"}
+              {firstPlace?.points ? `${firstPlace.points} pts` : "No points yet!"}
             </Text>
           </View>
 
@@ -389,9 +389,9 @@ const LeaderboardScreen = () => {
                 />
               </View>
             </View>
-            <Text style={styles.podiumName} numberOfLines={1}>{thirdPlace?.firstName || "—"}</Text>
+            <Text style={styles.podiumName} numberOfLines={1}>{thirdPlace?.firstName || "Bronze is yours!"}</Text>
             <Text style={[styles.podiumPoints, styles.thirdPoints]}>
-              {thirdPlace?.points ? `${thirdPlace.points} pts` : "—"}
+              {thirdPlace?.points ? `${thirdPlace.points} pts` : "Score now!"}
             </Text>
           </View>
         </View>
@@ -623,25 +623,19 @@ const LeaderboardScreen = () => {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Leaderboard</Text>
-        <View style={styles.cardContainer}>
-          <LinearGradient
-            colors={['#6284bf', '#3a5ca8']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.cardGradient}
-          >
-            <View style={styles.headerSection}>
-              <Text style={styles.facultyName}>{facultyName}</Text>
+        <Text style={styles.headerTitle}>{facultyCode} Leaderboard</Text>
+        <View style={styles.divider} />
+        <View style={styles.cardWrapper}>
+          <View style={styles.content}>
+            <Feather
+              name="refresh-cw"
+              size={20}
+              color="rgba(0, 0, 0, 0.9)"
+            />
+            <View style={styles.textContainer}>
+              <Text style={styles.title}>Next refresh: {refreshDate.toDate().toLocaleDateString()}</Text>
             </View>
-
-            <View style={styles.separator} />
-
-            <View style={styles.infoSection}>
-              <Feather name="refresh-cw" size={14} color="#ffffff" style={styles.icon} />
-              <Text style={styles.resetText}>Next Reset: {refreshDate.toDate().toLocaleDateString()}</Text>
-            </View>
-          </LinearGradient>
+          </View>
         </View>
       </View>
 
@@ -651,7 +645,9 @@ const LeaderboardScreen = () => {
       {/* FlatList with pull-to-refresh */}
       <View style={styles.listWrapper}>
         <LinearGradient
-          colors={['rgba(98, 132, 191, 0.08)', 'rgba(255, 255, 255, 0)']}
+          colors={['rgba(224, 235, 254, 0.9)', 'rgba(240, 249, 255, 0.5)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 0.7 }}
           style={styles.listGradient}
         >
           <FlatList
@@ -664,8 +660,8 @@ const LeaderboardScreen = () => {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor="#3b82f6"
-                colors={["#3b82f6"]}
+                tintColor="#718cce"
+                colors={["#718cce"]}
               />
             }
             ListHeaderComponent={() => (
@@ -679,7 +675,10 @@ const LeaderboardScreen = () => {
             ListEmptyComponent={() => (
               <View style={styles.emptyContainer}>
                 <MaterialIcons name="leaderboard" size={48} color="#ccc" />
-                <Text style={styles.emptyText}>No other participants yet</Text>
+                <Text style={styles.emptyTitle}>No challengers yet!</Text>
+                <Text style={styles.emptyText}>
+                  Think you've got what it takes to make the leaderboard? Join an event, earn points, and climb the ranks!
+                </Text>
               </View>
             )}
           />
@@ -716,23 +715,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 12,
   },
-  cardContainer: {
-    width: '90%',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-    marginVertical: 8,
-  },
-  cardGradient: {
-    borderRadius: 16,
-    padding: 16,
-    overflow: 'hidden',
-  },
-  headerSection: {
-    // marginBottom: 8,
+  divider: {
+    width: '80%',
+    height: 1.5,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+    marginBottom: 8,
   },
   facultyName: {
     fontSize: 16,
@@ -740,23 +727,39 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     textAlign: 'center',
   },
-  separator: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    marginVertical: 8,
+  cardWrapper: {
+    width: '90%',
+    alignSelf: 'center',
+    borderRadius: 10,
+    marginBottom: 8,
   },
-  infoSection: {
+  card: {
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  content: {
+    width: '100%',
+    display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 14,
   },
-  icon: {
-    marginRight: 8,
+  textContainer: {
+    marginLeft: 8,
   },
-  resetText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#ffffff',
+  title: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: 'rgba(0, 0, 0, 0.95)',
+    letterSpacing: 0.2,
+  },
+  subtitle: {
+    fontSize: 12,
+    fontWeight: '550',
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 1,
   },
   podiumSection: {
     paddingTop: 20,
@@ -764,7 +767,7 @@ const styles = StyleSheet.create({
   },
   infoIconContainer: {
     position: 'absolute',
-    top: 10,
+    top: 0,
     right: 20,
     zIndex: 10,
   },
@@ -1020,16 +1023,24 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   emptyContainer: {
-    padding: 32,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginVertical: 10,
+    color: '#555',
   },
   emptyText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#64748b',
+    fontSize: 14,
+    color: '#777',
     textAlign: 'center',
-  },
+    marginTop: 6,
+    paddingHorizontal: 20,
+  },  
   floatingRankContainer: {
     position: 'absolute',
     bottom: 15,

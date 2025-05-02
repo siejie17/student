@@ -6,7 +6,7 @@ import { db } from '../../utils/firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width * 0.85;
+const CARD_WIDTH = width * 0.875;
 
 // Move this outside component to prevent recreation on each render
 const ORGANISER_MAPPING = {
@@ -282,7 +282,6 @@ const OngoingUpcomingEventCarousel = ({ setIsLoading, navigation }) => {
 const styles = StyleSheet.create({
     container: {
         marginTop: 24,
-        marginBottom: 8,
         height: "auto",
         minHeight: 200,
     },
@@ -327,7 +326,7 @@ const styles = StyleSheet.create({
         minHeight: 220,
         backgroundColor: 'white',
         borderRadius: 12,
-        marginHorizontal: 10,
+        marginLeft: 10,
         shadowColor: '#000',
         shadowOffset: {
             width: 0,

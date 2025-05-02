@@ -87,10 +87,11 @@ const SignUpScreen = () => {
     if (!email.value.trim()) {
       email.error = 'Email is required';
       newError++;
-    } else if (!validateEmail(email.value)) {
-      email.error = 'Email must be in format: {matric_number}@siswa.unimas.my';
-      newError++;
-    }
+    } 
+    // else if (!validateEmail(email.value)) {
+    //   email.error = 'Email must be in format: {matric_number}@siswa.unimas.my';
+    //   newError++;
+    // }
 
     if (!password.value) {
       password.error = 'Password is required';
@@ -128,10 +129,7 @@ const SignUpScreen = () => {
         facultyID: faculty,
       }));
 
-      await sendEmailVerification(user, {
-        handleCodeInApp: true,
-        url: 'https://uniexp-bfc54.firebaseapp.com',
-      })
+      await sendEmailVerification(user);
 
       setIsEmailSentModalVisible(true);
     } catch (error) {
@@ -176,7 +174,7 @@ const SignUpScreen = () => {
               onChangeText={text => {
                 setEmail({ 
                   value: text, 
-                  error: validateEmail(text) ? '' : 'Please enter a valid student email'
+                  error: ''//validateEmail(text) ? '' : 'Please enter a valid student email'
                 })
               }}
               errorText={email.error}

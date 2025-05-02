@@ -43,55 +43,55 @@ const HomeScreen = () => {
       const studentID = await getItem("studentID");
       const facultyID = await getItem("facultyID");
       if (!studentID || !facultyID) return;
-  
+
       try {
         const leaderboardRef = collection(db, "leaderboard");
         const leaderboardQuery = query(leaderboardRef, where("facultyID", "==", facultyID));
         const leaderboardSnap = await getDocs(leaderboardQuery);
-  
+
         if (!leaderboardSnap.empty) {
           const leaderboardDoc = leaderboardSnap.docs[0];
           const leaderboardDocRef = leaderboardDoc.ref;
           const { refreshDateTime } = leaderboardDoc.data();
           const currentTime = Timestamp.now(); // Use actual timestamp
-  
+
           if (!refreshDateTime || !refreshDateTime.toMillis) {
             console.warn("refreshDateTime is missing or invalid.");
             return;
-        }
+          }
 
-        if (refreshDateTime.toMillis() <= currentTime.toMillis()) {
+          if (refreshDateTime.toMillis() <= currentTime.toMillis()) {
             const leaderboardEntriesRef = collection(leaderboardDocRef, "leaderboardEntries");
             const leaderboardEntriesQuery = query(leaderboardEntriesRef, orderBy("points", "desc"));
             const leaderboardEntriesSnapshot = await getDocs(leaderboardEntriesQuery);
 
             let rankings = leaderboardEntriesSnapshot.docs.map((doc, index) => ({
-                studentID: doc.data().studentID,
-                rank: index + 1,
+              studentID: doc.data().studentID,
+              rank: index + 1,
             }));
 
             // Assign rewards based on ranking
             for (const stud of rankings) {
-                let diamonds = 0;
-                if (stud.rank === 1) diamonds = 1000;
-                else if (stud.rank === 2) diamonds = 750;
-                else if (stud.rank === 3) diamonds = 500;
-                else if (stud.rank === 4) diamonds = 400;
-                else if (stud.rank === 5) diamonds = 350;
-                else if (stud.rank === 6) diamonds = 300;
-                else if (stud.rank === 7) diamonds = 250;
-                else if (stud.rank === 8) diamonds = 200;
-                else if (stud.rank === 9) diamonds = 150;
-                else if (stud.rank === 10) diamonds = 100;
-                else if (stud.rank >= 11 && stud.rank <= 20) diamonds = 50;
-                else if (stud.rank >= 21 && stud.rank <= 30) diamonds = 25;
-                else if (stud.rank >= 31 && stud.rank <= 40) diamonds = 10;
-                else if (stud.rank >= 41 && stud.rank <= 50) diamonds = 5;
-                else diamonds = 1;
+              let diamonds = 0;
+              if (stud.rank === 1) diamonds = 1000;
+              else if (stud.rank === 2) diamonds = 750;
+              else if (stud.rank === 3) diamonds = 500;
+              else if (stud.rank === 4) diamonds = 400;
+              else if (stud.rank === 5) diamonds = 350;
+              else if (stud.rank === 6) diamonds = 300;
+              else if (stud.rank === 7) diamonds = 250;
+              else if (stud.rank === 8) diamonds = 200;
+              else if (stud.rank === 9) diamonds = 150;
+              else if (stud.rank === 10) diamonds = 100;
+              else if (stud.rank >= 11 && stud.rank <= 20) diamonds = 50;
+              else if (stud.rank >= 21 && stud.rank <= 30) diamonds = 25;
+              else if (stud.rank >= 31 && stud.rank <= 40) diamonds = 10;
+              else if (stud.rank >= 41 && stud.rank <= 50) diamonds = 5;
+              else diamonds = 1;
 
-                await setItem(`showLeaderboardModal_${stud.studentID}`, "true");
-                await setItem(`previousRanking_${stud.studentID}`, String(stud.rank));
-                await setItem(`diamonds_${stud.studentID}`, String(diamonds));
+              await setItem(`showLeaderboardModal_${stud.studentID}`, "true");
+              await setItem(`previousRanking_${stud.studentID}`, String(stud.rank));
+              await setItem(`diamonds_${stud.studentID}`, String(diamonds));
             }
 
             // Efficiently delete old leaderboard entries
@@ -111,9 +111,9 @@ const HomeScreen = () => {
         console.error("Error checking leaderboard refresh:", error);
       }
     };
-  
+
     checkLeaderboardRefresh();
-  }, []);  
+  }, []);
 
   // Fetch user data on screen focus
   useFocusEffect(
@@ -259,13 +259,15 @@ const HomeScreen = () => {
       </View>
 
       {/* Search Bar with enhanced styling */}
-      <SearchBar
-        onSearch={setSearchQuery}
-        placeholder="Search events..."
-        style={styles.searchBar}
-        onPress={() => navigation.navigate("Events")}
-        icon="search"
-      />
+      <View style={styles.searchBarContainer}>
+        <SearchBar
+          onSearch={setSearchQuery}
+          placeholder="Search events..."
+          style={styles.searchBar}
+          onPress={() => navigation.navigate("Events", { autoFocusSearch: true })}
+          icon="search"
+        />
+      </View>
 
       {/* Main Content */}
       <MemoizedFlatList
@@ -306,14 +308,16 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 100,
+    height: 150,
     backgroundColor: '#f8f9fa',
-    zIndex: 0,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    zIndex: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: -1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
   },
   header: {
     flexDirection: 'row',
@@ -321,8 +325,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 10,
     paddingHorizontal: 20,
-    marginBottom: 10,
-    zIndex: 1,
+    marginBottom: 5,
+    zIndex: 6,
+  },
+  searchBarContainer: {
+    zIndex: 6,
   },
   welcomeText: {
     fontSize: 14,
@@ -365,7 +372,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   sectionContainer: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   fab: {
     position: 'absolute',

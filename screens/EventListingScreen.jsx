@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, {
   useCallback,
@@ -50,7 +50,7 @@ const CATEGORIES_MAPPING = {
   "Others": 7,
 };
 
-const EventListingScreen = ({ navigation }) => {
+const EventListingScreen = ({ route, navigation }) => {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -64,6 +64,8 @@ const EventListingScreen = ({ navigation }) => {
   const unsubscribeRegistrationRef = useRef(null);
   const unsubscribeEventRef = useRef(null);
   const unsubscribeTotalParticipantsRef = useRef(null);
+
+  const autoFocusSearch = route.params?.autoFocusSearch ?? false;
 
   const fetchEventCatalogue = useCallback(async () => {
     try {
@@ -270,6 +272,7 @@ const EventListingScreen = ({ navigation }) => {
             onSearch={setSearchQuery}
             placeholder="Search events by name..."
             style={styles.searchBar}
+            shouldFocus={autoFocusSearch}
           />
 
           <FlatList

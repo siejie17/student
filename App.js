@@ -29,7 +29,7 @@ import FeedbackFormScreen from './screens/FeedbackFormScreen.jsx';
 
 import LoadingIndicator from './components/General/LoadingIndicator.jsx';
 
-import { getItem } from './utils/asyncStorage.js';
+import { getItem, removeItem } from './utils/asyncStorage.js';
 import { auth } from './utils/firebaseConfig';
 
 const MainStack = createNativeStackNavigator();
@@ -46,6 +46,7 @@ const TopTab = createMaterialTopTabNavigator();
 export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(null);
   const [studentID, setStudentID] = useState(null);
+  const [student, setStudent] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -63,8 +64,18 @@ export default function App() {
 
       onAuthStateChanged(auth, async (user) => {
         if (user && user.emailVerified) {
-          setStudentID(storedStudentID);
+          const storedStudentID = await getItem('studentID'); // <- moved inside
+          console.log("stored student id", storedStudentID);
+
+          if (storedStudentID) {
+            setStudent(user);
+            setStudentID(storedStudentID);
+          } else {
+            setStudent({});
+            setStudentID(null);
+          }
         } else {
+          setStudent({});
           setStudentID(null);
         }
         setLoading(false);
@@ -209,15 +220,15 @@ const RegisteredEventTopTabs = ({ route, navigation }) => {
           lazyPreloadDistance: 1,
         }}
       >
-        <TopTab.Screen 
-          name="Details" 
-          component={RegisteredEventScreen} 
-          initialParams={params} 
+        <TopTab.Screen
+          name="Details"
+          component={RegisteredEventScreen}
+          initialParams={params}
         />
-        <TopTab.Screen 
-          name="Quest" 
-          component={EventQuestsScreen} 
-          initialParams={params} 
+        <TopTab.Screen
+          name="Quest"
+          component={EventQuestsScreen}
+          initialParams={params}
         />
       </TopTab.Navigator>
     </View>

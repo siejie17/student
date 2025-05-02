@@ -8,12 +8,10 @@ import { doc, onSnapshot, query, where, collection, orderBy } from "firebase/fir
 import { getItem } from '../../utils/asyncStorage';
 import { useNavigation } from '@react-navigation/native';
 
-const MerchandiseLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNavigation }) => {
+const MerchandiseLeaderboardCards = ({ setIsLoading, setFirstName }) => {
     const [diamonds, setDiamonds] = useState(0);
     const [diamondsLoading, setDiamondsLoading] = useState(false);
     const [rank, setRank] = useState(0);
-    const [totalUsers, setTotalUsers] = useState(0);
-    const [percentile, setPercentile] = useState(0);
 
     const navigation = useNavigation();
 
@@ -39,118 +37,93 @@ const MerchandiseLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNav
     };
 
     useEffect(() => {
-        const fetchUserDiamonds = async () => {
+        let userUnsubscribe = null;
+        let leaderboardUnsubscribe = null;
+        let entriesUnsubscribe = null;
+    
+        const init = async () => {
             try {
-                const studentID = await getItem("studentID");
+                const [studentID, facultyID] = await Promise.all([
+                    getItem("studentID"),
+                    getItem("facultyID")
+                ]);
+    
                 if (!studentID) return;
-
+    
                 setIsLoading(true);
                 setDiamondsLoading(true);
-
+    
+                // --- User Diamonds Listener ---
                 const userRef = doc(db, "user", studentID);
-
-                const unsubscribe = onSnapshot(userRef, (userSnap) => {
+                userUnsubscribe = onSnapshot(userRef, (userSnap) => {
                     if (userSnap.exists()) {
-                        setFirstName(userSnap.data().firstName);
-                        setDiamonds(userSnap.data().diamonds);
+                        const userData = userSnap.data();
+                        setFirstName(userData.firstName);
+                        setDiamonds(userData.diamonds);
                     } else {
                         console.log("User does not exist.");
                     }
                     setDiamondsLoading(false);
                     setIsLoading(false);
                 });
-
-                return () => unsubscribe(); // Cleanup on unmount
-            } catch (error) {
-                console.error("Error occurred when fetching user's diamonds", error);
-                setDiamondsLoading(false);
-                setIsLoading(false);
-            }
-        }
-
-        fetchUserDiamonds();
-    }, []);
-
-    useEffect(() => {
-        const fetchUserPlace = async () => {
-            try {
-                const studentID = await getItem("studentID");
-                const facultyID = await getItem("facultyID");
-
-                if (!studentID || !facultyID) return;
-
-                setIsLoading(true);
-
+    
+                // --- Leaderboard Listener ---
+                if (!facultyID) return;
+    
                 const leaderboardRef = collection(db, "leaderboard");
                 const leaderboardQuery = query(leaderboardRef, where("facultyID", "==", facultyID));
-
-                // Listen for real-time updates on leaderboard changes
-                const unsubscribeLeaderboard = onSnapshot(leaderboardQuery, (leaderboardSnap) => {
+    
+                leaderboardUnsubscribe = onSnapshot(leaderboardQuery, (leaderboardSnap) => {
                     if (leaderboardSnap.empty) {
                         console.log("No leaderboard found for this faculty.");
                         setRank(null);
-                        setTotalUsers(0);
-                        setPercentile(0);
                         return;
                     }
-
-                    const leaderboardDoc = leaderboardSnap.docs[0];
-                    const leaderboardID = leaderboardDoc.id;
-
-                    // Step 2: Listen for changes in `leaderboardEntries` collection
+    
+                    const leaderboardID = leaderboardSnap.docs[0].id;
                     const leaderboardEntriesRef = collection(db, "leaderboard", leaderboardID, "leaderboardEntries");
                     const leaderboardEntriesQuery = query(leaderboardEntriesRef, orderBy("points", "desc"));
-
-                    const unsubscribeEntries = onSnapshot(leaderboardEntriesQuery, (leaderboardEntriesSnapshot) => {
-                        const entries = leaderboardEntriesSnapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-
-                        const userPlace = entries.findIndex(entry => entry.studentID === studentID) + 1;
-                        const totalParticipants = entries.length;
-
-                        // Calculate percentile (top X%)
-                        const calculatedPercentile = Math.ceil((userPlace / totalParticipants) * 100);
-
+    
+                    if (entriesUnsubscribe) entriesUnsubscribe(); // Unsubscribe old entry listener if exists
+    
+                    entriesUnsubscribe = onSnapshot(leaderboardEntriesQuery, (entriesSnap) => {
+                        const entries = entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        const userIndex = entries.findIndex(entry => entry.studentID === studentID);
+                        
+                        const userPlace = userIndex != null && (userIndex + 1);
+    
                         setRank(userPlace);
-                        setTotalUsers(totalParticipants);
-                        setPercentile(calculatedPercentile);
                         setIsLoading(false);
                     });
-
-                    return () => unsubscribeEntries(); // Cleanup
                 });
-
-                return () => unsubscribeLeaderboard(); // Cleanup
             } catch (error) {
-                console.error("Error fetching leaderboard entries:", error);
+                console.error("Initialization error:", error);
                 setIsLoading(false);
+                setDiamondsLoading(false);
             }
         };
-
-        fetchUserPlace();
+    
+        init();
+    
+        return () => {
+            if (userUnsubscribe) userUnsubscribe();
+            if (leaderboardUnsubscribe) leaderboardUnsubscribe();
+            if (entriesUnsubscribe) entriesUnsubscribe();
+        };
     }, []);
-
-    const getPlacementColor = () => {
-        if (rank === 1) return ['#FFD700', '#FFC107']; // Gold
-        if (rank === 2) return ['#C0C0C0', '#A9A9A9']; // Silver
-        if (rank === 3) return ['#CD7F32', '#A0522D']; // Bronze
-        return ['#E0E0E0', '#BDBDBD']; // Default
-    };
 
     return (
         <View style={styles.container}>
             <Pressable
                 style={({ pressed }) => [
                     styles.card,
-                    pressed ? styles.cardPressed : styles.cardNormal
+                    pressed && styles.cardPressed
                 ]}
                 onPress={() => navigation.navigate("MerchandiseTopTabs")}
-                android_ripple={{ color: 'rgba(0, 0, 0, 0.1)' }}
+                android_ripple={{ color: 'rgba(0, 0, 0, 0.05)' }}
             >
                 <LinearGradient
-                    colors={['#F6FCFD', '#EDF4F7']}
+                    colors={['#F9FCFF', '#F0F6FF']}
                     style={styles.cardGradient}
                 >
                     <View style={styles.cardHeader}>
@@ -160,10 +133,6 @@ const MerchandiseLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNav
                                 style={styles.icon}
                             />
                         </View>
-                        <Text style={styles.cardTitle}>Shop</Text>
-                    </View>
-
-                    <View style={styles.cardBody}>
                         <Text style={styles.diamondAmount}>
                             <Text style={styles.diamondNumber}>{diamondsLoading ? <ActivityIndicator size={24} color="#6c63ff" /> : `${diamonds} Diamonds`}</Text>
                         </Text>
@@ -195,10 +164,7 @@ const MerchandiseLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNav
                                 style={styles.icon}
                             />
                         </View>
-                        <Text style={styles.cardTitle}>Rank</Text>
-                    </View>
-
-                    <View style={styles.cardBody}>
+                        <View style={styles.cardBody}>
                         {rank === 0 ? (
                             <Text style={styles.rankStart}>Battle On!</Text>
                         ) : (
@@ -208,6 +174,7 @@ const MerchandiseLeaderboardCards = ({ setIsLoading, setFirstName, setSpecialNav
                                 </Text>
                             </View>
                         )}
+                        </View>
                     </View>
 
                     <View style={styles.cardFooter}>
@@ -232,11 +199,11 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         marginHorizontal: 6,
         overflow: 'hidden',
-        elevation: 3,
+        elevation: 1,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.01,
+        shadowRadius: 2,
     },
     cardGradient: {
         padding: 16,
@@ -259,7 +226,7 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     cardBody: {
-        marginBottom: 16,
+        marginLeft: 12,
     },
     cardFooter: {
         flexDirection: 'row',
@@ -287,7 +254,7 @@ const styles = StyleSheet.create({
     diamondAmount: {
         fontSize: 18,
         color: '#333',
-        marginBottom: 4,
+        marginLeft: 10,
     },
     diamondNumber: {
         fontWeight: '700',

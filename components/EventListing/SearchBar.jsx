@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   TextInput,
@@ -9,18 +9,25 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const SearchBar = ({ onSearch, placeholder = 'Search...', style, onPress }) => {
+const SearchBar = ({ onSearch, placeholder = 'Search...', style, onPress, shouldFocus = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
-    
-    const handleChange = (text) => {
-        setSearchQuery(text);
-        onSearch(text);
-    };
-    
-    const handleClear = () => {
-        setSearchQuery('');
-        onSearch('');
-    };
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (shouldFocus && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [shouldFocus]);
+
+  const handleChange = (text) => {
+    setSearchQuery(text);
+    onSearch(text);
+  };
+
+  const handleClear = () => {
+    setSearchQuery('');
+    onSearch('');
+  };
 
   return (
     <View style={[styles.container, style]}>
@@ -29,8 +36,9 @@ const SearchBar = ({ onSearch, placeholder = 'Search...', style, onPress }) => {
           source={require('../../assets/eventListing/search.png')}
           style={styles.searchIcon}
         />
-        
+
         <TextInput
+          ref={inputRef}
           style={styles.input}
           value={searchQuery}
           onChangeText={handleChange}
@@ -44,7 +52,7 @@ const SearchBar = ({ onSearch, placeholder = 'Search...', style, onPress }) => {
         />
 
         {Platform.OS === 'android' && searchQuery.length > 0 && (
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={handleClear}
             style={styles.clearButton}
           >
