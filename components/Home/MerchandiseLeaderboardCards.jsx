@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
         width: 16,
     },
     diamondAmount: {
-        fontSize: 18,
+        fontSize: 16,
         color: '#333',
         marginLeft: 10,
     },
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     rankBadgeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 4,
+        // marginBottom: 4,
     },
     rankBadge: {
         width: 28,
@@ -288,12 +288,12 @@ const styles = StyleSheet.create({
         color: 'white',
     },
     rankText: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
         color: '#4A6EB5',
     },
     rankStart: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
         color: '#FFC107',
         marginBottom: 4,

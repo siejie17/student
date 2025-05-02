@@ -460,16 +460,16 @@ const RegisteredEventScreen = ({ route }) => {
                         <Text style={[styles.infoText, { marginBottom: "16" }]}>{eventDetails.locationName}</Text>
 
                         <View style={styles.mapContainer}>
-                            <MapView
-                                style={styles.map}
-                                region={{
-                                    latitude: eventDetails.locationLatitude,
-                                    longitude: eventDetails.locationLongitude,
-                                    latitudeDelta: 0.005,
-                                    longitudeDelta: 0.005,
-                                }}
-                            >
-                                {eventDetails.locationLatitude != null && eventDetails.locationLongitude != null && (
+                            {eventDetails.locationLatitude != null && eventDetails.locationLongitude != null && (
+                                <MapView
+                                    style={styles.map}
+                                    region={{
+                                        latitude: eventDetails.locationLatitude,
+                                        longitude: eventDetails.locationLongitude,
+                                        latitudeDelta: 0.005,
+                                        longitudeDelta: 0.005,
+                                    }}
+                                >
                                     <Marker
                                         coordinate={{
                                             latitude: eventDetails.locationLatitude,
@@ -477,8 +477,8 @@ const RegisteredEventScreen = ({ route }) => {
                                         }}
                                         title={eventDetails.locationName}
                                     />
-                                )}
-                            </MapView>
+                                </MapView>
+                            )}
                         </View>
                     </View>
                 </View>

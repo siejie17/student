@@ -107,6 +107,8 @@ const SignInScreen = () => {
       } else {
         await setItem('studentID', user.uid);
         await setItem('facultyID', userDocSnap.data().facultyID);
+        await auth.signOut();
+        await signInWithEmailAndPassword(auth, email.value, password.value)
       }
     } catch (error) {
       setLoading(false);

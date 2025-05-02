@@ -60,8 +60,6 @@ export default function App() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const storedStudentID = await getItem('studentID');
-
       onAuthStateChanged(auth, async (user) => {
         if (user && user.emailVerified) {
           const storedStudentID = await getItem('studentID'); // <- moved inside
