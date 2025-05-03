@@ -645,7 +645,7 @@ const LeaderboardScreen = () => {
       {/* FlatList with pull-to-refresh */}
       <View style={styles.listWrapper}>
         <LinearGradient
-          colors={['rgba(224, 235, 254, 0.9)', 'rgba(240, 249, 255, 0.5)']}
+          colors={['rgba(240, 242, 245, 0.9)', 'rgba(220, 223, 228, 0.3)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 0.7 }}
           style={styles.listGradient}
@@ -660,8 +660,8 @@ const LeaderboardScreen = () => {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor="#718cce"
-                colors={["#718cce"]}
+                tintColor="#A0A4AD"
+                colors={["#A0A4AD"]}
               />
             }
             ListHeaderComponent={() => (
@@ -1040,7 +1040,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 6,
     paddingHorizontal: 20,
-  },  
+  },
   floatingRankContainer: {
     position: 'absolute',
     bottom: 15,

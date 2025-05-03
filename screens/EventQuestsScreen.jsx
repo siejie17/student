@@ -12,9 +12,10 @@ import QuestionAnswerQuestSheet from '../components/Quests/QuestionAnswerQuestSh
 import NetworkingQuestSheet from '../components/Quests/NetworkingQuestSheet';
 import AttendanceQuestSheet from '../components/Quests/AttendanceQuestSheet';
 import EventQuestsTimeRestrictedEmptyState from '../components/QuestCard/EventQuestsTimeRestrictedEmptyState';
+import EventCancelledQuestState from '../components/QuestCard/EventCancelledQuestState';
 
 const EventQuestsScreen = ({ route, navigation }) => {
-  const { eventID, categoryID, eventStart, latitude, longitude, registrationID } = route.params || {};
+  const { eventID, categoryID, eventStart, latitude, longitude, registrationID, status } = route.params || {};
 
   const [selectedQuest, setSelectedQuest] = useState(null);
   const [userQuestsList, setUserQuestsList] = useState([]);
@@ -56,6 +57,12 @@ const EventQuestsScreen = ({ route, navigation }) => {
 
   const fetchUserQuests = async () => {
     try {
+      if (status === "Cancelled") {
+        console.log("Event is cancelled - skipping quest fetch.");
+        setIsLoading(false);
+        return () => {}; // Return empty cleanup
+      }
+
       setIsLoading(true);
 
       const studentID = await getItem("studentID");
@@ -172,22 +179,29 @@ const EventQuestsScreen = ({ route, navigation }) => {
   useEffect(() => {
     let unsubscribe = () => { };
     let timer;
+  
+    if (status === "Cancelled") {
+      console.log("Event is cancelled - skipping quest setup.");
+      return () => { };
+    }
+  
     const currentTimestamp = Math.floor(Date.now() / 1000);
     const timeUntilQuestsAvailable = eventStart.seconds - 3600 - currentTimestamp;
-
+  
     const checkQuestAvailability = () => {
       const now = Math.floor(Date.now() / 1000);
-
+  
       if (now >= eventStart.seconds - 3600) {
-        // Quests are now available
-        fetchUserQuests();
-        // Clear the timer since we no longer need to wait
+        fetchUserQuests().then((cleanup) => {
+          if (typeof cleanup === "function") {
+            unsubscribe = cleanup;
+          }
+        });
         if (timer) clearTimeout(timer);
       }
     };
-
+  
     if (timeUntilQuestsAvailable > 0) {
-      // If quests are not yet available, set a timer
       timer = setTimeout(checkQuestAvailability, timeUntilQuestsAvailable * 1000);
     } else {
       fetchUserQuests().then((cleanup) => {
@@ -196,13 +210,12 @@ const EventQuestsScreen = ({ route, navigation }) => {
         }
       });
     }
-
-
+  
     return () => {
       if (timer) clearTimeout(timer);
       unsubscribe();
     };
-  }, []);
+  }, []);  
 
   const handleSheetClose = (index) => {
     setIsQuestSheetVisible(index > 0);
@@ -251,6 +264,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
         renderItem={renderQuestCard}
         keyExtractor={item => item.questID}
         ListEmptyComponent={() => {
+          if (status === "Cancelled") return <EventCancelledQuestState />;
           return <EventQuestsTimeRestrictedEmptyState />;
         }}
       />

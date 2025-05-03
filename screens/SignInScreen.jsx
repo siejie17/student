@@ -9,7 +9,7 @@ import { auth, db } from '../utils/firebaseConfig';
 
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import Background from '../components/Authentication/Background';
-import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { getItem, removeItem, setItem } from '../utils/asyncStorage';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system';
@@ -19,6 +19,7 @@ const SignInScreen = () => {
   const [password, setPassword] = useState({ value: '', error: '' });
   const [loading, setLoading] = useState(false);
   const [isVerificationModalVisible, setIsVerificationModalVisible] = useState(false);
+  const [isAdminModalVisible, setIsAdminModalVisible] = useState(false);
 
   const navigation = useNavigation();
 
@@ -40,15 +41,21 @@ const SignInScreen = () => {
       const userCredential = await signInWithEmailAndPassword(auth, email.value, password.value);
       const user = userCredential.user;
 
-      const userSignedUpDataJSON = await getItem('@userSignedUpData');
-      console.log(JSON.parse(userSignedUpDataJSON));
+      const isAdminRef = query(collection(db, "admin"), where("adminID", "==", user.uid));
+      const isAdminSnapshot = await getDocs(isAdminRef);
+
+      if (!isAdminSnapshot.empty) {
+        setIsAdminModalVisible(true);
+        return;
+      }
+      console.log("Here");
 
       if (!user.emailVerified) {
         setLoading(false);
         setIsVerificationModalVisible(true);
         await auth.signOut();
         return; // Exit the function here
-      }      
+      }
 
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
@@ -95,8 +102,6 @@ const SignInScreen = () => {
           });
 
           await Promise.all(batchPromises);
-
-          console.log("Completed");
 
           await setItem('studentID', user.uid);
           await setItem('facultyID', userSignedUpData.facultyID.value);
@@ -210,6 +215,37 @@ const SignInScreen = () => {
                   onPress={closeVerificationModal}
                 >
                   <Text style={styles.closeButtonText}>GOT IT!</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            visible={isAdminModalVisible}
+            transparent
+            animationType="slide"
+          >
+            <View style={styles.modalBackground}>
+              <View style={styles.verificationModal}>
+                <Image
+                  source={require('../assets/auth/access-denied.png')}
+                  style={styles.verificationImage}
+                />
+
+                <Text style={styles.verificationTitle}>Whoa there, Admin!</Text>
+                <Text style={styles.verificationText}>
+                  ⚠️ Access Denied: This level is for students only.
+                  Admins must return to their designated portal!
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => {
+                    setIsAdminModalVisible(false);
+                    setLoading(false);
+                  }}
+                >
+                  <Text style={styles.closeButtonText}>Oops, My Bad!</Text>
                 </TouchableOpacity>
               </View>
             </View>

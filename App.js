@@ -62,8 +62,7 @@ export default function App() {
     const checkAuth = async () => {
       onAuthStateChanged(auth, async (user) => {
         if (user && user.emailVerified) {
-          const storedStudentID = await getItem('studentID'); // <- moved inside
-          console.log("stored student id", storedStudentID);
+          const storedStudentID = await getItem('studentID');
 
           if (storedStudentID) {
             setStudent(user);

@@ -188,6 +188,7 @@ const AgendaScreen = () => {
       eventStart: item.eventStart,
       latitude: item.latitude,
       longitude: item.longitude,
+      status: item.eventStatus
     })
   }, [navigation]);
 
