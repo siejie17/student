@@ -277,8 +277,8 @@ const EventDetailsScreen = ({ navigation, route }) => {
         });
 
         if (!result.canceled && result.assets && result.assets.length > 0) {
-            if (result.assets[0].fileSize > 50 * 1024) {
-                setImageError('Image size exceeds 50KB limit. Please choose a smaller image.');
+            if (result.assets[0].fileSize > 100 * 1024) {
+                setImageError('Image size exceeds 100KB limit. Please choose a smaller image.');
                 return;
             }
 
@@ -693,7 +693,7 @@ const EventDetailsScreen = ({ navigation, route }) => {
                                 <View style={styles.fieldContainer}>
                                     <Text style={styles.label}>Receipt Proof <Text style={{ color: "red" }}>*</Text></Text>
                                     <Text style={styles.helperText}>
-                                        Please upload a receipt image (maximum 50KB)
+                                        Please upload a receipt image (maximum 100KB)
                                     </Text>
 
                                     {receiptImage ? (
