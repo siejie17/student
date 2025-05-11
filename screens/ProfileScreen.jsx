@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
   Alert,
+  Animated
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { getItem, removeItem } from '../utils/asyncStorage';
@@ -57,40 +58,47 @@ const ProfileScreen = () => {
   const snapPoints = useMemo(() => ['10%'], []);
   const bottomSheetRef = useRef(null);
 
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const badgeScaleAnim = useRef(new Animated.Value(0.8)).current;
+
   const navigation = useNavigation();
 
   let unsub = [];
-  
+
   useEffect(() => {
     let userUnsub = null;
     let registrationUnsub = null;
-  
+    let badgeUnsub = null;
+
     (async () => {
       try {
         setIsLoading(true);
         const studentID = await getItem("studentID");
-  
+
         if (!studentID) {
           console.warn("No student ID found.");
           setIsLoading(false);
           return;
         }
-  
+
         const userRef = doc(db, "user", studentID);
-  
+
         userUnsub = onSnapshot(userRef, async (userSnap) => {
           if (userSnap.exists()) {
             setUserData(userSnap.data());
-  
+
             try {
-              const badgeProgress = await fetchUserBadgeProgress(studentID);
-              setBadgeProgressList(badgeProgress);
+              if (badgeUnsub) badgeUnsub(); // clean previous listener
+              badgeUnsub = await fetchUserBadgeProgress(studentID, setBadgeProgressList);
             } catch (error) {
-              console.error("Error fetching badge progress:", error);
+              console.error("Error setting up badge progress listener:", error);
               setBadgeProgressList([]);
             }
-  
+
             try {
+              if (registrationUnsub) registrationUnsub();
               registrationUnsub = await fetchNumOfAttendedEvents(studentID);
             } catch (error) {
               console.error("Error fetching attended events:", error);
@@ -101,65 +109,96 @@ const ProfileScreen = () => {
             setBadgeProgressList([]);
           }
           setIsLoading(false);
+
+          Animated.parallel([
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+              toValue: 0,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+            Animated.spring(badgeScaleAnim, {
+              toValue: 1,
+              friction: 8,
+              tension: 40,
+              useNativeDriver: true,
+            })
+          ]).start();
         }, (error) => {
           console.error("Error listening to user data:", error);
           setIsLoading(false);
         });
-  
+
       } catch (error) {
         console.error("Error fetching user information:", error);
         setIsLoading(false);
       }
     })();
-  
+
     return () => {
       if (userUnsub) userUnsub();
       if (registrationUnsub) registrationUnsub();
+      if (badgeUnsub) badgeUnsub();
     };
-  }, []);  
+  }, []);
 
-  const fetchUserBadgeProgress = async (studentID) => {
+  const fetchUserBadgeProgress = async (studentID, setBadgeProgressList) => {
     try {
       const badgeProgressQuery = query(
         collection(db, "badgeProgress"),
         where("studentID", "==", studentID)
       );
-  
+
       const badgeProgressSnapshot = await getDocs(badgeProgressQuery);
-      if (badgeProgressSnapshot.empty) return [];
-  
+      if (badgeProgressSnapshot.empty) {
+        setBadgeProgressList([]);
+        return () => { }; // return dummy unsubscribe
+      }
+
       const badgeProgressDoc = badgeProgressSnapshot.docs[0];
       const userBadgeProgressRef = collection(badgeProgressDoc.ref, "userBadgeProgress");
-  
-      const userBadgeProgressSnapshot = await getDocs(userBadgeProgressRef);
-      if (userBadgeProgressSnapshot.empty) return [];
-  
-      const badgeDocs = userBadgeProgressSnapshot.docs.map((doc) => ({
-        badgeDocID: doc.id,
-        ...doc.data(),
-      }));
-  
-      const badgeDetailPromises = badgeDocs.map(async (badge) => {
-        const badgeRef = doc(db, "badge", badge.badgeDocID);
-        const badgeSnapshot = await getDoc(badgeRef);
-  
-        return badgeSnapshot.exists()
-          ? {
+
+      const unsubscribe = onSnapshot(userBadgeProgressRef, async (userBadgeProgressSnapshot) => {
+        if (userBadgeProgressSnapshot.empty) {
+          setBadgeProgressList([]);
+          return;
+        }
+
+        const badgeDocs = userBadgeProgressSnapshot.docs.map((doc) => ({
+          badgeDocID: doc.id,
+          ...doc.data(),
+        }));
+
+        const badgeDetailPromises = badgeDocs.map(async (badge) => {
+          const badgeRef = doc(db, "badge", badge.badgeDocID);
+          const badgeSnapshot = await getDoc(badgeRef);
+
+          return badgeSnapshot.exists()
+            ? {
               id: badge.badgeDocID,
               progress: badge.progress,
               isUnlocked: badge.isUnlocked,
               dateUpdated: badge.dateUpdated,
               ...badgeSnapshot.data(),
             }
-          : null;
+            : null;
+        });
+
+        const badgeDetails = await Promise.all(badgeDetailPromises);
+        setBadgeProgressList(badgeDetails.filter(Boolean));
       });
-  
-      return (await Promise.all(badgeDetailPromises)).filter(Boolean);
+
+      return unsubscribe;
     } catch (error) {
       console.error("Error fetching badge progress:", error);
-      throw error;
+      setBadgeProgressList([]);
+      return () => { }; // return dummy unsubscribe on error
     }
-  };  
+  };
 
   const fetchNumOfAttendedEvents = async (studentID) => {
     try {
@@ -169,7 +208,7 @@ const ProfileScreen = () => {
         where("isAttended", "==", true),
         where("attendanceScannedTime", "!=", null)
       );
-  
+
       const unsubscribe = onSnapshot(registrationQuery, (registrationSnapshots) => {
         if (!registrationSnapshots.empty) {
           setAttendedEventsLength(registrationSnapshots.docs.length);
@@ -177,13 +216,13 @@ const ProfileScreen = () => {
           setAttendedEventsLength(0);
         }
       });
-  
+
       return unsubscribe;
     } catch (error) {
       console.error("Error fetching number of attended events:", error);
       throw error;
     }
-  };  
+  };
 
   const handleSheetClose = (index) => {
     setIsProfilePicSheetVisible(index > 0);
@@ -210,8 +249,8 @@ const ProfileScreen = () => {
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      if (result.assets[0].fileSize > 50 * 1024) {
-        Alert.alert('Image size exceeds 50KB limit. Please choose a smaller image.');
+      if (result.assets[0].fileSize > 100 * 1024) {
+        Alert.alert('Image size exceeds 100KB limit. Please choose a smaller image.');
         return;
       }
 
@@ -234,11 +273,19 @@ const ProfileScreen = () => {
     handleClosePress();
   };
 
-  const renderBadge = (badge) => {
+  const renderBadge = (badge, index) => {
+    // Create a small delay for each badge to stagger the animation
+    const badgeDelay = index * 100;
+
+    const animatedStyle = {
+      transform: [{ scale: badgeScaleAnim }],
+      opacity: fadeAnim,
+    };
+
     return (
       <TouchableOpacity
         key={badge.id}
-        style={styles.badgeContainer}
+        style={[styles.badgeContainer, animatedStyle]}
         onPress={() => navigation.navigate('BadgeDetails', { badge: badge })}
       >
         <View style={[styles.badge, !badge.isUnlocked && styles.lockedBadge]}>
@@ -249,6 +296,9 @@ const ProfileScreen = () => {
               !badge.isUnlocked && styles.lockedBadgeImage,
             ]}
           />
+          {badge.isUnlocked && (
+            <View style={styles.badgeUnlockedIndicator} />
+          )}
         </View>
         <Text
           style={[
@@ -283,7 +333,7 @@ const ProfileScreen = () => {
     return (
       <View style={styles.background}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A6FA5" />
+          <ActivityIndicator size="large" color="#4A80F0" />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </View>
@@ -316,7 +366,12 @@ const ProfileScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ flexGrow: 1 }}
       >
-        <View style={styles.profileContainer}>
+        <Animated.View
+          style={[
+            styles.profileContainer,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+          ]}
+        >
           <View style={styles.profileTopSection}>
             <View style={styles.profileImageContainer}>
               <Image
@@ -332,7 +387,7 @@ const ProfileScreen = () => {
                 style={styles.editProfileButton}
                 onPress={handleEditProfilePicture}
               >
-                <Feather name="edit-2" size={16} color="#FFFFFF" />
+                <Feather name="camera" size={16} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
             <View style={styles.userDetailsContainer}>
@@ -367,7 +422,7 @@ const ProfileScreen = () => {
             {/* Points Side */}
             <View style={styles.statItem}>
               <View style={styles.statIconContainer}>
-                <Ionicons name="star" size={20} color="#6284bf" />
+                <Ionicons name="star" size={20} color="#7f9bc9" />
               </View>
               <View>
                 <Text style={styles.statValue}>{userData.totalPointsGained || 0}</Text>
@@ -381,7 +436,7 @@ const ProfileScreen = () => {
             {/* Events Side */}
             <View style={styles.statItem}>
               <View style={styles.statIconContainer}>
-                <Ionicons name="calendar" size={20} color="#6284bf" />
+                <Ionicons name="calendar" size={20} color="#7f9bc9" />
               </View>
               <View>
                 <Text style={styles.statValue}>{attendedEventsLength || 0}</Text>
@@ -389,12 +444,17 @@ const ProfileScreen = () => {
               </View>
             </View>
           </View>
-        </View>
+        </Animated.View>
 
-        <View style={styles.sectionContainer}>
+        <Animated.View
+          style={[
+            styles.sectionContainer,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+          ]}
+        >
           <View style={styles.sectionHeaderRow}>
-            <Feather name="award" size={18} color="#A9A9A9" />
-            <Text style={styles.sectionTitle}>Your Badges</Text>
+            <Feather name="award" size={20} color="#A9A9A9" />
+            <Text style={styles.sectionTitle}>Your Achievement Badges</Text>
           </View>
 
           <View style={styles.achievementsFrame}>
@@ -406,11 +466,16 @@ const ProfileScreen = () => {
               <Text style={styles.noBadgesText}>No badges earned yet</Text>
             )}
           </View>
-        </View>
+        </Animated.View>
 
-        <View style={styles.sectionContainer}>
+        <Animated.View
+          style={[
+            styles.sectionContainer,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+          ]}
+        >
           <View style={styles.sectionHeaderRow}>
-            <Feather name="list" size={18} color="#A9A9A9" />
+            <Feather name="list" size={20} color="#A9A9A9" />
             <Text style={styles.sectionTitle}>Others</Text>
           </View>
 
@@ -420,7 +485,7 @@ const ProfileScreen = () => {
               onPress={() => navigation.navigate("NetworkList")}
             >
               <View style={styles.networkIconContainer}>
-                <Ionicons name="people-outline" size={24} color="#121212" />
+                <Ionicons name="people-outline" size={24} color="#7f9bc9" />
               </View>
 
               <View style={styles.networkContentContainer}>
@@ -433,7 +498,7 @@ const ProfileScreen = () => {
               </View>
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
 
         <TouchableOpacity style={styles.button} onPress={handleSignOut}>
           <Text style={styles.buttonText}>Sign Out</Text>
@@ -479,8 +544,8 @@ const styles = StyleSheet.create({
   header: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 14,
-    height: 60,
+    paddingVertical: 10,
+    height: 65,
   },
   headerTitle: {
     fontSize: 24,
@@ -488,54 +553,60 @@ const styles = StyleSheet.create({
     color: '#2C3E50',
   },
   profileContainer: {
-    padding: 12,
-    paddingBottom: 16,
+    padding: 16,
+    margin: 2,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(169, 169, 169, 0.2)',
-    // Remove flexDirection: 'row' to allow vertical stacking
+    borderRadius: 20,
     alignItems: 'flex-start',
-    marginBottom: 18,
-    shadowColor: '#BFCFE7',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowColor: '#7f9bc9',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  profileTopSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
   },
   profileImageContainer: {
     position: 'relative',
   },
   profileImage: {
-    width: 75,
-    height: 75,
-    borderRadius: 9999,
-    marginRight: 6,
-    borderWidth: 2,
-    borderColor: '#F0F0F0',
+    width: 85,
+    height: 85,
+    borderRadius: 42.5,
+    borderWidth: 3,
+    borderColor: '#E8F0FE',
   },
   editProfileButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#6284bf',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    backgroundColor: '#7f9bc9',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   userDetailsContainer: {
     flex: 1,
-    marginLeft: 20,
+    marginLeft: 16,
     justifyContent: 'center',
   },
   profileName: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#2C3E50',
+    letterSpacing: 0.3,
   },
   profileHandle: {
     marginTop: 4,
@@ -561,6 +632,11 @@ const styles = StyleSheet.create({
     color: '#36454f',
     marginLeft: 5,
   },
+  sectionContainer: {
+    paddingHorizontal: 5,
+    paddingVertical: 10,
+    marginTop: 10,
+  },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -570,64 +646,93 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#2C3E50',
-    marginLeft: 8,
+    marginLeft: 12,
   },
   achievementsFrame: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    shadowColor: '#BFCFE7',
-    shadowOffset: { width: 0, height: 2 },
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#7f9bc9',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(169, 169, 169, 0.2)',
+    shadowRadius: 10,
+    elevation: 4,
   },
   achievementsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     flexWrap: 'wrap',
   },
   badgeContainer: {
     width: '30%',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   badge: {
     width: 60,
     height: 60,
-    borderRadius: 30,
+    borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
-    backgroundColor: '#EDF2F7',
-    elevation: 2,
-    shadowColor: '#BFCFE7',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
+    marginBottom: 10,
+    backgroundColor: '#F0F5FF',
+    shadowColor: '#A0C4FF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 3,
+    position: 'relative',
+  },
+  badgeUnlockedIndicator: {
+    position: 'absolute',
+    width: 15,
+    height: 15,
+    borderRadius: 7.5,
+    backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    bottom: 0,
+    right: 0,
   },
   lockedBadge: {
     backgroundColor: '#F0F0F0',
-  },
-  lockedBadgeImage: {
-    opacity: 0.5,
-    tintColor: '#A9A9A9',
   },
   badgeImage: {
     width: 40,
     height: 40,
     resizeMode: 'contain',
   },
-  badgeTitle: {
-    fontSize: 12,
-    color: '#121212',
-    textAlign: 'center',
+  lockedBadgeImage: {
+    opacity: 0.4,
+    tintColor: '#A9A9A9',
   },
-  sectionContainer: {
-    paddingVertical: 16,
+  badgeName: {
+    fontSize: 10,
+    color: '#2C3E50',
+    fontWeight: '500',
+    textAlign: 'center',
+    maxWidth: 90,
+  },
+  lockedBadgeName: {
+    color: '#929EA9',
+  },
+  noBadgesContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  noBadgesText: {
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#7F8C9A',
+    marginTop: 12,
+  },
+  noBadgesSubtext: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#A9B9C5',
+    marginTop: 6,
   },
   optionItem: {
     flexDirection: 'row',
@@ -643,28 +748,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   networkCardContainer: {
-    borderRadius: 12,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: 'rgba(169, 169, 169, 0.2)',
     overflow: 'hidden',
-    shadowColor: '#BFCFE7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: '#7f9bc9',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
   },
   networkCard: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
   },
   networkIconContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#F0F0F0',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F0F5FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -686,8 +789,8 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   button: {
-    marginBottom: 24,
-    backgroundColor: '#6284bf',
+    marginVertical: 24,
+    backgroundColor: '#FF5A5F',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
@@ -762,11 +865,6 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-  },
-  profileTopSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
   },
   dividerContainer: {
     width: '100%',

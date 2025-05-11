@@ -131,6 +131,7 @@ const LeaderboardScreen = () => {
             remainingUsers: entriesWithUserInfo.slice(3)
           });
 
+          // Here the rewards modal
           const showRewardsModalKey = `showLeaderboardModal_${currentStudentID}`;
           const rewardsModalShown = await getItem(showRewardsModalKey);
 
@@ -268,8 +269,7 @@ const LeaderboardScreen = () => {
     return (
       <Animated.View
         style={[
-          styles.card,
-          isCurrentUser && styles.highlightedCard
+          styles.card
         ]}
       >
         <View style={styles.rankContainer}>
@@ -280,7 +280,7 @@ const LeaderboardScreen = () => {
           source={item.profilePic
             ? { uri: `data:image/png;base64,${item.profilePic}` }
             : require('../assets/leaderboard/unknown-profile.png')}
-          style={[styles.listAvatar, isCurrentUser && styles.highlightedAvatar]}
+          style={[styles.listAvatar]}
         />
 
         <View style={styles.listUserInfo}>
@@ -470,31 +470,6 @@ const LeaderboardScreen = () => {
             </View>
             <Text style={styles.motivationText}>Go, go, go! Grab points to climb to the top spots!</Text>
 
-            {/* Points Section */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeaderRow}>
-                <MaterialIcons name="stars" size={20} color="#3b82f6" />
-                <Text style={styles.sectionTitle}>How to Earn Points!</Text>
-              </View>
-
-              <View style={styles.pointsList}>
-                {[
-                  { icon: "event-available", label: "Attendance-based", desc: "Check in to events on time" },
-                  { icon: "alarm-on", label: "Early bird", desc: "Be among the earliest attendees" },
-                  { icon: "people", label: "Networking", desc: "Connect with other attendees" },
-                  { icon: "question-answer", label: "Q&A based", desc: "Answer the questions correctly" },
-                  { icon: "rate-review", label: "Feedback driven", desc: "Complete event surveys" },
-                ].map((item, index) => (
-                  <View key={index} style={styles.pointItem}>
-                    <MaterialIcons name={item.icon} size={20} color="#3b82f6" />
-                    <Text style={styles.pointText}>
-                      <Text style={styles.boldText}>{item.label}:</Text> {item.desc}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
             {/* Rewards Table */}
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
@@ -508,7 +483,7 @@ const LeaderboardScreen = () => {
                 <View style={styles.podiumItem}>
                   <View style={[styles.podiumPillar, styles.secondPlace]}>
                     <View style={styles.trophyContainer}>
-                      <FontAwesome5 name="trophy" size={20} color="#C0C0C0" />
+                      <FontAwesome5 name="trophy" size={16} color="#C0C0C0" />
                     </View>
                     <Text style={styles.podiumRank}>2</Text>
                     <Text style={styles.podiumReward}>750 💎</Text>
@@ -518,7 +493,7 @@ const LeaderboardScreen = () => {
                 <View style={styles.podiumItem}>
                   <View style={[styles.podiumPillar, styles.firstPlace]}>
                     <View style={styles.trophyContainer}>
-                      <FontAwesome5 name="trophy" size={24} color="#FFD700" />
+                      <FontAwesome5 name="trophy" size={16} color="#FFD700" />
                     </View>
                     <Text style={styles.podiumRank}>1</Text>
                     <Text style={styles.podiumReward}>1000 💎</Text>
@@ -528,7 +503,7 @@ const LeaderboardScreen = () => {
                 <View style={styles.podiumItem}>
                   <View style={[styles.podiumPillar, styles.thirdPlace]}>
                     <View style={styles.trophyContainer}>
-                      <FontAwesome5 name="trophy" size={18} color="#CD7F32" />
+                      <FontAwesome5 name="trophy" size={16} color="#CD7F32" />
                     </View>
                     <Text style={styles.podiumRank}>3</Text>
                     <Text style={styles.podiumReward}>500 💎</Text>
@@ -553,6 +528,31 @@ const LeaderboardScreen = () => {
                 ))}
               </View>
             </View>
+
+            {/* Points Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <MaterialIcons name="stars" size={20} color="#3b82f6" />
+                <Text style={styles.sectionTitle}>How to Earn Points!</Text>
+              </View>
+
+              <View style={styles.pointsList}>
+                {[
+                  { icon: "event-available", label: "Attendance-based", desc: "Check in to events on time" },
+                  { icon: "alarm-on", label: "Early bird", desc: "Be among the earliest attendees" },
+                  { icon: "people", label: "Networking", desc: "Connect with other attendees" },
+                  { icon: "question-answer", label: "Q&A based", desc: "Answer the questions correctly" },
+                  { icon: "rate-review", label: "Feedback driven", desc: "Complete event surveys" },
+                ].map((item, index) => (
+                  <View key={index} style={styles.pointItem}>
+                    <MaterialIcons name={item.icon} size={20} color="#3b82f6" />
+                    <Text style={styles.pointText}>
+                      <Text style={styles.boldText}>{item.label}:</Text> {item.desc}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
           </ScrollView>
         </Animated.View>
       </Animated.View>
@@ -566,13 +566,13 @@ const LeaderboardScreen = () => {
     let badgeText = "Ranked";
     let badgeColors = ['#6284bf', '#4A6EB5'];
 
-    if (currentUserRank <= 3) {
+    if (currentUserRank == 1) {
       badgeText = "Top 3";
-      badgeColors = ['#FFD700', '#FFA500']; // Gold gradient
-    } else if (currentUserRank <= 10) {
+      badgeColors = ['#E6C200', '#CC8400']; // Gold gradient
+    } else if (currentUserRank == 2) {
       badgeText = "Top 10";
       badgeColors = ['#C0C0C0', '#A9A9A9']; // Silver gradient
-    } else if (currentUserRank <= 20) {
+    } else if (currentUserRank == 3) {
       badgeText = "Top 20";
       badgeColors = ['#CD7F32', '#8B4513']; // Bronze gradient
     }
@@ -619,23 +619,35 @@ const LeaderboardScreen = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{facultyCode} Leaderboard</Text>
-        <View style={styles.divider} />
         <View style={styles.cardWrapper}>
           <View style={styles.content}>
             <Feather
               name="refresh-cw"
-              size={20}
+              size={8}
               color="rgba(0, 0, 0, 0.9)"
             />
             <View style={styles.textContainer}>
               <Text style={styles.title}>Next refresh: {refreshDate.toDate().toLocaleDateString()}</Text>
             </View>
           </View>
+        </View>
+        <View
+          style={[
+            styles.dividerContainer,
+          ]}
+        >
+          <View
+            style={[
+              styles.divider,
+              {
+                height: 0.5,
+                backgroundColor: '#E0E0E0',
+              }
+            ]}
+          />
         </View>
       </View>
 
@@ -645,9 +657,13 @@ const LeaderboardScreen = () => {
       {/* FlatList with pull-to-refresh */}
       <View style={styles.listWrapper}>
         <LinearGradient
-          colors={['rgba(240, 242, 245, 0.9)', 'rgba(220, 223, 228, 0.3)']}
+          colors={[
+            'rgba(239, 238, 238, 0.3)', // Light blue top
+            'rgba(205, 205, 205, 0.2)', // Medium blue middle
+            'rgba(176, 176, 176, 0.1)'  // Deeper blue bottom
+          ]}
           start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 0.7 }}
+          end={{ x: 0, y: 1 }}
           style={styles.listGradient}
         >
           <FlatList
@@ -713,13 +729,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2C3E50',
     letterSpacing: 0.5,
-    marginBottom: 12,
+    marginBottom: 4,
+  },
+  dividerContainer: {
+    alignSelf: 'center',
+    marginTop: 8,
+    width: '98%',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+    elevation: 3,
   },
   divider: {
-    width: '80%',
-    height: 1.5,
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-    marginBottom: 8,
+    width: '100%',
+    borderRadius: 1,
   },
   facultyName: {
     fontSize: 16,
@@ -728,10 +754,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cardWrapper: {
-    width: '90%',
+    width: '100%',
     alignSelf: 'center',
     borderRadius: 10,
-    marginBottom: 8,
   },
   card: {
     borderRadius: 10,
@@ -750,7 +775,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   title: {
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: '700',
     color: 'rgba(0, 0, 0, 0.95)',
     letterSpacing: 0.2,
@@ -762,18 +787,18 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   podiumSection: {
-    paddingTop: 20,
+    paddingTop: 40,
     paddingBottom: 10,
   },
   infoIconContainer: {
     position: 'absolute',
-    top: 0,
+    top: 10,
     right: 20,
     zIndex: 10,
   },
   infoButton: {
-    width: 40,
-    height: 40,
+    width: 35,
+    height: 35,
     borderRadius: 20,
     backgroundColor: 'rgba(101, 153, 230, 0.15)',
     justifyContent: 'center',
@@ -924,29 +949,39 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
-    marginTop: 10,
+    marginTop: 12,
+    // Add shadow
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   listGradient: {
     flex: 1,
-    paddingTop: 5,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   listContainer: {
+    paddingBottom: 120, // Extra space at bottom for floating rank indicator
     paddingHorizontal: 16,
-    paddingBottom: 70, // Space for floating rank indicator
   },
   listHeader: {
-    paddingVertical: 16,
     alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 4,
   },
   listHeaderTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1e3a8a',
-    marginBottom: 4,
+    fontWeight: '600',
+    color: '#1F2937',
   },
   listHeaderSubtitle: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#6B7280',
     fontStyle: 'italic',
   },
   card: {
@@ -979,17 +1014,17 @@ const styles = StyleSheet.create({
   rankText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#64748b',
+    color: '#3b82f6',
   },
   highlightedRankText: {
-    color: '#3b82f6',
+    color: '#334155',
   },
   listAvatar: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    marginRight: 12,
-    borderWidth: 2,
+    marginRight: 16,
+    borderWidth: 1,
     borderColor: '#E0E0E0',
   },
   highlightedAvatar: {
@@ -1001,10 +1036,10 @@ const styles = StyleSheet.create({
   listUserName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#334155',
+    color: '#3b82f6',
   },
   highlightedText: {
-    color: '#1e3a8a',
+    color: '#334155',
   },
   listPointsContainer: {
     paddingLeft: 8,
@@ -1012,10 +1047,10 @@ const styles = StyleSheet.create({
   listPointsText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#334155',
+    color: '#3b82f6',
   },
   highlightedPoints: {
-    color: '#3b82f6',
+    color: '#334155',
   },
   listPointsLabel: {
     fontSize: 12,

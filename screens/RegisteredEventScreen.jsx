@@ -186,17 +186,21 @@ const RegisteredEventScreen = ({ route }) => {
         const index = Math.round(contentOffsetX / width);
     };
 
-    // Memoized cancel registration handler to prevent unnecessary rerenders
     const handleCancelRegistration = useCallback(async () => {
         try {
             setIsDeleting(true);
             const registrationRef = doc(db, "registration", registrationID);
-            await deleteDoc(registrationRef);
-
-            await deleteQuestProgress();
-
-            deleteNotifications();
-
+    
+            const deleteRegistration = deleteDoc(registrationRef);
+            const deleteProgress = deleteQuestProgress();
+            const cancelNotifs = deleteNotifications();
+    
+            await Promise.all([
+                deleteRegistration,
+                deleteProgress,
+                cancelNotifs
+            ]);
+    
             setCancelModalVisible(false);
             navigation.goBack();
         } catch (error) {
@@ -205,53 +209,54 @@ const RegisteredEventScreen = ({ route }) => {
         } finally {
             setIsDeleting(false);
         }
-    }, [registrationID, navigation]);
+    }, [registrationID, navigation, deleteQuestProgress, deleteNotifications]);    
 
-    const deleteNotifications = async () => {
+    const deleteNotifications = useCallback(async () => {
         const studentID = await getItem("studentID");
         if (!studentID || !eventID) return;
-
+    
         const notificationArr = [`${eventID}_${studentID}_1D`, `${eventID}_${studentID}_1H`];
-
         const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-
-        notificationArr.forEach(async (notificationID) => {
+    
+        const cancelPromises = notificationArr.map((notificationID) => {
             const matchedNotification = scheduledNotifications.find(
                 notification => notification.content.data?.id === notificationID
             );
-
             if (matchedNotification) {
-                // Cancel the specific notification using its identifier
-                await Notifications.cancelScheduledNotificationAsync(matchedNotification.identifier);
-                console.log(`Notification with unique ID ${notificationID} has been cancelled`);
+                return Notifications.cancelScheduledNotificationAsync(matchedNotification.identifier);
             }
         });
-    };
+    
+        await Promise.all(cancelPromises);
+    }, [eventID]);    
 
-    // Optimize quest progress deletion
     const deleteQuestProgress = useCallback(async () => {
         try {
             const studentID = await getItem("studentID");
-            if (!studentID) return;
-
+            if (!studentID || !eventID) return;
+    
             const questProgressRef = collection(db, "questProgress");
             const questProgressQuery = query(
                 questProgressRef,
                 where("studentID", "==", studentID),
                 where("eventID", "==", eventID)
             );
-
+    
             const questProgressSnap = await getDocs(questProgressQuery);
             if (questProgressSnap.empty) return;
-
+    
             const questProgressDoc = questProgressSnap.docs[0];
             const progressListRef = collection(db, "questProgress", questProgressDoc.id, "questProgressList");
+    
+            // Fetch subcollection and delete all in batch
             const progressListSnapshots = await getDocs(progressListRef);
-
             const batch = writeBatch(db);
-            progressListSnapshots.forEach((doc) => batch.delete(doc.ref));
-
-            // Commit batch delete and delete main document
+    
+            progressListSnapshots.forEach((doc) => {
+                batch.delete(doc.ref);
+            });
+    
+            // Commit batch and delete parent doc in parallel
             await Promise.all([
                 batch.commit(),
                 deleteDoc(questProgressDoc.ref)
@@ -260,13 +265,6 @@ const RegisteredEventScreen = ({ route }) => {
             console.error("Error deleting quest progress list:", error);
         }
     }, [eventID]);
-
-    // Performance optimization for rendering
-    const memoizedEventDetails = useMemo(() => ({
-        ...eventDetails,
-        startTime: eventDetails.startTime,
-        endTime: eventDetails.endTime
-    }), [eventDetails]);
 
     if (isLoading) {
         return (

@@ -11,7 +11,7 @@ import {
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
-import { collection, writeBatch, getDocs, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore'
+import { collection, writeBatch, getDocs, orderBy, query, Timestamp, updateDoc, where, addDoc, doc } from 'firebase/firestore'
 
 // Components
 import HeroBanner from '../components/Home/HeroBanner';
@@ -39,14 +39,17 @@ const HomeScreen = () => {
   const navigation = useNavigation();
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkLeaderboardRefresh = async () => {
+      if (!isMounted) return;
+
       const studentID = await getItem("studentID");
       const facultyID = await getItem("facultyID");
       if (!studentID || !facultyID) return;
 
       try {
-        const leaderboardRef = collection(db, "leaderboard");
-        const leaderboardQuery = query(leaderboardRef, where("facultyID", "==", facultyID));
+        const leaderboardQuery = query(collection(db, "leaderboard"), where("facultyID", "==", facultyID));
         const leaderboardSnap = await getDocs(leaderboardQuery);
 
         if (!leaderboardSnap.empty) {
@@ -56,7 +59,7 @@ const HomeScreen = () => {
           const currentTime = Timestamp.now(); // Use actual timestamp
 
           if (!refreshDateTime || !refreshDateTime.toMillis) {
-            console.warn("refreshDateTime is missing or invalid.");
+            console.log("refreshDateTime is missing or invalid.");
             return;
           }
 
@@ -65,45 +68,63 @@ const HomeScreen = () => {
             const leaderboardEntriesQuery = query(leaderboardEntriesRef, orderBy("points", "desc"));
             const leaderboardEntriesSnapshot = await getDocs(leaderboardEntriesQuery);
 
-            let rankings = leaderboardEntriesSnapshot.docs.map((doc, index) => ({
-              studentID: doc.data().studentID,
-              rank: index + 1,
-            }));
+            // Prepare rankings
+            const rankings = leaderboardEntriesSnapshot.docs.map((doc, index) => {
+              const data = doc.data();
+              const rank = index + 1;
 
-            // Assign rewards based on ranking
-            for (const stud of rankings) {
-              let diamonds = 0;
-              if (stud.rank === 1) diamonds = 1000;
-              else if (stud.rank === 2) diamonds = 750;
-              else if (stud.rank === 3) diamonds = 500;
-              else if (stud.rank === 4) diamonds = 400;
-              else if (stud.rank === 5) diamonds = 350;
-              else if (stud.rank === 6) diamonds = 300;
-              else if (stud.rank === 7) diamonds = 250;
-              else if (stud.rank === 8) diamonds = 200;
-              else if (stud.rank === 9) diamonds = 150;
-              else if (stud.rank === 10) diamonds = 100;
-              else if (stud.rank >= 11 && stud.rank <= 20) diamonds = 50;
-              else if (stud.rank >= 21 && stud.rank <= 30) diamonds = 25;
-              else if (stud.rank >= 31 && stud.rank <= 40) diamonds = 10;
-              else if (stud.rank >= 41 && stud.rank <= 50) diamonds = 5;
-              else diamonds = 1;
+              let diamonds = 1;
+              if (rank === 1) diamonds = 1000;
+              else if (rank === 2) diamonds = 750;
+              else if (rank === 3) diamonds = 500;
+              else if (rank === 4) diamonds = 400;
+              else if (rank === 5) diamonds = 350;
+              else if (rank === 6) diamonds = 300;
+              else if (rank === 7) diamonds = 250;
+              else if (rank === 8) diamonds = 200;
+              else if (rank === 9) diamonds = 150;
+              else if (rank === 10) diamonds = 100;
+              else if (rank <= 20) diamonds = 50;
+              else if (rank <= 30) diamonds = 25;
+              else if (rank <= 40) diamonds = 10;
+              else if (rank <= 50) diamonds = 5;
 
-              await setItem(`showLeaderboardModal_${stud.studentID}`, "true");
-              await setItem(`previousRanking_${stud.studentID}`, String(stud.rank));
-              await setItem(`diamonds_${stud.studentID}`, String(diamonds));
+              return {
+                rank,
+                studentID: data.studentID,
+                points: data.points,
+                claimed: false,
+                diamonds,
+              };
+            });
+
+            const leaderboardLastMonthRef = collection(leaderboardDocRef, "lastMonth");
+
+            // Clear previous lastMonth entries
+            const lastMonthSnapshot = await getDocs(leaderboardLastMonthRef);
+            if (!lastMonthSnapshot.empty) {
+              const deleteBatch = writeBatch(db);
+              lastMonthSnapshot.docs.forEach((doc) => deleteBatch.delete(doc.ref));
+              await deleteBatch.commit();
             }
 
-            // Efficiently delete old leaderboard entries
-            const batch = writeBatch(db);
-            leaderboardEntriesSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
-            await batch.commit();
+            // Insert new rankings into lastMonth
+            const insertBatch = writeBatch(db);
+            rankings.forEach((entry) => {
+              const newDocRef = doc(leaderboardLastMonthRef);
+              insertBatch.set(newDocRef, entry);
+            });
+            await insertBatch.commit();
 
-            // Set new refresh date
-            let currentRefreshDateTime = refreshDateTime.toDate();
-            currentRefreshDateTime.setMonth(currentRefreshDateTime.getMonth() + 1);
-            let newRefreshDateTime = Timestamp.fromDate(currentRefreshDateTime);
+            // Delete old leaderboard entries
+            const deleteLeaderboardBatch = writeBatch(db);
+            leaderboardEntriesSnapshot.docs.forEach((doc) => deleteLeaderboardBatch.delete(doc.ref));
+            await deleteLeaderboardBatch.commit();
 
+            // Update next refresh timestamp
+            const nextDate = refreshDateTime.toDate();
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            const newRefreshDateTime = Timestamp.fromDate(nextDate);
             await updateDoc(leaderboardDocRef, { refreshDateTime: newRefreshDateTime });
           }
         }
@@ -113,6 +134,10 @@ const HomeScreen = () => {
     };
 
     checkLeaderboardRefresh();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Fetch user data on screen focus
@@ -367,7 +392,7 @@ const styles = StyleSheet.create({
     height: 50,
   },
   searchBar: {
-    marginHorizontal: 16,
+    marginHorizontal: 5,
     marginBottom: 8,
     zIndex: 1,
   },

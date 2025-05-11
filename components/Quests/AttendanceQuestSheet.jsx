@@ -28,7 +28,7 @@ const AttendanceQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
     const [animatingDiamonds, setAnimatingDiamonds] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
-    const [attendanceFailureModalVisible,setAttendanceFailureModalVisible] = useState(false);
+    const [attendanceFailureModalVisible, setAttendanceFailureModalVisible] = useState(false);
     const [completedModalVisible, setCompletedModalVisible] = useState(false);
     const [attendanceFailureModalContent, setAttendanceFailureModalContent] = useState({
         title: '',
@@ -86,12 +86,21 @@ const AttendanceQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
         try {
             const decryptedBytes = CryptoJS.AES.decrypt(data, secretKey);
             const decryptedText = decryptedBytes.toString(CryptoJS.enc.Utf8);
-            const parsedData = JSON.parse(decryptedText);
 
-            if (!parsedData.eventID && !parsedData.timestamp) {
-                setMode('display');
-                setScanned(false);
-                throw new Error('Invalid QR Code');
+            // Check if decryption gave something non-empty
+            if (!decryptedText || decryptedText.trim() === "") {
+                throw new Error("Failed to decrypt QR code — possibly invalid or corrupted");
+            }
+
+            let parsedData;
+            try {
+                parsedData = JSON.parse(decryptedText);
+            } catch (jsonError) {
+                throw new Error("Decryption succeeded but produced invalid JSON");
+            }
+
+            if (!parsedData.eventID || !parsedData.timestamp) {
+                throw new Error('Invalid QR Code — missing eventID or timestamp');
             }
 
             if (parsedData.eventID != eventID) {
@@ -138,29 +147,31 @@ const AttendanceQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
                         updateBadgeProgress(studentID);
                     }
                 } else {
-                    console.log("The user is too far away from the event location.");
                     setAttendanceFailureModalContent({
-                        title: 'Distance Denied!',
-                        subtitle: 'Halt, valiant warrior! Your current position is too far from the quest zone. Teleport closer or prepare for an epic trek! 🗺️'
+                        title: "You're Too Far Away",
+                        subtitle: "You're outside the allowed scanning range. Please move closer to the location and try again.",
+                        buttonText: "Understood"
                     });
                     setAttendanceFailureModalVisible(true);
                 }
             } else {
                 setAttendanceFailureModalContent({
-                    title: "Time Warp Warning!",
-                    subtitle: "Whoa, brave adventurer! The QR code has expired! 🕰️"
+                    title: "QR Code Expired",
+                    subtitle: "This QR code is no longer valid. Please scan the latest one to proceed.",
+                    buttonText: "Okay, Got It!"
                 });
                 setAttendanceFailureModalVisible(true);
             }
+        } catch (error) {
+            setAttendanceFailureModalContent({
+                title: "Invalid QR Code",
+                subtitle: "The QR code you scanned is not valid. Please try again with a valid code.",
+                buttonText: "Let's Try Again"
+            });
+            setAttendanceFailureModalVisible(true);
+        } finally {
             setScanned(false);
             setMode('display');
-        } catch (error) {
-            console.error('Error processing QR code:', error);
-            setAttendanceFailureModalContent({
-                title: "Oops, Invalid QR Code!",
-                subtitle: "Looks like your QR scroll got a bit wonky. Please try again! 🕹️"
-              });
-            setAttendanceFailureModalVisible(true);
         }
     }
 
@@ -372,7 +383,7 @@ const AttendanceQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
                 const leaderboardEntryRef = collection(db, "leaderboard", leaderboardID, "leaderboardEntries");
                 const leaderboardEntryQuery = query(leaderboardEntryRef, where("studentID", "==", studentID));
                 const leaderboardEntrySnapshot = await getDocs(leaderboardEntryQuery);
-            
+
                 if (leaderboardEntrySnapshot.empty) {
                     // 🔹 Create a new leaderboard entry
                     const newEntryRef = doc(leaderboardEntryRef); // Auto-generate ID
@@ -386,14 +397,14 @@ const AttendanceQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
                     // 🔹 Update existing entry
                     const existingEntryDoc = leaderboardEntrySnapshot.docs[0]; // Get first matched entry
                     const existingEntryRef = doc(db, "leaderboard", leaderboardID, "leaderboardEntries", existingEntryDoc.id);
-                    
+
                     await updateDoc(existingEntryRef, {
                         points: increment(selectedQuest.pointsRewards),
                         lastUpdated: new Date(),
                     });
                     console.log("Leaderboard entry updated.");
                 }
-            }            
+            }
 
             updateQuestStatus();
         } catch (error) {
@@ -616,6 +627,7 @@ const AttendanceQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
                     onClose={() => setAttendanceFailureModalVisible(false)}
                     title={attendanceFailureModalContent.title}
                     subtitle={attendanceFailureModalContent.subtitle}
+                    buttonText={attendanceFailureModalContent.buttonText}
                 />
             )}
         </View>

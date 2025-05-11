@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Image, KeyboardAvoidingView, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal } from 'react-native'
-import React, { useState, memo } from 'react';
+import React, { useRef, useState, memo } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import Header from '../components/Authentication/Header';
 import Button from '../components/Authentication/Button';
@@ -20,6 +20,10 @@ const SignInScreen = () => {
   const [loading, setLoading] = useState(false);
   const [isVerificationModalVisible, setIsVerificationModalVisible] = useState(false);
   const [isAdminModalVisible, setIsAdminModalVisible] = useState(false);
+
+  // Refs for the input fields
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
 
   const navigation = useNavigation();
 
@@ -142,8 +146,20 @@ const SignInScreen = () => {
     setIsVerificationModalVisible(false);
   };
 
+  const dismissEverything = () => {
+    // Blur both input fields if they're focused
+    if (emailInputRef.current) {
+      emailInputRef.current.blur();
+    }
+    if (passwordInputRef.current) {
+      passwordInputRef.current.blur();
+    }
+    // Dismiss the keyboard
+    Keyboard.dismiss();
+  };
+
   return (
-    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+    <TouchableWithoutFeedback onPress={dismissEverything}>
       <Background>
         <KeyboardAvoidingView style={styles.container} behavior='padding'>
           <Image source={require('../assets/logo.png')} style={styles.image} />
@@ -159,6 +175,7 @@ const SignInScreen = () => {
             textContentType="emailAddress"
             keyboardType="email-address"
             disabled={loading}
+            onRef={(ref) => (emailInputRef.current = ref)}
           />
           <TextInput
             label="Password"
@@ -168,6 +185,7 @@ const SignInScreen = () => {
             errorText={password.error}
             secureTextEntry
             disabled={loading}
+            onRef={(ref) => (passwordInputRef.current = ref)}
           />
           <View style={styles.forgotPassword}>
             <TouchableOpacity

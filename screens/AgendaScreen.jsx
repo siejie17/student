@@ -14,8 +14,11 @@ const AgendaScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const unsubscribeRef = useRef(null);
   const navigation = useNavigation();
+
+  const unsubscribeRef = useRef(null);
+  const isMountedRef = useRef(true);
+  const seenEventIDs = useRef(new Set());
 
   const fetchRegisteredEventsRealtime = useCallback(async () => {
     setIsLoading(true);
@@ -32,6 +35,8 @@ const AgendaScreen = () => {
 
     // Subscribe to real-time updates
     const unsubscribe = onSnapshot(registrationQuery, async (registrationSnapshot) => {
+      if (!isMountedRef.current) return; // Ensure component is mounted
+
       if (registrationSnapshot.empty) {
         console.warn("No registrations found for student ID:", studentID);
         setRegisteredEvents({});  // Clear the state when no events found
@@ -47,7 +52,7 @@ const AgendaScreen = () => {
         isVerified: doc.data().isVerified,
       }));
 
-      let eventData = [];
+      let eventDataMap = new Map();
 
       for (const reg of eventRegistrations) {
         const eventRef = doc(db, "event", reg.eventID);
@@ -57,11 +62,10 @@ const AgendaScreen = () => {
           const eventInfo = eventSnap.data();
           const startDateTime = new Date(eventInfo.eventStartDateTime.seconds * 1000);
           const endDateTime = new Date(eventInfo.eventEndDateTime.seconds * 1000);
-
           const startDateStr = startDateTime.toISOString().split('T')[0];
           const endDateStr = endDateTime.toISOString().split('T')[0];
 
-          eventData.push({
+          const event = {
             id: reg.id,
             category: eventInfo.category,
             eventStatus: eventInfo.status,
@@ -95,9 +99,15 @@ const AgendaScreen = () => {
               }),
             isVerified: reg.isVerified,
             isAttended: reg.isAttended,
-          });
+          };
+
+          // Ensure unique by eventID
+          eventDataMap.set(reg.eventID, event);
         }
       }
+
+      // Convert map to array
+      const eventData = Array.from(eventDataMap.values());
 
       // Categorize events by date
       let categorizedEvents = {};
@@ -106,7 +116,7 @@ const AgendaScreen = () => {
         const endDate = new Date(event.eventEndDate);
 
         let currentDate = new Date(startDate);
-        while (currentDate <= endDate) {
+        // while (currentDate <= endDate) {
           const eventDateKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
 
           if (!categorizedEvents[eventDateKey]) {
@@ -117,11 +127,13 @@ const AgendaScreen = () => {
 
           // Move to next day
           currentDate.setDate(currentDate.getDate() + 1);
-        }
+        // }
       });
 
-
-      setRegisteredEvents(categorizedEvents);
+      if (!isMountedRef.current) return; // Ensure component is mounted before updating state
+      if (JSON.stringify(registeredEvents) !== JSON.stringify(categorizedEvents)) {
+        setRegisteredEvents(categorizedEvents);
+      }
       setIsLoading(false);
       setRefreshing(false);
     });
@@ -141,6 +153,8 @@ const AgendaScreen = () => {
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     const fetchData = async () => {
       unsubscribeRef.current = await fetchRegisteredEventsRealtime();
     };
@@ -148,6 +162,7 @@ const AgendaScreen = () => {
     fetchData();
 
     return () => {
+      isMountedRef.current = false;
       if (unsubscribeRef.current) {
         unsubscribeRef.current(); // Cleanup listener on unmount
       }

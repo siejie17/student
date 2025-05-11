@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Text, Modal, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, StyleSheet, Image } from 'react-native';
 
 const AttendanceFailureModal = ({
     isVisible,
     onClose,
     title,
-    subtitle
+    subtitle,
+    buttonText
 }) => {
     return (
         <Modal
@@ -16,6 +17,11 @@ const AttendanceFailureModal = ({
         >
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContainer}>
+                    <Image
+                        source={require('../../assets/icons/exclamation-mark.png')}
+                        style={styles.failureImage}
+                    />
+
                     <Text style={styles.titleText}>{title}</Text>
                     <Text style={styles.subtitleText}>{subtitle}</Text>
 
@@ -23,7 +29,7 @@ const AttendanceFailureModal = ({
                         style={styles.closeButton}
                         onPress={onClose}
                     >
-                        <Text style={styles.closeButtonText}>Roger That! 🚀</Text>
+                        <Text style={styles.closeButtonText}>{buttonText}</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -34,7 +40,7 @@ const AttendanceFailureModal = ({
 const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(114, 114, 114, 0.5))',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -53,21 +59,29 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 5
     },
+    failureImage: {
+        width: 100,
+        height: 100,
+        marginBottom: 16,
+    },
     titleText: {
         fontSize: 24,
         fontWeight: 'bold',
         color: '#2C3E50',
-        marginBottom: 15,
+        marginBottom: 5,
         textAlign: 'center'
     },
     subtitleText: {
         fontSize: 18,
         color: '#34495E',
-        marginBottom: 20,
+        paddingTop: 15,
+        paddingBottom: 25,
         textAlign: 'center',
-        fontStyle: 'italic'
     },
     closeButton: {
+        width: '80%',
+        justifyContent: 'center',
+        alignItems: 'center',
         backgroundColor: '#3498DB',
         paddingVertical: 12,
         paddingHorizontal: 25,

@@ -259,9 +259,9 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
 
                 if (!userIdExists) {
                     setNetworkingFailureModalContent({
-                        title: '🕵️ Mystery User Detected',
-                        subtitle: 'Oops! Looks like this digital explorer hasn\'t joined the UniEXP universe yet. They\'re off the grid! 🌐❓'
-                    })
+                        title: 'Unregistered User Detected',
+                        subtitle: 'The scanned user has not been registered in the system. Please ensure the user has joined the platform before attempting to connect.'
+                    });
                     setNetworkingFailureModalVisible(true);
                     setMode('display');
                     setScanned(false);
@@ -270,9 +270,9 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
 
                 if (studentID === parsedData.networkID) {
                     setNetworkingFailureModalContent({
-                        title: '🤨 Nice Try, Time Bender!',
-                        subtitle: 'Whoa there! Trying to scan yourself? Networking quests are about connecting with others, not your own reflection. 🪞✨'
-                    })
+                        title: 'Invalid Scan Attempt',
+                        subtitle: 'You cannot scan your own QR code. Networking requires connecting with other participants.'
+                    });
                     setNetworkingFailureModalVisible(true);
                     setMode('display');
                     setScanned(false);
@@ -281,9 +281,9 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
 
                 if (eventID !== parsedData.eventID) {
                     setNetworkingFailureModalContent({
-                        title: '🌪️ Event Mismatch Alert',
-                        subtitle: 'Whoa, time traveler! You seem to be trying to scan into a different event dimension. Are we on the same mission? 🚀🗓️'
-                    })
+                        title: 'Event Mismatch',
+                        subtitle: 'The scanned QR code belongs to a different event. Please ensure you are scanning a valid code for this event.'
+                    });
                     setNetworkingFailureModalVisible(true);
                     setMode('display');
                     setScanned(false);
@@ -333,28 +333,26 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                             networkID: parsedData.networkID,
                             scannedTime: serverTimestamp(),
                         });
-                        console.log("New network added successfully.");
-                        // Error here
                         updateQuestProgress(studentID);
                         updateBadgeProgress(studentID);
-                        setMode('display');
-                        setScanned(false);
                     }
                 }
             } else {
                 setNetworkingFailureModalContent({
-                    title: '🧩 Incomplete Connection Puzzle',
-                    subtitle: 'Oops! The QR code seems to have lost its way. Key details are missing from this digital whisper. 🌫️📡'
-                })
+                    title: 'Invalid QR Code',
+                    subtitle: 'The scanned QR code is missing required information. Please verify the code and try again.'
+                });
                 setNetworkingFailureModalVisible(true);
             }
         } catch (error) {
-            console.error('Error processing QR code:', error);
             setNetworkingFailureModalContent({
-                title: '🧩 Incomplete Connection Puzzle',
-                subtitle: 'Oops! The QR code seems to have lost its way. Key details are missing from this digital whisper. 🌫️📡'
-            })
+                title: 'Invalid QR Code',
+                subtitle: 'The scanned QR code could not be processed due to missing or invalid data. Please try again with a valid code.'
+            });
             setNetworkingFailureModalVisible(true);
+        } finally {
+            setMode('display');
+            setScanned(false);
         }
     }
 

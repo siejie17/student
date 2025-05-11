@@ -70,95 +70,67 @@ const EventListingScreen = ({ route, navigation }) => {
   const fetchEventCatalogue = useCallback(async () => {
     try {
       setIsLoading(true);
-
+  
       const studentID = await getItem("studentID");
-      if (!studentID) {
-        setIsLoading(false);
-        return;
-      }
-
-      // Clear previous subscriptions
-      if (unsubscribeRegistrationRef.current) {
-        unsubscribeRegistrationRef.current();
-      }
-      if (unsubscribeEventRef.current) {
-        unsubscribeEventRef.current();
-      }
-      if (unsubscribeTotalParticipantsRef.current) {
-        unsubscribeTotalParticipantsRef.current();
-      }
-
-      const registrationRef = collection(db, "registration");
-      const registrationQuery = query(registrationRef, where("studentID", "==", studentID));
-
-      const unsubscribeRegistration = onSnapshot(registrationQuery, async (registrationSnap) => {
-        // Extract registered event IDs
+      if (!studentID) return setIsLoading(false);
+  
+      // Unsubscribe previous listeners
+      unsubscribeRegistrationRef.current?.();
+      unsubscribeEventRef.current?.();
+  
+      // Listen to student registrations
+      const registrationQuery = query(
+        collection(db, "registration"),
+        where("studentID", "==", studentID)
+      );
+  
+      unsubscribeRegistrationRef.current = onSnapshot(registrationQuery, async (registrationSnap) => {
         const registeredEventIDs = registrationSnap.docs.map(doc => doc.data().eventID);
-
-        // Get events where registration is still open
-        const eventsRef = collection(db, "event");
+  
+        // Listen to current events (not completed or cancelled)
         const eventsQuery = query(
-          eventsRef,
+          collection(db, "event"),
           where("registrationClosingDate", ">", Timestamp.now()),
           where("status", "not-in", ["Completed", "Cancelled"]),
           orderBy("lastAdded", "desc")
         );
-
-        const unsubscribeEvent = onSnapshot(eventsQuery, async (eventSnap) => {
-          // Filter out events the student has already registered for
-          const filteredEvents = await Promise.all(
-            eventSnap.docs
-              .filter(doc => !registeredEventIDs.includes(doc.id))
-              .map(async (doc) => {
-                const event = { id: doc.id, ...doc.data() };
-
-                // Fetch event images
-                const eventImagesRef = collection(db, "eventImages");
-                const eventImagesQuery = query(eventImagesRef, where("eventID", "==", event.id));
-                const eventImagesDoc = await getDocs(eventImagesQuery);
-
-                let thumbnail = null;
-                eventImagesDoc.forEach((doc) => {
-                  const imageData = doc.data();
-                  if (imageData.images && imageData.images.length > 0) {
-                    thumbnail = imageData.images[0];
-                  }
-                });
-
-                return { ...event, thumbnail };
-              })
+  
+        unsubscribeEventRef.current = onSnapshot(eventsQuery, async (eventSnap) => {
+          const allEvents = eventSnap.docs
+            .filter(doc => !registeredEventIDs.includes(doc.id))
+            .map(doc => ({ id: doc.id, ...doc.data() }));
+  
+          // Fetch all event thumbnails in one go
+          const eventIDs = allEvents.map(e => e.id);
+          const imagesQuery = query(
+            collection(db, "eventImages"),
+            where("eventID", "in", eventIDs.slice(0, 10)) // Firestore 'in' max 10 items
           );
-
-          setEvents(filteredEvents);
-          setRegisteredEventIDs(registeredEventIDs);
-
-          // Store unsubscribe functions
-          unsubscribeRegistrationRef.current = unsubscribeRegistration;
-          unsubscribeEventRef.current = unsubscribeEvent;
-
+          const imageDocs = await getDocs(imagesQuery);
+  
+          const imageMap = new Map();
+          imageDocs.forEach(doc => {
+            const { eventID, images } = doc.data();
+            if (images && images.length > 0) imageMap.set(eventID, images[0]);
+          });
+  
+          const enrichedEvents = allEvents.map(event => ({
+            ...event,
+            thumbnail: imageMap.get(event.id) || null
+          }));
+  
+          setEvents(enrichedEvents);
           setIsLoading(false);
           setRefreshing(false);
         });
       });
-
+  
     } catch (error) {
       console.error("Error fetching events:", error);
       setIsLoading(false);
       setRefreshing(false);
     }
   }, []);
-
-  useEffect(() => {
-    fetchEventCatalogue();
-
-    return () => {
-      if (unsubscribeRegistrationRef.current && unsubscribeEventRef.current && unsubscribeTotalParticipantsRef.current) {
-        unsubscribeRegistrationRef.current(); // Cleanup on unmount
-        unsubscribeEventRef.current();
-        unsubscribeTotalParticipantsRef.current();
-      }
-    };
-  }, [fetchEventCatalogue]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -168,8 +140,13 @@ const EventListingScreen = ({ route, navigation }) => {
   useFocusEffect(
     useCallback(() => {
       fetchEventCatalogue();
+      return () => {
+        unsubscribeRegistrationRef.current?.();
+        unsubscribeEventRef.current?.();
+        unsubscribeTotalParticipantsRef.current?.();
+      };
     }, [])
-  );
+  );  
 
   const filteredEvents = useMemo(() => {
     let filtered = events;
@@ -337,7 +314,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   searchBar: {
-    marginHorizontal: 10,
+    marginHorizontal: 5,
     marginBottom: 5,
   },
   categoriesList: {

@@ -179,14 +179,6 @@ const OngoingUpcomingEventCarousel = ({ setIsLoading, navigation }) => {
                 }}
             >
                 <View style={styles.card}>
-                    {/* Color bar at top based on faculty */}
-                    <LinearGradient 
-                        colors={facultyColors} 
-                        start={{x: 0, y: 0}} 
-                        end={{x: 1, y: 0}} 
-                        style={styles.cardTopBar} 
-                    />
-                    
                     <View style={styles.cardContent}>
                         {/* Status badge */}
                         <View style={[styles.statusBadge, { backgroundColor: isOngoing ? 'rgba(255, 87, 34, 0.1)' : 'rgba(76, 175, 80, 0.1)' }]}>
@@ -323,7 +315,7 @@ const styles = StyleSheet.create({
     },
     card: {
         width: CARD_WIDTH,
-        minHeight: 220,
+        minHeight: 200,
         backgroundColor: 'white',
         borderRadius: 12,
         marginLeft: 10,

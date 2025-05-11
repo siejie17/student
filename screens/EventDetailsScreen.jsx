@@ -878,7 +878,7 @@ const styles = StyleSheet.create({
     },
     tagText: {
         color: '#1E61A4',
-        fontSize: 16,
+        fontSize: 14,
     },
     infoRow: {
         flexDirection: 'row',
