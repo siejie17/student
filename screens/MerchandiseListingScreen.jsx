@@ -1,12 +1,14 @@
-import { View, Text, StyleSheet, FlatList, Animated, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native'
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { View, Text, StyleSheet, FlatList, Animated, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import DiamondBalance from '../components/Merchandise/DiamondBalance';
-import MerchandiseCard from '../components/Merchandise/MerchandiseCard';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
+
 import { db } from '../utils/firebaseConfig';
 import { getItem } from '../utils/asyncStorage';
+
+import DiamondBalance from '../components/Merchandise/DiamondBalance';
+import MerchandiseCard from '../components/Merchandise/MerchandiseCard';
 
 const MerchandiseListingScreen = ({ navigation }) => {
   const [currentDiamonds, setCurrentDiamonds] = useState(0);

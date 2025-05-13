@@ -1,11 +1,13 @@
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { Dropdown } from 'react-native-element-dropdown';
-import { getItem } from '../../utils/asyncStorage';
-import { addDoc, collection, doc, increment, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { db } from '../../utils/firebaseConfig';
+import { addDoc, collection, doc, increment, updateDoc } from 'firebase/firestore';
+
 import RedemptionSuccessModal from '../Modal/RedemptionSuccessModal';
+
+import { getItem } from '../../utils/asyncStorage';
+import { db } from '../../utils/firebaseConfig';
 
 const MerchandiseFooter = ({ merch, balanceDiamonds }) => {
     const [selectedSize, setSelectedSize] = useState('');

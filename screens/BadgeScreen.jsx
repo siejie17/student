@@ -1,13 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import React from 'react';
-import { 
-  View, 
-  Text, 
-  Image, 
-  StyleSheet,
-  Dimensions, 
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, Image, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 // Badge image mapping

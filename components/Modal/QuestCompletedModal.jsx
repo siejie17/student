@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { 
   Modal, 
   View, 
@@ -6,6 +6,7 @@ import {
   StyleSheet, 
   Dimensions 
 } from 'react-native';
+
 import { Trophy } from 'lucide-react-native';
 
 const QuestCompletedModal = ({ 

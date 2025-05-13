@@ -60,12 +60,10 @@ const ProfileScreen = () => {
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
   const badgeScaleAnim = useRef(new Animated.Value(0.8)).current;
 
   const navigation = useNavigation();
-
-  let unsub = [];
 
   useEffect(() => {
     let userUnsub = null;
@@ -121,12 +119,6 @@ const ProfileScreen = () => {
               duration: 600,
               useNativeDriver: true,
             }),
-            Animated.spring(badgeScaleAnim, {
-              toValue: 1,
-              friction: 8,
-              tension: 40,
-              useNativeDriver: true,
-            })
           ]).start();
         }, (error) => {
           console.error("Error listening to user data:", error);
@@ -274,18 +266,10 @@ const ProfileScreen = () => {
   };
 
   const renderBadge = (badge, index) => {
-    // Create a small delay for each badge to stagger the animation
-    const badgeDelay = index * 100;
-
-    const animatedStyle = {
-      transform: [{ scale: badgeScaleAnim }],
-      opacity: fadeAnim,
-    };
-
     return (
       <TouchableOpacity
         key={badge.id}
-        style={[styles.badgeContainer, animatedStyle]}
+        style={[styles.badgeContainer]}
         onPress={() => navigation.navigate('BadgeDetails', { badge: badge })}
       >
         <View style={[styles.badge, !badge.isUnlocked && styles.lockedBadge]}>
@@ -364,7 +348,7 @@ const ProfileScreen = () => {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 22 }}
       >
         <Animated.View
           style={[
@@ -422,7 +406,7 @@ const ProfileScreen = () => {
             {/* Points Side */}
             <View style={styles.statItem}>
               <View style={styles.statIconContainer}>
-                <Ionicons name="star" size={20} color="#7f9bc9" />
+                <Ionicons name="star" size={20} color='#3f6bc4' />
               </View>
               <View>
                 <Text style={styles.statValue}>{userData.totalPointsGained || 0}</Text>
@@ -436,7 +420,7 @@ const ProfileScreen = () => {
             {/* Events Side */}
             <View style={styles.statItem}>
               <View style={styles.statIconContainer}>
-                <Ionicons name="calendar" size={20} color="#7f9bc9" />
+                <Ionicons name="calendar" size={20} color='#3f6bc4' />
               </View>
               <View>
                 <Text style={styles.statValue}>{attendedEventsLength || 0}</Text>
@@ -458,13 +442,9 @@ const ProfileScreen = () => {
           </View>
 
           <View style={styles.achievementsFrame}>
-            {badgeProgressList.length > 0 ? (
               <View style={styles.achievementsContainer}>
                 {badgeProgressList.map(badge => renderBadge(badge))}
               </View>
-            ) : (
-              <Text style={styles.noBadgesText}>No badges earned yet</Text>
-            )}
           </View>
         </Animated.View>
 
@@ -500,8 +480,12 @@ const ProfileScreen = () => {
           </View>
         </Animated.View>
 
-        <TouchableOpacity style={styles.button} onPress={handleSignOut}>
-          <Text style={styles.buttonText}>Sign Out</Text>
+        <TouchableOpacity
+          style={styles.signOutButton}
+          onPress={handleSignOut}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.signOutButtonText}>Sign Out</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -514,13 +498,24 @@ const ProfileScreen = () => {
         handleIndicatorStyle={styles.handleIndicatorStyle}
         handleStyle={styles.handleStyle}
         style={styles.bottomSheetStyles}
-        backgroundStyle={{ backgroundColor: '#F5F5F5', borderTopLeftRadius: 34, borderTopRightRadius: 34, borderWidth: 0.4 }}
+        backgroundStyle={styles.sheetBackgroundStyle}
         enableHandlePanningGesture
         enableOverDrag={false}
       >
-        <BottomSheetView>
-          <TouchableOpacity style={[styles.button, { marginHorizontal: 24 }]} onPress={pickImage}>
-            <Text style={styles.buttonText}>Change Profile Picture</Text>
+        <BottomSheetView style={styles.contentContainer}>
+          <Text style={styles.headerText}>Profile Picture</Text>
+
+          <View style={styles.imageContainer}>
+            <Image
+              source={userData.profilePicture
+                ? { uri: `data:image/png;base64,${userData.profilePicture}` }
+                : DEFAULT_PROFILE_IMAGE}
+              style={styles.editProfileImage}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.editButton} onPress={pickImage}>
+            <Text style={styles.editButtonText}>Choose New Photo</Text>
           </TouchableOpacity>
         </BottomSheetView>
       </BottomSheet>
@@ -531,26 +526,45 @@ const ProfileScreen = () => {
 export default ProfileScreen;
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-    width: '100%',
-    backgroundColor: 'white',
-  },
   container: {
     flex: 1,
-    paddingHorizontal: 24,
-    backgroundColor: "white"
+    backgroundColor: "#fff",
   },
   header: {
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 10,
-    height: 65,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2C3E50',
+    fontWeight: '700',
+    color: '#000',
+  },
+  headerWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    height: 65,
+    marginVertical: 12,
+    paddingHorizontal: 18
+  },
+  titleContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  divider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginTop: 8,
   },
   profileContainer: {
     padding: 16,
@@ -558,11 +572,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     alignItems: 'flex-start',
-    shadowColor: '#7f9bc9',
+    shadowColor: '#3f6bc4',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   profileTopSection: {
     flexDirection: 'row',
@@ -576,14 +590,14 @@ const styles = StyleSheet.create({
     width: 85,
     height: 85,
     borderRadius: 42.5,
-    borderWidth: 3,
-    borderColor: '#E8F0FE',
+    borderWidth: 1.5,
+    borderColor: 'rgba(63, 107, 196, 0.7)',
   },
   editProfileButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#7f9bc9',
+    backgroundColor: '#3f6bc4',
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -652,7 +666,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 16,
-    shadowColor: '#7f9bc9',
+    shadowColor: '#3f6bc4',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
@@ -751,11 +765,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
-    shadowColor: '#7f9bc9',
+    shadowColor: '#3f6bc4',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   networkCard: {
     flexDirection: 'row',
@@ -788,22 +802,24 @@ const styles = StyleSheet.create({
   chevronContainer: {
     padding: 4,
   },
-  button: {
+  signOutButton: {
     marginVertical: 24,
-    backgroundColor: '#FF5A5F',
-    borderRadius: 8,
-    padding: 16,
+    backgroundColor: '#E53935',  // Material Design red
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     alignItems: 'center',
-    shadowColor: '#BFCFE7',
+    shadowColor: '#C62828',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  buttonText: {
+  signOutButtonText: {
     fontSize: 16,
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
   loadingContainer: {
     flex: 1,
@@ -848,16 +864,20 @@ const styles = StyleSheet.create({
   bottomSheetStyles: {
     flex: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 40,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+  },
+  sheetBackgroundStyle: {
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    borderWidth: 0,
   },
   handleIndicatorStyle: {
     width: 40,
     height: 4,
-    backgroundColor: 'black',
+    backgroundColor: '#D1D1D6',
     borderRadius: 2,
   },
   handleStyle: {
@@ -865,6 +885,47 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+  },
+  contentContainer: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  headerText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 24,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  imageContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  editProfileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#F2F2F7',
+  },
+  editButton: {
+    width: '100%',
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  editButtonText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   dividerContainer: {
     width: '100%',

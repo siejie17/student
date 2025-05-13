@@ -1,7 +1,8 @@
 import { View, StyleSheet, Text } from 'react-native'
-import React, { useState, memo } from 'react'
+import { useState, memo } from 'react'
 import { Dropdown } from 'react-native-element-dropdown';
 import { theme } from '../../core/theme';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const DropdownList = ({
     label,
@@ -17,15 +18,17 @@ const DropdownList = ({
 
     return (
         <View style={styles.container}>
+            {label && <Text style={styles.label}>{label}</Text>}
             <Dropdown
                 style={[
                     styles.dropdown,
-                    isFocus && { borderColor: theme.colors.primary, borderWidth: 2 },
+                    isFocus && styles.focused,
                     disabled && styles.disabled
                 ]}
                 placeholderStyle={styles.placeholderStyle}
                 selectedTextStyle={styles.selectedTextStyle}
                 inputSearchStyle={styles.inputSearchStyle}
+                iconStyle={styles.iconStyle}
                 data={data || []}
                 maxHeight={300}
                 labelField="label"
@@ -40,11 +43,22 @@ const DropdownList = ({
                     setIsFocus(false);
                 }}
                 disable={disabled}
-                renderItem={(item) => (
-                    <Text numberOfLines={1} ellipsizeMode="tail" style={{ padding: 10 }}>
-                      {item.label}
-                    </Text>
+                renderRightIcon={() => (
+                    <MaterialIcons
+                        name={isFocus ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                        size={22}
+                        color={isFocus ? theme.colors.primary : "#757575"}
+                    />
                 )}
+                renderItem={(item) => (
+                    <View style={styles.itemContainer}>
+                        <Text numberOfLines={1} ellipsizeMode="tail" style={styles.itemText}>
+                            {item.label}
+                        </Text>
+                    </View>
+                )}
+                containerStyle={styles.dropdownContainer}
+                showsVerticalScrollIndicator={false}
                 {...props}
             />
             {errorText ? <Text style={styles.error}>{errorText}</Text> : null}
@@ -57,37 +71,91 @@ export default memo(DropdownList);
 const styles = StyleSheet.create({
     container: {
         width: '100%',
-        marginVertical: 4,
+        marginVertical: 8,
+    },
+    label: {
+        fontSize: 14,
+        color: '#424242',
+        marginBottom: 6,
+        fontWeight: '500',
+        paddingHorizontal: 4,
     },
     dropdown: {
         height: 56,
-        borderColor: '#c4c4c4',
+        borderColor: '#e0e0e0',
         borderWidth: 1,
-        borderRadius: 4,
-        paddingHorizontal: 12,
-        backgroundColor: theme.colors.surface,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#fafafa',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 1,
+        },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    focused: {
+        borderColor: theme.colors.primary,
+        borderWidth: 1.5,
+        backgroundColor: '#ffffff',
     },
     disabled: {
         backgroundColor: '#f0f0f0',
         opacity: 0.7,
+        borderColor: '#e0e0e0',
     },
     placeholderStyle: {
         fontSize: 16,
-        color: '#757575',
+        color: '#9e9e9e',
     },
     selectedTextStyle: {
         fontSize: 16,
         color: '#212121',
+        fontWeight: '400',
+    },
+    iconStyle: {
+        width: 22,
+        height: 22,
     },
     inputSearchStyle: {
-        height: 40,
+        height: 44,
         fontSize: 16,
-        borderColor: '#c4c4c4',
+        borderColor: '#e0e0e0',
+        borderRadius: 8,
+        backgroundColor: '#f7f7f7',
+        paddingHorizontal: 12,
     },
     error: {
         fontSize: 14,
         color: theme.colors.error,
-        paddingHorizontal: 4,
-        paddingTop: 4,
+        paddingHorizontal: 12,
+        paddingTop: 6,
+    },
+    dropdownContainer: {
+        borderRadius: 12,
+        marginTop: 4,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        backgroundColor: '#ffffff',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    itemContainer: {
+        padding: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    itemText: {
+        fontSize: 16,
+        color: '#424242',
     },
 });

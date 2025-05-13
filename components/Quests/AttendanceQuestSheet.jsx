@@ -1,16 +1,18 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, Image } from 'react-native';
 import { collection, setDoc, getDocs, increment, query, updateDoc, where, getDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../utils/firebaseConfig';
-import { getItem } from '../../utils/asyncStorage';
 import Constants from 'expo-constants';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import CryptoJS from 'react-native-crypto-js';
 import * as Location from 'expo-location';
-import QuestCompletedModal from '../Modal/QuestCompletedModal';
 import { getDistance } from 'geolib';
 import { Ionicons } from '@expo/vector-icons';
+
+import QuestCompletedModal from '../Modal/QuestCompletedModal';
 import AttendanceFailureModal from '../Modal/AttendanceFailureModal';
+
+import { db } from '../../utils/firebaseConfig';
+import { getItem } from '../../utils/asyncStorage';
 
 const EVENT_TYPE_MAPPING = {
     1: "academic",

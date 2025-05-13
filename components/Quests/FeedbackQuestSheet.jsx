@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, Image } from 'react-native';
-import { collection, setDoc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc, where, getDoc, doc } from 'firebase/firestore';
+import { collection, setDoc, getDocs, increment, query, updateDoc, where, doc } from 'firebase/firestore';
+
 import { db } from '../../utils/firebaseConfig';
 import { getItem } from '../../utils/asyncStorage';
 

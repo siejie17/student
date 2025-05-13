@@ -1,10 +1,12 @@
-import { View, Text, StyleSheet, ScrollView, Image, Dimensions, ActivityIndicator, FlatList, RefreshControl, Animated, Modal, Pressable, StatusBar, TouchableOpacity } from 'react-native'
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { MaterialIcons, FontAwesome5, Feather } from '@expo/vector-icons';
+import { View, Text, StyleSheet, ScrollView, Image, Dimensions, ActivityIndicator, FlatList, RefreshControl, Animated, Modal, Pressable } from 'react-native'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { collection, doc, getDoc, query, where, onSnapshot, getDocs, Timestamp } from 'firebase/firestore';
+import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getItem, removeItem } from '../utils/asyncStorage';
-import { collection, doc, getDoc, query, where, onSnapshot } from 'firebase/firestore';
+
+import { getItem } from '../utils/asyncStorage';
 import { db } from '../utils/firebaseConfig';
+
 import RankingRewardsModal from '../components/Leaderboard/RankingRewardsModal';
 
 const { width } = Dimensions.get('window');
@@ -30,14 +32,11 @@ const LeaderboardScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentUserRank, setCurrentUserRank] = useState(null);
-  const [refreshDate, setRefreshDate] = useState(new Date());
+  const [refreshDate, setRefreshDate] = useState((Timestamp.now()).toDate().toLocaleString());
   const [facultyCode, setFacultyCode] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
-  // const [rewardsModalVisible, setRewardsModalVisible] = useState(true);
   const [rewardsModalVisible, setRewardsModalVisible] = useState(false);
-  // const [previousMonthRanking, setPreviousMonthRanking] = useState(2);
   const [previousMonthRanking, setPreviousMonthRanking] = useState(null);
-  // const [diamondsRewards, setDiamondsRewards] = useState(750);
   const [diamondsRewards, setDiamondsRewards] = useState(0);
 
   // Used to store unsubscribe functions
@@ -57,20 +56,21 @@ const LeaderboardScreen = () => {
 
   const fetchRankings = useCallback(async () => {
     try {
-      // Clean up any existing subscriptions first
-      if (unsubscribeRef.current.main) {
-        unsubscribeRef.current.main();
-      }
-      if (unsubscribeRef.current.entries) {
-        unsubscribeRef.current.entries();
-      }
+      // Clean up any existing subscriptions
+      unsubscribeRef.current.main?.();
+      unsubscribeRef.current.entries?.();
 
-      const facultyID = await getItem("facultyID");
-      const currentStudentID = await getItem("studentID");
+      const [facultyID, currentStudentID] = await Promise.all([
+        getItem("facultyID"),
+        getItem("studentID"),
+      ]);
+
       setFacultyCode(FACULTY_MAPPING[facultyID] || "");
 
-      const leaderboardRef = collection(db, "leaderboard");
-      const leaderboardQuery = query(leaderboardRef, where("facultyID", "==", facultyID));
+      const leaderboardQuery = query(
+        collection(db, "leaderboard"),
+        where("facultyID", "==", facultyID)
+      );
 
       // Subscribe to leaderboard updates
       unsubscribeRef.current.main = onSnapshot(leaderboardQuery, async (leaderboardSnap) => {
@@ -80,32 +80,26 @@ const LeaderboardScreen = () => {
           return;
         }
 
-        const leaderboardDoc = leaderboardSnap.docs[0]; // Assuming one doc per faculty
+        const leaderboardDoc = leaderboardSnap.docs[0]; // Assume one per faculty
         const leaderboardId = leaderboardDoc.id;
+        setRefreshDate((leaderboardDoc.data().refreshDateTime).toDate().toLocaleString());
 
-        setRefreshDate(leaderboardDoc.data().refreshDateTime);
-
-        const leaderboardEntriesRef = collection(db, "leaderboard", leaderboardId, "leaderboardEntries");
+        const leaderboardEntriesRef = collection(
+          db,
+          "leaderboard",
+          leaderboardId,
+          "leaderboardEntries"
+        );
 
         // Subscribe to leaderboard entries
-        unsubscribeRef.current.entries = onSnapshot(leaderboardEntriesRef, async (leaderboardEntriesSnap) => {
-          const entries = leaderboardEntriesSnap.docs
-            .map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }))
-            // Sort by points (desc) then by lastUpdated (asc)
-            .sort((a, b) => {
-              if (b.points !== a.points) return b.points - a.points;
-              return a.lastUpdated - b.lastUpdated;
-            });
+        unsubscribeRef.current.entries = onSnapshot(leaderboardEntriesRef, async (entriesSnap) => {
+          const sortedEntries = entriesSnap.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .sort((a, b) => (b.points - a.points) || (a.lastUpdated - b.lastUpdated));
 
-          // Fetch user details in parallel
           const entriesWithUserInfo = await Promise.all(
-            entries.map(async (entry, index) => {
-              const userRef = doc(db, "user", entry.studentID);
-              const userSnap = await getDoc(userRef);
-
+            sortedEntries.map(async (entry, index) => {
+              const userSnap = await getDoc(doc(db, "user", entry.studentID));
               const userData = userSnap.exists()
                 ? userSnap.data()
                 : { firstName: "Unknown", profilePicture: "" };
@@ -114,10 +108,10 @@ const LeaderboardScreen = () => {
                 ...entry,
                 firstName: userData.firstName,
                 profilePic: userData.profilePicture,
-                rank: index + 1
+                rank: index + 1,
               };
 
-              if (rankData.studentID === currentStudentID) {
+              if (entry.studentID === currentStudentID) {
                 setCurrentUserRank(index + 1);
               }
 
@@ -125,34 +119,12 @@ const LeaderboardScreen = () => {
             })
           );
 
-          // Split into top 3 and remaining users
           setLeaderboardData({
             top3: entriesWithUserInfo.slice(0, 3),
-            remainingUsers: entriesWithUserInfo.slice(3)
+            remainingUsers: entriesWithUserInfo.slice(3),
           });
 
-          // Here the rewards modal
-          const showRewardsModalKey = `showLeaderboardModal_${currentStudentID}`;
-          const rewardsModalShown = await getItem(showRewardsModalKey);
-
-          try {
-            if (rewardsModalShown) {
-              const [previousRank, diamondsRewards] = await Promise.all([
-                getItem(`previousRanking_${currentStudentID}`),
-                getItem(`diamonds_${currentStudentID}`)
-              ]);
-
-              setPreviousMonthRanking(previousRank || "N/A");
-              setDiamondsRewards(diamondsRewards);
-
-              await removeItem(showRewardsModalKey);
-              setRewardsModalVisible(true);
-            }
-          } catch (error) {
-            console.error("Error retrieving rewards modal data:", error);
-          }
-
-          setIsLoading(false);
+          
         });
       });
     } catch (error) {
@@ -162,17 +134,51 @@ const LeaderboardScreen = () => {
   }, []);
 
   useEffect(() => {
-    // Initial data fetch
-    fetchRankings();
+    let unsubscribeLastMonth = () => { };
 
-    // Cleanup function for unmounting
+    const fetchLiveLastMonthRanking = async () => {
+      try {
+        const [facultyID, studentID] = await Promise.all([
+          getItem("facultyID"),
+          getItem("studentID"),
+        ]);
+
+        const leaderboardSnapshot = await getDocs(
+          query(collection(db, "leaderboard"), where("facultyID", "==", facultyID))
+        );
+
+        if (leaderboardSnapshot.empty) return;
+
+        const leaderboardDoc = leaderboardSnapshot.docs[0];
+
+        const lastMonthQuery = query(
+          collection(db, "leaderboard", leaderboardDoc.id, "lastMonth"),
+          where("studentID", "==", studentID)
+        );
+
+        unsubscribeLastMonth = onSnapshot(lastMonthQuery, (snapshot) => {
+          if (!snapshot.empty) {
+            const data = snapshot.docs[0].data();
+            setPreviousMonthRanking(data.rank);
+            setDiamondsRewards(data.diamonds);
+            setRewardsModalVisible(true);
+          }
+        });
+      } catch (error) {
+        console.error("Error fetching last month's ranking:", error);
+      }
+    };
+
+    // Initial fetch
+    fetchRankings();
+    fetchLiveLastMonthRanking();
+    setIsLoading(false);
+
+    // Cleanup
     return () => {
-      if (unsubscribeRef.current.main) {
-        unsubscribeRef.current.main();
-      }
-      if (unsubscribeRef.current.entries) {
-        unsubscribeRef.current.entries();
-      }
+      unsubscribeRef.current.main?.();
+      unsubscribeRef.current.entries?.();
+      unsubscribeLastMonth?.();
     };
   }, [fetchRankings]);
 
@@ -465,7 +471,7 @@ const LeaderboardScreen = () => {
             {/* Monthly Refresh Banner */}
             <View style={styles.refreshBanner}>
               <MaterialIcons name="refresh" size={20} color="#fff" />
-              <Text style={styles.refreshText}>Leaderboard refreshes monthly</Text>
+              <Text style={styles.refreshInfoText}>Leaderboard refreshes monthly</Text>
               <FontAwesome5 name="trophy" size={24} color="#FFD700" />
             </View>
             <Text style={styles.motivationText}>Go, go, go! Grab points to climb to the top spots!</Text>
@@ -619,37 +625,29 @@ const LeaderboardScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{facultyCode} Leaderboard</Text>
-        <View style={styles.cardWrapper}>
-          <View style={styles.content}>
-            <Feather
-              name="refresh-cw"
-              size={8}
-              color="rgba(0, 0, 0, 0.9)"
-            />
-            <View style={styles.textContainer}>
-              <Text style={styles.title}>Next refresh: {refreshDate.toDate().toLocaleDateString()}</Text>
-            </View>
+      <View style={styles.headerWrapper}>
+        <View style={styles.titleContainer}>
+          <Text style={styles.facultyCode}>{facultyCode}</Text>
+          <Text style={styles.headerTitle}>Leaderboard</Text>
+        </View>
+        
+        <View style={styles.refreshContainer}>
+          <MaterialIcons 
+            name="refresh" 
+            size={24} 
+            color="#374151" 
+            style={styles.refreshIcon}
+          />
+          <View style={styles.refreshTextContainer}>
+            <Text style={styles.refreshLabel}>Next Update</Text>
+            <Text style={styles.refreshText}>
+              {refreshDate}
+            </Text>
           </View>
         </View>
-        <View
-          style={[
-            styles.dividerContainer,
-          ]}
-        >
-          <View
-            style={[
-              styles.divider,
-              {
-                height: 0.5,
-                backgroundColor: '#E0E0E0',
-              }
-            ]}
-          />
-        </View>
       </View>
+      
+      <View style={styles.divider} />
 
       {/* Podium section */}
       {PodiumComponent}
@@ -719,72 +717,63 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
-  header: {
-    paddingTop: 10,
-    paddingBottom: 15,
+  headerWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginVertical: 12,
+    paddingHorizontal: 18
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#2C3E50',
-    letterSpacing: 0.5,
+  titleContainer: {
+    flexDirection: 'column',
+  },
+  facultyCode: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
     marginBottom: 4,
   },
-  dividerContainer: {
-    alignSelf: 'center',
-    marginTop: 8,
-    width: '98%',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
-    elevation: 3,
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
+    lineHeight: 34,
+  },
+  refreshContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 12,
+  },
+  refreshIcon: {
+    opacity: 0.7,
+  },
+  refreshTextContainer: {
+    alignItems: 'flex-end',
+  },
+  refreshLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  refreshText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
   },
   divider: {
     width: '100%',
-    borderRadius: 1,
-  },
-  facultyName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
-  },
-  cardWrapper: {
-    width: '100%',
-    alignSelf: 'center',
-    borderRadius: 10,
-  },
-  card: {
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  content: {
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 14,
-  },
-  textContainer: {
-    marginLeft: 8,
-  },
-  title: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(0, 0, 0, 0.95)',
-    letterSpacing: 0.2,
-  },
-  subtitle: {
-    fontSize: 12,
-    fontWeight: '550',
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginTop: 8,
   },
   podiumSection: {
     paddingTop: 40,
@@ -1171,7 +1160,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
-  refreshText: {
+  refreshInfoText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',

@@ -1,5 +1,4 @@
 import { View, Text, Animated, StyleSheet, Image } from 'react-native';
-import React from 'react';
 
 const FACULTY_MAPPING = {
     1: "FACA",

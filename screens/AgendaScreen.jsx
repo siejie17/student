@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { Agenda } from 'react-native-calendars';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,7 +18,6 @@ const AgendaScreen = () => {
 
   const unsubscribeRef = useRef(null);
   const isMountedRef = useRef(true);
-  const seenEventIDs = useRef(new Set());
 
   const fetchRegisteredEventsRealtime = useCallback(async () => {
     setIsLoading(true);
@@ -113,7 +112,6 @@ const AgendaScreen = () => {
       let categorizedEvents = {};
       eventData.forEach(event => {
         const startDate = new Date(event.eventDate);
-        const endDate = new Date(event.eventEndDate);
 
         let currentDate = new Date(startDate);
         // while (currentDate <= endDate) {
@@ -278,7 +276,7 @@ const AgendaScreen = () => {
       >
         <View style={styles.emptyIconContainer}>
           <View style={styles.emptyCircle} />
-          <MaterialCommunityIcons name="calendar-blank" size={72} color="#415881" />
+          <MaterialCommunityIcons name="calendar-blank" size={72} color='#3f6bc4' />
         </View>
         <Text style={styles.emptyTitle}>No Events Scheduled</Text>
         <Text style={styles.emptyDescription}>
@@ -324,11 +322,11 @@ const AgendaScreen = () => {
             theme={{
               agendaDayTextColor: '#333333',
               agendaDayNumColor: '#333333',
-              agendaTodayColor: '#6284bf',
-              agendaKnobColor: '#6284bf',
-              selectedDayBackgroundColor: '#6284bf',
-              dotColor: '#6284bf',
-              todayTextColor: '#6284bf',
+              agendaTodayColor: '#3f6bc4',
+              agendaKnobColor: '#3f6bc4',
+              selectedDayBackgroundColor: '#3f6bc4',
+              dotColor: '#3f6bc4',
+              todayTextColor: '#3f6bc4',
               reservationsBackgroundColor: 'rgba(98, 132, 191, 0.02)',
               calendarBackground: '#FFFFFF',
               textSectionTitleColor: '#333333',
@@ -531,7 +529,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   browseButton: {
-    backgroundColor: '#6284bf',
+    backgroundColor: '#3f6bc4',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,

@@ -1,11 +1,11 @@
 import { StyleSheet, TouchableWithoutFeedback } from 'react-native';
-import React from 'react';
 import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
+
 import { setItem } from '../../utils/asyncStorage';
 
 const CustomButton = ({flatListRef, flatListIndex, dataLength}) => {

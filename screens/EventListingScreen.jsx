@@ -70,23 +70,27 @@ const EventListingScreen = ({ route, navigation }) => {
   const fetchEventCatalogue = useCallback(async () => {
     try {
       setIsLoading(true);
-  
+
       const studentID = await getItem("studentID");
-      if (!studentID) return setIsLoading(false);
-  
+      if (!studentID) {
+        setIsLoading(false);
+        setRefreshing(false); // ← Add this line
+        return;
+      }
+
       // Unsubscribe previous listeners
       unsubscribeRegistrationRef.current?.();
       unsubscribeEventRef.current?.();
-  
+
       // Listen to student registrations
       const registrationQuery = query(
         collection(db, "registration"),
         where("studentID", "==", studentID)
       );
-  
+
       unsubscribeRegistrationRef.current = onSnapshot(registrationQuery, async (registrationSnap) => {
         const registeredEventIDs = registrationSnap.docs.map(doc => doc.data().eventID);
-  
+
         // Listen to current events (not completed or cancelled)
         const eventsQuery = query(
           collection(db, "event"),
@@ -94,39 +98,42 @@ const EventListingScreen = ({ route, navigation }) => {
           where("status", "not-in", ["Completed", "Cancelled"]),
           orderBy("lastAdded", "desc")
         );
-  
+
         unsubscribeEventRef.current = onSnapshot(eventsQuery, async (eventSnap) => {
           const allEvents = eventSnap.docs
             .filter(doc => !registeredEventIDs.includes(doc.id))
             .map(doc => ({ id: doc.id, ...doc.data() }));
-  
+
           // Fetch all event thumbnails in one go
-          const eventIDs = allEvents.map(e => e.id);
-          const imagesQuery = query(
-            collection(db, "eventImages"),
-            where("eventID", "in", eventIDs.slice(0, 10)) // Firestore 'in' max 10 items
-          );
-          const imageDocs = await getDocs(imagesQuery);
-  
-          const imageMap = new Map();
-          imageDocs.forEach(doc => {
-            const { eventID, images } = doc.data();
-            if (images && images.length > 0) imageMap.set(eventID, images[0]);
-          });
-  
-          const enrichedEvents = allEvents.map(event => ({
-            ...event,
-            thumbnail: imageMap.get(event.id) || null
-          }));
-  
-          setEvents(enrichedEvents);
-          setIsLoading(false);
-          setRefreshing(false);
+          if (allEvents.length > 0) {
+            const eventIDs = allEvents.map(e => e.id);
+
+            const imagesQuery = query(
+              collection(db, "eventImages"),
+              where("eventID", "in", eventIDs.slice(0, 10)) // Firestore 'in' max 10 items
+            );
+            const imageDocs = await getDocs(imagesQuery);
+
+            const imageMap = new Map();
+            imageDocs.forEach(doc => {
+              const { eventID, images } = doc.data();
+              if (images && images.length > 0) imageMap.set(eventID, images[0]);
+            });
+
+            const enrichedEvents = allEvents.map(event => ({
+              ...event,
+              thumbnail: imageMap.get(event.id) || null
+            }));
+
+            setEvents(enrichedEvents);
+          } else {
+            setEvents([]);
+          }
         });
       });
-  
     } catch (error) {
       console.error("Error fetching events:", error);
+    } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
@@ -146,23 +153,28 @@ const EventListingScreen = ({ route, navigation }) => {
         unsubscribeTotalParticipantsRef.current?.();
       };
     }, [])
-  );  
+  );
 
   const filteredEvents = useMemo(() => {
     let filtered = events;
 
-    if (selectedCategory !== 'All') {
-      const categoryID = CATEGORIES_MAPPING[selectedCategory];
-      filtered = filtered.filter(event => event.category === categoryID);
-    }
+    if (filtered.length > 0) {
 
-    if (searchQuery.trim() !== '') {
-      filtered = filtered.filter(event =>
-        event.eventName.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
+      if (selectedCategory !== 'All') {
+        const categoryID = CATEGORIES_MAPPING[selectedCategory];
+        filtered = filtered.filter(event => event.category === categoryID);
+      }
 
-    return filtered;
+      if (searchQuery.trim() !== '') {
+        filtered = filtered.filter(event =>
+          event.eventName.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+
+      return filtered;
+    } else {
+      return []
+    }
   }, [events, selectedCategory, searchQuery]);
 
   const handleCategoryPress = useCallback((category) => {
@@ -194,7 +206,7 @@ const EventListingScreen = ({ route, navigation }) => {
         activeOpacity={0.7}
       >
         <LinearGradient
-          colors={isSelected ? ['#6284bf', '#4A6EB5'] : ['#FFFFFF', '#F8F8F8']}
+          colors={isSelected ? ['#3f6bc4', '#6d93e3'] : ['#FFFFFF', '#F8F8F8']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[
@@ -274,7 +286,7 @@ const EventListingScreen = ({ route, navigation }) => {
             data={filteredEvents}
             renderItem={renderCard}
             keyExtractor={item => item.id}
-            contentContainerStyle={styles.listContainer}
+            contentContainerStyle={[styles.listContainer, filteredEvents.length === 0 && { justifyContent: 'center' }]}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
@@ -346,8 +358,6 @@ const styles = StyleSheet.create({
   },
   listView: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
   },
   loadingContainer: {
     flex: 1,
@@ -361,9 +371,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContainer: {
+    flexGrow: 1,
+    alignItems: 'center',
     paddingBottom: 16,
   },
   emptyContainer: {
+    display: 'flex',
     padding: 40,
     alignItems: 'center',
     justifyContent: 'center',

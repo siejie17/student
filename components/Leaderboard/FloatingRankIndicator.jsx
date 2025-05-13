@@ -1,5 +1,5 @@
 import { View, Text, Animated, StyleSheet } from 'react-native'
-import React, { useCallback } from 'react'
+import { useCallback } from 'react'
 import { LinearGradient } from 'expo-linear-gradient';
 
 const FloatingRankIndicator = useCallback(({ currentUserRank }) => {

@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { collection, setDoc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc, where, getDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, setDoc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc, where, getDoc, doc, serverTimestamp } from 'firebase/firestore';
+
 import { db } from '../../utils/firebaseConfig';
 import { getItem } from '../../utils/asyncStorage';
 

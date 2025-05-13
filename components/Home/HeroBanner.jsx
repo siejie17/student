@@ -1,5 +1,5 @@
 import { View, Text, Image, Dimensions, Animated, StyleSheet } from 'react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');

@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions } from 'react-native'
-import React, { useRef } from 'react'
+import { useRef } from 'react'
 import { Entypo, MaterialIcons } from '@expo/vector-icons';
+
 import MerchandiseFooter from '../components/Merchandise/MerchandiseFooter';
 
 const { width } = Dimensions.get('window');

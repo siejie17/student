@@ -1,16 +1,18 @@
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Image, Dimensions, Platform, Alert } from 'react-native'
-import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { Entypo, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Image, Dimensions, Platform, Alert } from 'react-native';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import MapView, { Marker } from 'react-native-maps';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
-import * as ImagePicker from 'expo-image-picker';
 import { GestureHandlerRootView, TextInput } from 'react-native-gesture-handler';
-import { AlertTriangle, CircleX } from 'lucide-react-native';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, writeBatch } from "firebase/firestore";
+import { Entypo, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as Notifications from 'expo-notifications';
+import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import { CircleX } from 'lucide-react-native';
 
 import { db } from '../utils/firebaseConfig';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, writeBatch } from "firebase/firestore";
 import { getItem } from '../utils/asyncStorage';
+
 import ClashScheduleModal from '../components/Modal/ClashScheduleModal';
 import RegistrationModal from '../components/Modal/RegistrationModal';
 
@@ -57,8 +59,6 @@ const EventDetailsScreen = ({ navigation, route }) => {
     const [imageError, setImageError] = useState("");
     const [eventDetails, setEventDetails] = useState({});
     const [currentParticipantNum, setCurrentParticipantNum] = useState(0);
-    const [userRegisteredEventsID, setUserRegisteredEventsID] = useState([]);
-    const [userRegisteredEventTimeSlot, setUserRegisteredEventTimeSlot] = useState([]);
     const [hasClash, setHasClash] = useState(false);
     const [userRegistrationInfo, setUserRegistrationInfo] = useState({});
 
@@ -146,9 +146,7 @@ const EventDetailsScreen = ({ navigation, route }) => {
                 const registrationQuery = query(registrationRef, where("studentID", "==", studentID));
                 const registrationSnap = await getDocs(registrationQuery);
 
-                if (registrationSnap.empty) {
-                    setUserRegisteredEventsID([]);
-                } else {
+                if (!registrationSnap.empty) {
                     let registeredEventsID = registrationSnap.docs.map(doc => doc.data().eventID);
 
                     const eventPromises = registeredEventsID.map(id => getDoc(doc(db, "event", id)));
@@ -272,17 +270,37 @@ const EventDetailsScreen = ({ navigation, route }) => {
 
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: 0.3, // Lower quality to help keep size down
-            base64: true
+            allowsEditing: true,
+            quality: 1,
         });
 
         if (!result.canceled && result.assets && result.assets.length > 0) {
-            if (result.assets[0].fileSize > 100 * 1024) {
-                setImageError('Image size exceeds 100KB limit. Please choose a smaller image.');
-                return;
-            }
+            const pickedImage = result.assets[0];
 
-            setReceiptImage(result.assets[0].base64);
+            try {
+                const manipulatedImage = await ImageManipulator.manipulateAsync(
+                    pickedImage.uri,
+                    [{ resize: { width: 800 } }], // Resize width, maintain aspect ratio
+                    {
+                        compress: 0.3, // Compress quality
+                        format: ImageManipulator.SaveFormat.JPEG,
+                        base64: true,
+                    }
+                );
+
+                const base64Length = manipulatedImage.base64.length * (3 / 4); // Approx file size in bytes
+                const fileSizeKB = base64Length / 1024;
+
+                if (fileSizeKB > 100) {
+                    setImageError('Image size exceeds 100KB limit. Please choose a smaller image.');
+                    return;
+                }
+
+                setReceiptImage(manipulatedImage.base64);
+            } catch (error) {
+                console.error('Image manipulation error:', error);
+                setImageError('Failed to process image.');
+            }
         }
     };
 

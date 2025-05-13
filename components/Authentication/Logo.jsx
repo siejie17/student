@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { Image, StyleSheet } from 'react-native';
 
 const Logo = () => (
@@ -7,8 +7,8 @@ const Logo = () => (
 
 const styles = StyleSheet.create({
   image: {
-    width: 128,
-    height: 128,
+    width: 192,
+    height: 192,
     marginBottom: 12,
   },
 });

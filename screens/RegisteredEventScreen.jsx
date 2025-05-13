@@ -1,32 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-    ScrollView,
-    ActivityIndicator,
-    Dimensions,
-    Image,
-    TouchableOpacity
-} from 'react-native';
+import { useState, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions, Image, TouchableOpacity } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
 import * as Notifications from 'expo-notifications';
-
-import {
-    doc,
-    onSnapshot,
-    collection,
-    query,
-    where,
-    deleteDoc,
-    Timestamp,
-    getDocs,
-    writeBatch
-} from 'firebase/firestore';
-import { db } from '../utils/firebaseConfig';
-
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { doc, onSnapshot, collection, query, where, deleteDoc, Timestamp, getDocs, writeBatch } from 'firebase/firestore';
+
+import { db } from '../utils/firebaseConfig';
 import { getItem } from '../utils/asyncStorage';
 
 import PaymentProofModal from '../components/Modal/PaymentProofModal';

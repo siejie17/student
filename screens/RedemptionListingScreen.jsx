@@ -1,8 +1,10 @@
-import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
+import { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, where, doc, getDoc, orderBy } from 'firebase/firestore';
+
 import { db } from '../utils/firebaseConfig';
 import { getItem } from '../utils/asyncStorage';
+
 import RedemptionCard from '../components/Merchandise/RedemptionCard';
 import EmptyListComponent from '../components/Merchandise/EmptyListComponent';
 

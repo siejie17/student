@@ -1,17 +1,7 @@
-import {
-  View,
-  Text,
-  StyleSheet,
-  StatusBar,
-  TouchableOpacity,
-  Animated,
-  SafeAreaView,
-  Image
-} from 'react-native';
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, SafeAreaView, Image } from 'react-native';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
-import { collection, writeBatch, getDocs, orderBy, query, Timestamp, updateDoc, where, addDoc, doc } from 'firebase/firestore'
 
 // Components
 import HeroBanner from '../components/Home/HeroBanner';
@@ -21,8 +11,7 @@ import MerchandiseLeaderboardCards from '../components/Home/MerchandiseLeaderboa
 import SearchBar from '../components/EventListing/SearchBar';
 import MemoizedFlatList from '../components/Home/MemoizedFlatList';
 
-import { getItem, setItem } from '../utils/asyncStorage';
-import { db } from '../utils/firebaseConfig';
+import { getItem } from '../utils/asyncStorage';
 
 const HomeScreen = () => {
   // State management
@@ -38,107 +27,107 @@ const HomeScreen = () => {
   // Navigation
   const navigation = useNavigation();
 
-  useEffect(() => {
-    let isMounted = true;
+  // useEffect(() => {
+  //   let isMounted = true;
 
-    const checkLeaderboardRefresh = async () => {
-      if (!isMounted) return;
+  //   const checkLeaderboardRefresh = async () => {
+  //     if (!isMounted) return;
 
-      const studentID = await getItem("studentID");
-      const facultyID = await getItem("facultyID");
-      if (!studentID || !facultyID) return;
+  //     const studentID = await getItem("studentID");
+  //     const facultyID = await getItem("facultyID");
+  //     if (!studentID || !facultyID) return;
 
-      try {
-        const leaderboardQuery = query(collection(db, "leaderboard"), where("facultyID", "==", facultyID));
-        const leaderboardSnap = await getDocs(leaderboardQuery);
+  //     try {
+  //       const leaderboardQuery = query(collection(db, "leaderboard"), where("facultyID", "==", facultyID));
+  //       const leaderboardSnap = await getDocs(leaderboardQuery);
 
-        if (!leaderboardSnap.empty) {
-          const leaderboardDoc = leaderboardSnap.docs[0];
-          const leaderboardDocRef = leaderboardDoc.ref;
-          const { refreshDateTime } = leaderboardDoc.data();
-          const currentTime = Timestamp.now(); // Use actual timestamp
+  //       if (!leaderboardSnap.empty) {
+  //         const leaderboardDoc = leaderboardSnap.docs[0];
+  //         const leaderboardDocRef = leaderboardDoc.ref;
+  //         const { refreshDateTime } = leaderboardDoc.data();
+  //         const currentTime = Timestamp.now(); // Use actual timestamp
 
-          if (!refreshDateTime || !refreshDateTime.toMillis) {
-            console.log("refreshDateTime is missing or invalid.");
-            return;
-          }
+  //         if (!refreshDateTime || !refreshDateTime.toMillis) {
+  //           console.log("refreshDateTime is missing or invalid.");
+  //           return;
+  //         }
 
-          if (refreshDateTime.toMillis() <= currentTime.toMillis()) {
-            const leaderboardEntriesRef = collection(leaderboardDocRef, "leaderboardEntries");
-            const leaderboardEntriesQuery = query(leaderboardEntriesRef, orderBy("points", "desc"));
-            const leaderboardEntriesSnapshot = await getDocs(leaderboardEntriesQuery);
+  //         if (refreshDateTime.toMillis() <= currentTime.toMillis()) {
+  //           const leaderboardEntriesRef = collection(leaderboardDocRef, "leaderboardEntries");
+  //           const leaderboardEntriesQuery = query(leaderboardEntriesRef, orderBy("points", "desc"));
+  //           const leaderboardEntriesSnapshot = await getDocs(leaderboardEntriesQuery);
 
-            // Prepare rankings
-            const rankings = leaderboardEntriesSnapshot.docs.map((doc, index) => {
-              const data = doc.data();
-              const rank = index + 1;
+  //           // Prepare rankings
+  //           const rankings = leaderboardEntriesSnapshot.docs.map((doc, index) => {
+  //             const data = doc.data();
+  //             const rank = index + 1;
 
-              let diamonds = 1;
-              if (rank === 1) diamonds = 1000;
-              else if (rank === 2) diamonds = 750;
-              else if (rank === 3) diamonds = 500;
-              else if (rank === 4) diamonds = 400;
-              else if (rank === 5) diamonds = 350;
-              else if (rank === 6) diamonds = 300;
-              else if (rank === 7) diamonds = 250;
-              else if (rank === 8) diamonds = 200;
-              else if (rank === 9) diamonds = 150;
-              else if (rank === 10) diamonds = 100;
-              else if (rank <= 20) diamonds = 50;
-              else if (rank <= 30) diamonds = 25;
-              else if (rank <= 40) diamonds = 10;
-              else if (rank <= 50) diamonds = 5;
+  //             let diamonds = 1;
+  //             if (rank === 1) diamonds = 1000;
+  //             else if (rank === 2) diamonds = 750;
+  //             else if (rank === 3) diamonds = 500;
+  //             else if (rank === 4) diamonds = 400;
+  //             else if (rank === 5) diamonds = 350;
+  //             else if (rank === 6) diamonds = 300;
+  //             else if (rank === 7) diamonds = 250;
+  //             else if (rank === 8) diamonds = 200;
+  //             else if (rank === 9) diamonds = 150;
+  //             else if (rank === 10) diamonds = 100;
+  //             else if (rank <= 20) diamonds = 50;
+  //             else if (rank <= 30) diamonds = 25;
+  //             else if (rank <= 40) diamonds = 10;
+  //             else if (rank <= 50) diamonds = 5;
 
-              return {
-                rank,
-                studentID: data.studentID,
-                points: data.points,
-                claimed: false,
-                diamonds,
-              };
-            });
+  //             return {
+  //               rank,
+  //               studentID: data.studentID,
+  //               points: data.points,
+  //               claimed: false,
+  //               diamonds,
+  //             };
+  //           });
 
-            const leaderboardLastMonthRef = collection(leaderboardDocRef, "lastMonth");
+  //           const leaderboardLastMonthRef = collection(leaderboardDocRef, "lastMonth");
 
-            // Clear previous lastMonth entries
-            const lastMonthSnapshot = await getDocs(leaderboardLastMonthRef);
-            if (!lastMonthSnapshot.empty) {
-              const deleteBatch = writeBatch(db);
-              lastMonthSnapshot.docs.forEach((doc) => deleteBatch.delete(doc.ref));
-              await deleteBatch.commit();
-            }
+  //           // Clear previous lastMonth entries
+  //           const lastMonthSnapshot = await getDocs(leaderboardLastMonthRef);
+  //           if (!lastMonthSnapshot.empty) {
+  //             const deleteBatch = writeBatch(db);
+  //             lastMonthSnapshot.docs.forEach((doc) => deleteBatch.delete(doc.ref));
+  //             await deleteBatch.commit();
+  //           }
 
-            // Insert new rankings into lastMonth
-            const insertBatch = writeBatch(db);
-            rankings.forEach((entry) => {
-              const newDocRef = doc(leaderboardLastMonthRef);
-              insertBatch.set(newDocRef, entry);
-            });
-            await insertBatch.commit();
+  //           // Insert new rankings into lastMonth
+  //           const insertBatch = writeBatch(db);
+  //           rankings.forEach((entry) => {
+  //             const newDocRef = doc(leaderboardLastMonthRef);
+  //             insertBatch.set(newDocRef, entry);
+  //           });
+  //           await insertBatch.commit();
 
-            // Delete old leaderboard entries
-            const deleteLeaderboardBatch = writeBatch(db);
-            leaderboardEntriesSnapshot.docs.forEach((doc) => deleteLeaderboardBatch.delete(doc.ref));
-            await deleteLeaderboardBatch.commit();
+  //           // Delete old leaderboard entries
+  //           const deleteLeaderboardBatch = writeBatch(db);
+  //           leaderboardEntriesSnapshot.docs.forEach((doc) => deleteLeaderboardBatch.delete(doc.ref));
+  //           await deleteLeaderboardBatch.commit();
 
-            // Update next refresh timestamp
-            const nextDate = refreshDateTime.toDate();
-            nextDate.setMonth(nextDate.getMonth() + 1);
-            const newRefreshDateTime = Timestamp.fromDate(nextDate);
-            await updateDoc(leaderboardDocRef, { refreshDateTime: newRefreshDateTime });
-          }
-        }
-      } catch (error) {
-        console.error("Error checking leaderboard refresh:", error);
-      }
-    };
+  //           // Update next refresh timestamp
+  //           const nextDate = refreshDateTime.toDate();
+  //           nextDate.setMonth(nextDate.getMonth() + 1);
+  //           const newRefreshDateTime = Timestamp.fromDate(nextDate);
+  //           await updateDoc(leaderboardDocRef, { refreshDateTime: newRefreshDateTime });
+  //         }
+  //       }
+  //     } catch (error) {
+  //       console.error("Error checking leaderboard refresh:", error);
+  //     }
+  //   };
 
-    checkLeaderboardRefresh();
+  //   checkLeaderboardRefresh();
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  //   return () => {
+  //     isMounted = false;
+  //   };
+  // }, []);
 
   // Fetch user data on screen focus
   useFocusEffect(
@@ -250,8 +239,6 @@ const HomeScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
-
       {/* Animated Header Background */}
       <Animated.View
         style={[

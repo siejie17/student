@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import {
     Modal,
     View,
@@ -8,8 +8,9 @@ import {
     StyleSheet,
     Image,
 } from 'react-native';
-import { getItem } from '../../utils/asyncStorage';
 import { doc, increment, updateDoc } from 'firebase/firestore';
+
+import { getItem } from '../../utils/asyncStorage';
 import { db } from '../../utils/firebaseConfig';
 
 const FUNNY_MESSAGES = [

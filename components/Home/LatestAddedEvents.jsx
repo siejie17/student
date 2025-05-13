@@ -1,9 +1,10 @@
-import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native'
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { collection, getDocs, limit, orderBy, query, Timestamp, where } from 'firebase/firestore';
-import { db } from '../../utils/firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
+
+import { db } from '../../utils/firebaseConfig';
 import { getItem } from '../../utils/asyncStorage';
 
 const { width } = Dimensions.get('window');

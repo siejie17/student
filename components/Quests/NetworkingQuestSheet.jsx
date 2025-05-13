@@ -1,17 +1,19 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, Image } from 'react-native';
 import { collection, setDoc, getDocs, increment, query, updateDoc, where, getDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../utils/firebaseConfig';
-import { getItem } from '../../utils/asyncStorage';
+import { BlurView } from 'expo-blur';
+import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import QRCode from 'react-native-qrcode-svg';
 import CryptoJS from 'react-native-crypto-js';
+
+import { db } from '../../utils/firebaseConfig';
+import { getItem } from '../../utils/asyncStorage';
+
 import NetworkScannedModal from '../Modal/NetworkScannedModal';
 import QuestCompletedModal from '../Modal/QuestCompletedModal';
 import NetworkingFailureModal from '../Modal/NetworkingFailureModal';
-import { BlurView } from 'expo-blur';
-import { Ionicons } from '@expo/vector-icons';
 
 const FACULTY_MAPPING = {
     1: "FACA",

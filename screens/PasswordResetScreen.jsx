@@ -1,15 +1,16 @@
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Image } from 'react-native'
-import React, { useState, memo } from 'react'
-import Background from '../components/Authentication/Background';
-import BackButton from '../components/Authentication/BackButton';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Image } from 'react-native';
+import { useState, memo } from 'react';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
+
 import { theme } from '../core/theme';
+import { auth } from '../utils/firebaseConfig';
+
+import BackButton from '../components/Authentication/BackButton';
 import Header from '../components/Authentication/Header';
 import Logo from '../components/Authentication/Logo';
 import TextInput from '../components/Authentication/TextInput';
 import Button from '../components/Authentication/Button';
-import { auth } from '../utils/firebaseConfig';
-import { sendPasswordResetEmail } from 'firebase/auth';
 
 const PasswordResetScreen = () => {
   const [email, setEmail] = useState({ value: '', error: '' });
@@ -46,8 +47,9 @@ const PasswordResetScreen = () => {
   }
 
   return (
-    <Background>
+    <View style={styles.background}>
       <BackButton goBack={() => navigation.navigate("SignIn")} />
+      <View style={styles.content}>
         <Logo />
         <Header>Password Reset</Header>
         <TextInput
@@ -61,10 +63,11 @@ const PasswordResetScreen = () => {
           autoCompleteType="email"
           textContentType="emailAddress"
           keyboardType="email-address"
-      />
-      <Button mode="contained" onPress={_onSendPressed} style={styles.button}>
-        Send Reset Instructions Email
-      </Button>
+        />
+        <Button mode="contained" onPress={_onSendPressed} style={styles.button}>
+          Send Reset Instructions Email
+        </Button>
+      </View>
 
       <Modal
         visible={isPasswordResetModalVisible}
@@ -80,7 +83,7 @@ const PasswordResetScreen = () => {
 
             <Text style={styles.passwordResetTitle}>Houston, We Have A Password!</Text>
             <Text style={styles.passwordResetText}>
-              Your password reset instructions are floating through the digital universe 
+              Your password reset instructions are floating through the digital universe
               toward your inbox right now! Check your email now! 📧✨
             </Text>
 
@@ -93,14 +96,26 @@ const PasswordResetScreen = () => {
           </View>
         </View>
       </Modal>
-    </Background>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  back: {
+  background: {
+    flex: 1,
     width: '100%',
-    marginTop: 12,
+    backgroundColor: 'white',
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    display: 'flex',
+    width: '100%',
+    padding: 50,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   button: {
     marginTop: 24,

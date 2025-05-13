@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { TouchableOpacity, Image, StyleSheet } from 'react-native';
 import { getStatusBarHeight } from 'react-native-status-bar-height';
 
@@ -12,7 +12,7 @@ const styles = StyleSheet.create({
     container: {
         position: 'absolute',
         top: 0 + getStatusBarHeight(),
-        left: 0,
+        left: 20,
     },
     image: {
         width: 24,

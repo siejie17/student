@@ -51,7 +51,8 @@
     "react-native-screens": "^4.7.0",
     "react-native-status-bar-height": "^2.6.0",
     "react-native-svg": "15.8.0",
-    "react-native-vector-icons": "^10.2.0"
+    "react-native-vector-icons": "^10.2.0",
+    "expo-image-manipulator": "~13.0.6"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"

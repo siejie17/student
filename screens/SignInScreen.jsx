@@ -1,18 +1,18 @@
-import { View, Text, StyleSheet, Image, KeyboardAvoidingView, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal } from 'react-native'
-import React, { useRef, useState, memo } from 'react';
+import { View, Text, StyleSheet, Image, KeyboardAvoidingView, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal } from 'react-native';
+import { useRef, useState, memo } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system';
+
 import Header from '../components/Authentication/Header';
 import Button from '../components/Authentication/Button';
 import TextInput from '../components/Authentication/TextInput';
+
 import { theme } from '../core/theme';
 import { auth, db } from '../utils/firebaseConfig';
-
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import Background from '../components/Authentication/Background';
-import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { getItem, removeItem, setItem } from '../utils/asyncStorage';
-import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system';
 
 const SignInScreen = () => {
   const [email, setEmail] = useState({ value: '', error: '' });
@@ -160,116 +160,116 @@ const SignInScreen = () => {
 
   return (
     <TouchableWithoutFeedback onPress={dismissEverything}>
-      <Background>
-        <KeyboardAvoidingView style={styles.container} behavior='padding'>
-          <Image source={require('../assets/logo.png')} style={styles.image} />
-          <Header>Welcome Back, Warrior!</Header>
-          <TextInput
-            label="Email"
-            returnKeyType="next"
-            value={email.value}
-            onChangeText={text => setEmail({ value: text, error: '' })}
-            errorText={email.error}
-            autoCapitalize="none"
-            autoCompleteType="email"
-            textContentType="emailAddress"
-            keyboardType="email-address"
-            disabled={loading}
-            onRef={(ref) => (emailInputRef.current = ref)}
-          />
-          <TextInput
-            label="Password"
-            returnKeyType="done"
-            value={password.value}
-            onChangeText={text => setPassword({ value: text, error: '' })}
-            errorText={password.error}
-            secureTextEntry
-            disabled={loading}
-            onRef={(ref) => (passwordInputRef.current = ref)}
-          />
-          <View style={styles.forgotPassword}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('PasswordReset')}
-            >
-              <Text style={styles.label}>Forgot your password?</Text>
-            </TouchableOpacity>
-          </View>
-          <Button
-            mode="contained"
-            onPress={_onLoginPressed}
-            loading={loading}
-            disabled={loading}
+      <View style={styles.background}>
+      <KeyboardAvoidingView style={styles.container} behavior='padding'>
+        <Image source={require('../assets/logo.png')} style={styles.image} />
+        <Header>Welcome Back, Warrior!</Header>
+        <TextInput
+          label="Email"
+          returnKeyType="next"
+          value={email.value}
+          onChangeText={text => setEmail({ value: text, error: '' })}
+          errorText={email.error}
+          autoCapitalize="none"
+          autoCompleteType="email"
+          textContentType="emailAddress"
+          keyboardType="email-address"
+          disabled={loading}
+          onRef={(ref) => (emailInputRef.current = ref)}
+        />
+        <TextInput
+          label="Password"
+          returnKeyType="done"
+          value={password.value}
+          onChangeText={text => setPassword({ value: text, error: '' })}
+          errorText={password.error}
+          secureTextEntry
+          disabled={loading}
+          onRef={(ref) => (passwordInputRef.current = ref)}
+        />
+        <View style={styles.forgotPassword}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('PasswordReset')}
           >
-            LOGIN
-          </Button>
-          <View style={styles.row}>
-            <Text style={styles.label}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-              <Text style={styles.link}>Sign up</Text>
-            </TouchableOpacity>
-          </View>
+            <Text style={styles.label}>Forgot your password?</Text>
+          </TouchableOpacity>
+        </View>
+        <Button
+          mode="contained"
+          onPress={_onLoginPressed}
+          loading={loading}
+          disabled={loading}
+        >
+          Login
+        </Button>
+        <View style={styles.row}>
+          <Text style={styles.label}>Don't have an account? </Text>
+          <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
+            <Text style={styles.link}>Sign up</Text>
+          </TouchableOpacity>
+        </View>
 
-          {/* Verification Modal */}
-          <Modal
-            visible={isVerificationModalVisible}
-            transparent
-            animationType="slide"
-          >
-            <View style={styles.modalBackground}>
-              <View style={styles.verificationModal}>
-                <Image
-                  source={require('../assets/auth/email-send.png')}
-                  style={styles.verificationImage}
-                />
+        {/* Verification Modal */}
+        <Modal
+          visible={isVerificationModalVisible}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalBackground}>
+            <View style={styles.verificationModal}>
+              <Image
+                source={require('../assets/auth/email-send.png')}
+                style={styles.verificationImage}
+              />
 
-                <Text style={styles.verificationTitle}>Whoa there, Warrior!</Text>
-                <Text style={styles.verificationText}>
-                  Looks like you haven't verified your email yet! Check your inbox for the verification link.
-                  Your quest awaits after verification! 🏆✨
-                </Text>
+              <Text style={styles.verificationTitle}>Whoa there, Warrior!</Text>
+              <Text style={styles.verificationText}>
+                Looks like you haven't verified your email yet! Check your inbox for the verification link.
+                Your quest awaits after verification! 🏆✨
+              </Text>
 
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={closeVerificationModal}
-                >
-                  <Text style={styles.closeButtonText}>GOT IT!</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={closeVerificationModal}
+              >
+                <Text style={styles.closeButtonText}>GOT IT!</Text>
+              </TouchableOpacity>
             </View>
-          </Modal>
+          </View>
+        </Modal>
 
-          <Modal
-            visible={isAdminModalVisible}
-            transparent
-            animationType="slide"
-          >
-            <View style={styles.modalBackground}>
-              <View style={styles.verificationModal}>
-                <Image
-                  source={require('../assets/auth/access-denied.png')}
-                  style={styles.verificationImage}
-                />
+        <Modal
+          visible={isAdminModalVisible}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalBackground}>
+            <View style={styles.verificationModal}>
+              <Image
+                source={require('../assets/auth/access-denied.png')}
+                style={styles.verificationImage}
+              />
 
-                <Text style={styles.verificationTitle}>Whoa there, Admin!</Text>
-                <Text style={styles.verificationText}>
-                  ⚠️ Access Denied: This level is for students only.
-                  Admins must return to their designated portal!
-                </Text>
+              <Text style={styles.verificationTitle}>Whoa there, Admin!</Text>
+              <Text style={styles.verificationText}>
+                ⚠️ Access Denied: This level is for students only.
+                Admins must return to their designated portal!
+              </Text>
 
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => {
-                    setIsAdminModalVisible(false);
-                    setLoading(false);
-                  }}
-                >
-                  <Text style={styles.closeButtonText}>Oops, My Bad!</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => {
+                  setIsAdminModalVisible(false);
+                  setLoading(false);
+                }}
+              >
+                <Text style={styles.closeButtonText}>Oops, My Bad!</Text>
+              </TouchableOpacity>
             </View>
-          </Modal>
-        </KeyboardAvoidingView>
-      </Background>
+          </View>
+        </Modal>
+      </KeyboardAvoidingView>
+      </View>
     </TouchableWithoutFeedback>
   )
 }
@@ -305,10 +305,11 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
     width: '100%',
+    backgroundColor: 'white'
   },
   container: {
     flex: 1,
-    padding: 10,
+    padding: 15,
     width: '100%',
     maxWidth: 340,
     alignSelf: 'center',

@@ -1,5 +1,6 @@
 import { StyleSheet, Text } from 'react-native';
-import React, { memo } from 'react';
+import { memo } from 'react';
+
 import { theme } from '../../core/theme';
 
 const Header = ({ children }) => (
@@ -9,7 +10,7 @@ const Header = ({ children }) => (
 const styles = StyleSheet.create({
     header: {
         fontSize: 26,
-        color: theme.colors.primary,
+        color: theme.colors.secondary,
         fontWeight: 'bold',
         paddingVertical: 14,
     },

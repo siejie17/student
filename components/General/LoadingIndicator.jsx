@@ -1,6 +1,5 @@
-import React from 'react'
-import { Text, StyleSheet, ActivityIndicator, Animated } from 'react-native'
-import { useState, useEffect } from 'react'
+import { Text, StyleSheet, ActivityIndicator, Animated } from 'react-native';
+import { useState, useEffect } from 'react';
 
 const LoadingIndicator = () => {
   const [fadeAnim] = useState(new Animated.Value(0));

@@ -1,18 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import {
-    StyleSheet,
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    ScrollView,
-    StatusBar,
-    Alert
-} from 'react-native';
-import QuestCompletedModal from '../components/Modal/QuestCompletedModal';
-import { getItem } from '../utils/asyncStorage';
+import { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, StatusBar, Alert } from 'react-native';
 import { addDoc, collection, doc, getDoc, getDocs, increment, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+
+import { getItem } from '../utils/asyncStorage';
 import { db } from '../utils/firebaseConfig';
+
+import QuestCompletedModal from '../components/Modal/QuestCompletedModal';
 
 const FeedbackFormScreen = ({ route, navigation }) => {
     const { eventID, questProgressID, registrationID, questName, questType } = route.params;

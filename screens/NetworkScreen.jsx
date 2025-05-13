@@ -1,10 +1,12 @@
-import { View, Text, ActivityIndicator, StyleSheet, Animated, ImageBackground, TouchableOpacity, FlatList } from 'react-native'
-import React, { useEffect, useState } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet, Animated, TouchableOpacity, FlatList } from 'react-native';
+import { useEffect, useState } from 'react';
 import { Entypo } from '@expo/vector-icons';
-import { getItem } from '../utils/asyncStorage';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../utils/firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
+
+import { db } from '../utils/firebaseConfig';
+import { getItem } from '../utils/asyncStorage';
+
 import NetworkCard from '../components/Network/NetworkCard';
 import EmptyNetworkState from '../components/Network/EmptyNetworkState';
 

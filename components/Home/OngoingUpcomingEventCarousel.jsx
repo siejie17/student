@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { collection, getDocs, limit, orderBy, query, Timestamp, where } from 'firebase/firestore';
+
 import { db } from '../../utils/firebaseConfig';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.875;
@@ -166,7 +166,6 @@ const OngoingUpcomingEventCarousel = ({ setIsLoading, navigation }) => {
     const renderEventCard = useCallback(({ item, index }) => {
         const isOngoing = item.status === 'Ongoing';
         const statusColor = isOngoing ? '#FF5722' : '#4CAF50';
-        const facultyColors = FACULTY_COLORS[item.organiserID] || ['#E0E0E0', '#BDBDBD'];
         
         return (
             <TouchableOpacity 
@@ -317,16 +316,16 @@ const styles = StyleSheet.create({
         width: CARD_WIDTH,
         minHeight: 200,
         backgroundColor: 'white',
-        borderRadius: 12,
+        borderRadius: 16,
         marginLeft: 10,
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
-            height: 6,
+            height: 4,
         },
         shadowOpacity: 0.3,
-        shadowRadius: 10,
-        elevation: 8,
+        shadowRadius: 8,
+        elevation: 3,
         overflow: 'hidden',
     },
     cardTopBar: {

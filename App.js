@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StatusBar, StyleSheet, TouchableOpacity, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
@@ -29,7 +29,7 @@ import FeedbackFormScreen from './screens/FeedbackFormScreen.jsx';
 
 import LoadingIndicator from './components/General/LoadingIndicator.jsx';
 
-import { getItem, removeItem } from './utils/asyncStorage.js';
+import { getItem } from './utils/asyncStorage.js';
 import { auth } from './utils/firebaseConfig';
 
 const MainStack = createNativeStackNavigator();
@@ -93,7 +93,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar
-        backgroundColor="transparent"
+        backgroundColor="white"
         barStyle="dark-content"
         translucent={false}
         hidden={false}
@@ -317,7 +317,7 @@ const AppTabs = () => (
             </View>
           );
         },
-        tabBarActiveTintColor: '#6284bf',
+        tabBarActiveTintColor: '#3f6bc4',
         tabBarInactiveTintColor: '#A9A9A9',
         tabBarShowLabel: true,
         tabBarStyle: styles.bottomBar,
@@ -375,24 +375,24 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,                     // Added border width
-    borderColor: '#b3b9c4',             // Added subtle border color
-    borderBottomWidth: 0,               // No border at the bottom
-    elevation: 8,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 0.5,                     // Added border width
+    borderColor: 'rgba(179, 185, 196, 0.5)',             // Added subtle border color
+    elevation: 10,
     height: 70,
     left: 24,
-    paddingBottom: 4,
+    paddingBottom: 8,
     paddingHorizontal: 8,
     right: 24,
-    shadowColor: 'rgba(59, 111, 201, 0.2)',
+    shadowColor: 'rgba(59, 111, 201, 0.15)',
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOpacity: 0.2,
+    shadowRadius: 15,
+    borderBottomWidth: 0,
   },
   tabBarItem: {
     height: 52,
@@ -411,6 +411,7 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
   indicator: {
     position: 'absolute',
@@ -419,6 +420,7 @@ const styles = StyleSheet.create({
     height: 2,
     borderRadius: 1,
     backgroundColor: '#6284bf',
+    alignSelf: 'center',
   },
   header: {
     flexDirection: 'row',

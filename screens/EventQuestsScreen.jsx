@@ -1,11 +1,13 @@
-import { View, StyleSheet, ActivityIndicator, FlatList } from 'react-native'
-import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react'
-import { getItem } from '../utils/asyncStorage';
-import { collection, query, where, getDocs, onSnapshot, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../utils/firebaseConfig';
-import EventQuestCard from '../components/QuestCard/EventQuestCard';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { View, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { collection, query, where, getDocs, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+
+import { getItem } from '../utils/asyncStorage';
+import { db } from '../utils/firebaseConfig';
+
+import EventQuestCard from '../components/QuestCard/EventQuestCard';
 import EarlyBirdQuestSheet from '../components/Quests/EarlyBirdQuestSheet';
 import FeedbackQuestSheet from '../components/Quests/FeedbackQuestSheet';
 import QuestionAnswerQuestSheet from '../components/Quests/QuestionAnswerQuestSheet';

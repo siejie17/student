@@ -1,5 +1,4 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import React from 'react';
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,

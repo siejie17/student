@@ -1,12 +1,12 @@
 import { View, Text, StyleSheet, Pressable, Image, ActivityIndicator } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { doc, onSnapshot, query, where, collection, orderBy } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 
 import { db } from '../../utils/firebaseConfig';
-import { doc, onSnapshot, query, where, collection, orderBy } from "firebase/firestore";
 import { getItem } from '../../utils/asyncStorage';
-import { useNavigation } from '@react-navigation/native';
 
 const MerchandiseLeaderboardCards = ({ setIsLoading, setFirstName }) => {
     const [diamonds, setDiamonds] = useState(0);

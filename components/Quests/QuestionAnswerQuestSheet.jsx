@@ -1,12 +1,14 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, Image, TextInput } from 'react-native';
-import { collection, setDoc, getDocs, increment, limit, onSnapshot, orderBy, query, updateDoc, where, getDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../utils/firebaseConfig';
-import { getItem } from '../../utils/asyncStorage';
+import { collection, setDoc, getDocs, increment, query, updateDoc, where, getDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+
 import QuestCompletedModal from '../Modal/QuestCompletedModal';
 
-const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatus, registrationID, navigation }) => {
+import { db } from '../../utils/firebaseConfig';
+import { getItem } from '../../utils/asyncStorage';
+
+const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatus }) => {
     const [animatingDiamonds, setAnimatingDiamonds] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [answer, setAnswer] = useState('');
@@ -56,7 +58,6 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
                 if (!studentID) return;
 
                 let qaBadge;
-                let badgeProgressID;
 
                 const questProgressQuery = query(collection(db, "questProgress"), where("eventID", "==", eventID), where("studentID", "==", studentID));
                 const questProgressSnap = await getDocs(questProgressQuery);

@@ -1,16 +1,17 @@
 import { View, Text, TouchableWithoutFeedback, KeyboardAvoidingView, StyleSheet, Modal, Image, TouchableOpacity } from 'react-native';
-import React, { useState, memo } from 'react';
-import Background from '../components/Authentication/Background';
+import { useState, memo } from 'react';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { useNavigation } from '@react-navigation/native';
+
 import BackButton from '../components/Authentication/BackButton';
 import Header from '../components/Authentication/Header';
 import TextInput from '../components/Authentication/TextInput';
-import { useNavigation } from '@react-navigation/native';
-import { theme } from '../core/theme';
 import DropdownList from '../components/Authentication/DropdownList';
 import Button from '../components/Authentication/Button';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+
 import { auth } from '../utils/firebaseConfig';
 import { setItem } from '../utils/asyncStorage';
+import { theme } from '../core/theme';
 
 const SignUpScreen = () => {
   const [firstName, setFirstName] = useState({ value: '', error: '' });
@@ -144,10 +145,10 @@ const SignUpScreen = () => {
 
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-      <Background>
+      <View style={styles.background}>
         <BackButton goBack={() => navigation.navigate("SignIn")} />
           <KeyboardAvoidingView style={styles.container} behavior='padding'>
-            <Header>Let's Sign Up, Warrior!</Header>
+            <Header>Let's Sign Up</Header>
 
             <TextInput
               label="First Name"
@@ -229,24 +230,24 @@ const SignUpScreen = () => {
                     style={styles.emailSentImage}
                   />
 
-                  <Text style={styles.emailSentTitle}>High-Five, Email Sent! ✉️</Text>
+                  <Text style={styles.emailSentTitle}>Verification Email Sent!</Text>
                   <Text style={styles.emailSentText}>
                     We've just launched a magical verification link to your inbox! 
                     Check your email, click that sparkly link, and unlock the full 
-                    adventure waiting for you! Your journey begins with one click! ✨🚀
+                    adventure waiting for you! ✨
                   </Text>
 
                   <TouchableOpacity
                     style={styles.closeButton}
                     onPress={closeEmailSentModal}
                   >
-                    <Text style={styles.closeButtonText}>I'M ON IT!</Text>
+                    <Text style={styles.closeButtonText}>I'm on it!</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </Modal>
           </KeyboardAvoidingView>
-      </Background>
+      </View>
     </TouchableWithoutFeedback>
   )
 }
@@ -282,10 +283,12 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
     width: '100%',
+    backgroundColor: 'white'
   },
   container: {
     flex: 1,
     paddingVertical: 10,
+    paddingHorizontal: 15,
     width: '100%',
     maxWidth: 340,
     alignSelf: 'center',
