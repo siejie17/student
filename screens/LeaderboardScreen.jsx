@@ -630,21 +630,6 @@ const LeaderboardScreen = () => {
           <Text style={styles.facultyCode}>{facultyCode}</Text>
           <Text style={styles.headerTitle}>Leaderboard</Text>
         </View>
-        
-        <View style={styles.refreshContainer}>
-          <MaterialIcons 
-            name="refresh" 
-            size={24} 
-            color="#374151" 
-            style={styles.refreshIcon}
-          />
-          <View style={styles.refreshTextContainer}>
-            <Text style={styles.refreshLabel}>Next Update</Text>
-            <Text style={styles.refreshText}>
-              {refreshDate}
-            </Text>
-          </View>
-        </View>
       </View>
       
       <View style={styles.divider} />
@@ -718,16 +703,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   headerWrapper: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 12,
+    marginTop: 12,
+    marginBottom: 8,
     paddingHorizontal: 18
   },
   titleContainer: {
     flexDirection: 'column',
+    alignItems: 'center'
   },
   facultyCode: {
+    width: '100%',
     fontSize: 12,
     fontWeight: '600',
     color: '#6B7280',

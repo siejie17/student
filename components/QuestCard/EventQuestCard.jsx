@@ -54,12 +54,54 @@ const EventQuestCard = ({
     }
   }, []);
 
+  const getQuestTypeInfo = () => {
+    switch (questType) {
+      case 'attendance':
+        return {
+          label: 'Attendance',
+          color: '#2196F3',
+          icon: 'check-circle'
+        };
+      case 'earlyBird':
+        return {
+          label: 'Early Bird',
+          color: '#FF9800',
+          icon: 'alarm'
+        };
+      case 'q&a':
+        return {
+          label: 'Q&A',
+          color: '#607D8B',
+          icon: 'star'
+        };
+      case 'networking':
+        return {
+          label: 'Networking',
+          color: '#E91E63',
+          icon: 'account-group'
+        };
+      case 'feedback':
+        return {
+          label: 'Feedback',
+          color: '#9C27B0',
+          icon: 'clipboard-text'
+        };
+    }
+  };
+
+  const questTypeInfo = getQuestTypeInfo();
+
   return (
     <TouchableOpacity
       style={styles.container}
       onPress={onPress}
       activeOpacity={0.7}
     >
+      {/* Quest Type Indicator Badge */}
+      <View style={[styles.questTypeBadge, { backgroundColor: questTypeInfo.color }]}>
+        <MaterialCommunityIcons name={questTypeInfo.icon} size={12} color="#FFFFFF" />
+        <Text style={styles.questTypeText}>{questTypeInfo.label}</Text>
+      </View>
       {/* Status Indicator */}
       <View
         style={[
@@ -145,7 +187,8 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
     marginHorizontal: 16,
     marginVertical: 8,
     elevation: 5,
@@ -156,12 +199,43 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.5,
     shadowRadius: 10,
-    overflow: 'hidden',
+    // overflow: 'visible',
+    marginTop: 16,
+  },
+
+  // Quest Type Badge
+  questTypeBadge: {
+    position: 'absolute',
+    top: -10,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 10,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    overflow: 'visible',
+    shadowRadius: 3,
+  },
+  questTypeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    marginLeft: 4,
   },
 
   // Status indicator on the left
   statusIndicator: {
     width: 4,
+    borderBottomLeftRadius: 16,
+    borderTopLeftRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
