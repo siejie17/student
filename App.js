@@ -26,6 +26,7 @@ import EventQuestsScreen from './screens/EventQuestsScreen.jsx';
 import BadgeScreen from './screens/BadgeScreen.jsx';
 import NetworkScreen from './screens/NetworkScreen.jsx';
 import FeedbackFormScreen from './screens/FeedbackFormScreen.jsx';
+import MessagingScreen from './screens/MessagingScreen.jsx';
 
 import LoadingIndicator from './components/General/LoadingIndicator.jsx';
 
@@ -115,6 +116,7 @@ const AppStack = () => (
     <MainStack.Screen name="BadgeDetails" component={BadgeScreen} options={{ headerShown: false }} />
     <MainStack.Screen name="NetworkList" component={NetworkScreen} options={{ headerShown: false }} />
     <MainStack.Screen name="MerchandiseDetails" component={MerchandiseDetailsScreen} options={{ headerShown: false }} />
+    <MainStack.Screen name="Messaging" component={MessagingScreen} options={{ headerShown: false }} />
   </MainStack.Navigator>
 )
 

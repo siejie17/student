@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import {
   StyleSheet,
   View,
@@ -8,8 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
-  Alert,
-  Animated
+  Alert
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { getItem, removeItem } from '../utils/asyncStorage';
@@ -58,11 +57,6 @@ const ProfileScreen = () => {
   const snapPoints = useMemo(() => ['10%'], []);
   const bottomSheetRef = useRef(null);
 
-  // Animation values
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const badgeScaleAnim = useRef(new Animated.Value(0.8)).current;
-
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -107,19 +101,6 @@ const ProfileScreen = () => {
             setBadgeProgressList([]);
           }
           setIsLoading(false);
-
-          Animated.parallel([
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 600,
-              useNativeDriver: true,
-            }),
-            Animated.timing(slideAnim, {
-              toValue: 0,
-              duration: 600,
-              useNativeDriver: true,
-            }),
-          ]).start();
         }, (error) => {
           console.error("Error listening to user data:", error);
           setIsLoading(false);
@@ -350,12 +331,7 @@ const ProfileScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 22 }}
       >
-        <Animated.View
-          style={[
-            styles.profileContainer,
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
-          ]}
-        >
+        <View style={styles.profileContainer}>
           <View style={styles.profileTopSection}>
             <View style={styles.profileImageContainer}>
               <Image
@@ -428,14 +404,9 @@ const ProfileScreen = () => {
               </View>
             </View>
           </View>
-        </Animated.View>
+        </View>
 
-        <Animated.View
-          style={[
-            styles.sectionContainer,
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
-          ]}
-        >
+        <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderRow}>
             <Feather name="award" size={20} color="#A9A9A9" />
             <Text style={styles.sectionTitle}>Your Achievement Badges</Text>
@@ -446,14 +417,9 @@ const ProfileScreen = () => {
                 {badgeProgressList.map(badge => renderBadge(badge))}
               </View>
           </View>
-        </Animated.View>
+        </View>
 
-        <Animated.View
-          style={[
-            styles.sectionContainer,
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
-          ]}
-        >
+        <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderRow}>
             <Feather name="list" size={20} color="#A9A9A9" />
             <Text style={styles.sectionTitle}>Others</Text>
@@ -478,7 +444,7 @@ const ProfileScreen = () => {
               </View>
             </TouchableOpacity>
           </View>
-        </Animated.View>
+        </View>
 
         <TouchableOpacity
           style={styles.signOutButton}

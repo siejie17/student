@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Image, Dimensions, Platform, Alert } from 'react-native';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Image, Dimensions, Platform, Alert, Animated } from 'react-native';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import MapView, { Marker } from 'react-native-maps';
 import { GestureHandlerRootView, TextInput } from 'react-native-gesture-handler';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, writeBatch } from "firebase/firestore";
@@ -7,7 +7,7 @@ import { Entypo, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Notifications from 'expo-notifications';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
 import { CircleX } from 'lucide-react-native';
 
 import { db } from '../utils/firebaseConfig';
@@ -16,7 +16,7 @@ import { getItem } from '../utils/asyncStorage';
 import ClashScheduleModal from '../components/Modal/ClashScheduleModal';
 import RegistrationModal from '../components/Modal/RegistrationModal';
 
-const { width } = Dimensions.get('window');
+const { height, width } = Dimensions.get('window');
 
 // Configure notifications
 Notifications.setNotificationHandler({
@@ -53,8 +53,6 @@ const EventDetailsScreen = ({ navigation, route }) => {
         10: "FSSH",
     }
 
-    const snapPoints = ["50%", "70%"];
-
     const [receiptImage, setReceiptImage] = useState("");
     const [imageError, setImageError] = useState("");
     const [eventDetails, setEventDetails] = useState({});
@@ -64,6 +62,7 @@ const EventDetailsScreen = ({ navigation, route }) => {
 
     const [isLoading, setIsLoading] = useState(true);
 
+    const [contentHeight, setContentHeight] = useState(0);
     const [isRegistrationFormVisible, setIsRegistrationFormVisible] = useState(false);
     const [clashModalVisible, setClashModalVisible] = useState(false);
     const [registeredModalVisible, setRegisteredModalVisible] = useState(false);
@@ -71,123 +70,149 @@ const EventDetailsScreen = ({ navigation, route }) => {
     const scrollViewRef = useRef(null);
     const registrationFormRef = useRef(null);
 
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const scaleAnim = useRef(new Animated.Value(0.98)).current;
+
+    const snapPoints = useMemo(() => {
+        const minHeight = Math.min(contentHeight + 40, height * 0.9); // limit to 90% of screen height
+        return [minHeight];
+    }, [contentHeight]);
+
+    const renderBackdrop = useCallback(
+        props => (
+            <BottomSheetBackdrop
+                {...props}
+                disappearsOnIndex={-1}
+                appearsOnIndex={0}
+                opacity={0.7}
+            />
+        ),
+        []
+    );
+
     useEffect(() => {
+        let unsubscribeEvent = null;
+        let unsubscribeRegistration = null;
+
         const fetchData = async () => {
             try {
                 setIsLoading(true);
 
                 if (!eventID) return;
 
-                // Query event collection by document ID
                 const eventRef = doc(db, "event", eventID);
-                const eventSnap = await getDoc(eventRef);
 
-                if (!eventSnap.exists()) {
-                    console.log("No such event!");
-                    setIsLoading(false);
-                    return;
-                }
-
-                const eventImagesRef = collection(db, "eventImages");
-                const eventImagesQuery = query(eventImagesRef, where("eventID", "==", eventID));
-                const eventImagesSnap = await getDocs(eventImagesQuery);
-
-                let images = [];
-                eventImagesSnap.forEach((doc) => {
-                    if (doc.data().images) {
-                        images = [...images, ...doc.data().images];
+                unsubscribeEvent = onSnapshot(eventRef, async (eventSnap) => {
+                    if (!eventSnap.exists()) {
+                        console.log("No such event!");
+                        setIsLoading(false);
+                        return;
                     }
+
+                    const eventData = eventSnap.data();
+
+                    const eventImagesRef = collection(db, "eventImages");
+                    const eventImagesQuery = query(eventImagesRef, where("eventID", "==", eventID));
+                    const eventImagesSnap = await getDocs(eventImagesQuery);
+
+                    let images = [];
+                    eventImagesSnap.forEach((doc) => {
+                        if (doc.data().images) {
+                            images = [...images, ...doc.data().images];
+                        }
+                    });
+
+                    const currentEventDetails = {
+                        name: eventData.eventName,
+                        description: eventData.eventDescription,
+                        startTime: eventData.eventStartDateTime,
+                        endTime: eventData.eventEndDateTime,
+                        registrationClosingDate: eventData.registrationClosingDate,
+                        locationName: eventData.locationName,
+                        locationLongitude: eventData.locationLongitude,
+                        locationLatitude: eventData.locationLatitude,
+                        requiresPaymentProof: eventData.paymentProofRequired,
+                        requiresCapacity: eventData.requiresCapacity,
+                        isYearRestrict: eventData.isYearRestrict,
+                        isFacultyRestrict: eventData.isFacultyRestrict,
+                        organiserID: eventData.organiserID,
+                        category: eventData.category,
+                        images
+                    };
+
+                    if (currentEventDetails.requiresCapacity) {
+                        currentEventDetails.capacity = eventData.capacity;
+                    }
+
+                    if (currentEventDetails.isYearRestrict) {
+                        currentEventDetails.yearsRestricted = eventData.yearsRestricted;
+                    }
+
+                    setEventDetails(currentEventDetails);
+
+                    const studentID = await getItem('studentID');
+
+                    const userRef = doc(db, "user", studentID);
+                    const userSnap = await getDoc(userRef);
+
+                    if (!userSnap.exists()) {
+                        console.log("User does not exist.");
+                        return;
+                    }
+
+                    const userData = userSnap.data();
+
+                    const userDetails = {
+                        fullname: userData.firstName + " " + userData.lastName,
+                        email: userData.email,
+                        yearOfStudy: userData.yearOfStudy,
+                        facultyID: userData.facultyID,
+                    };
+
+                    setUserRegistrationInfo(userDetails);
+
+                    const registrationRef = collection(db, "registration");
+                    const registrationQuery = query(registrationRef, where("studentID", "==", studentID));
+                    const registrationSnap = await getDocs(registrationQuery);
+
+                    if (!registrationSnap.empty) {
+                        const registeredEventsID = registrationSnap.docs.map(doc => doc.data().eventID);
+
+                        const eventPromises = registeredEventsID.map(id => getDoc(doc(db, "event", id)));
+                        const eventDocs = await Promise.all(eventPromises);
+                        const eventsDetails = eventDocs.map(docSnap =>
+                            docSnap.exists() ? {
+                                eventID: docSnap.id,
+                                startTime: docSnap.data().eventStartDateTime,
+                                endTime: docSnap.data().eventEndDateTime
+                            } : null
+                        );
+                        const clashCheck = checkForEventClash(currentEventDetails, eventsDetails);
+
+                        setHasClash(clashCheck.hasClash);
+                    }
+
+                    const registrationListRef = collection(db, "registration");
+                    const registrationListQuery = query(registrationListRef, where("eventID", "==", eventID));
+
+                    unsubscribeRegistration = onSnapshot(registrationListQuery, (snapshot) => {
+                        setCurrentParticipantNum(snapshot.size);
+                    });
+
+                    setIsLoading(false);
                 });
-
-                const eventData = eventSnap.data();
-
-                const currentEventDetails = {
-                    name: eventData.eventName,
-                    description: eventData.eventDescription,
-                    startTime: eventData.eventStartDateTime,
-                    endTime: eventData.eventEndDateTime,
-                    registrationClosingDate: eventData.registrationClosingDate,
-                    locationName: eventData.locationName,
-                    locationLongitude: eventData.locationLongitude,
-                    locationLatitude: eventData.locationLatitude,
-                    requiresPaymentProof: eventData.paymentProofRequired,
-                    requiresCapacity: eventData.requiresCapacity,
-                    organiserID: eventData.organiserID,
-                    category: eventData.category,
-                    images
-                };
-
-                if (currentEventDetails.requiresCapacity) {
-                    currentEventDetails.capacity = eventData.capacity;
-                }
-
-                setEventDetails(currentEventDetails);
-
-                const studentID = await getItem('studentID');
-
-                const userRef = doc(db, "user", studentID);
-                const userSnap = await getDoc(userRef);
-
-                if (!userSnap.exists()) {
-                    console.log("User does not existed.");
-                    return;
-                }
-
-                const userData = userSnap.data();
-
-                const userDetails = {
-                    fullname: userData.firstName + " " + userData.lastName,
-                    email: userData.email,
-                };
-
-                setUserRegistrationInfo(userDetails);
-
-                const registrationRef = collection(db, "registration");
-                const registrationQuery = query(registrationRef, where("studentID", "==", studentID));
-                const registrationSnap = await getDocs(registrationQuery);
-
-                if (!registrationSnap.empty) {
-                    let registeredEventsID = registrationSnap.docs.map(doc => doc.data().eventID);
-
-                    const eventPromises = registeredEventsID.map(id => getDoc(doc(db, "event", id)));
-                    const eventDocs = await Promise.all(eventPromises);
-                    const eventsDetails = eventDocs.map(docSnap =>
-                        docSnap.exists() ? {
-                            eventID: docSnap.id,
-                            startTime: docSnap.data().eventStartDateTime,
-                            endTime: docSnap.data().eventEndDateTime
-                        } : null
-                    );
-                    const clashCheck = checkForEventClash(currentEventDetails, eventsDetails);
-
-                    setHasClash(clashCheck.hasClash);
-                }
-
-                const registrationListRef = collection(db, "registration");
-                const registrationListQuery = query(registrationListRef, where("eventID", "==", eventID));
-
-                const unsubscribe = onSnapshot(registrationListQuery, (snapshot) => {
-                    setCurrentParticipantNum(snapshot.size);
-                });
-
-                setIsLoading(false);
-
-                return unsubscribe;
             } catch (error) {
                 console.error("Error when fetching data,", error.message);
             }
-        }
+        };
 
-        const unsubscribePromise = fetchData();
+        fetchData();
 
         return () => {
-            unsubscribePromise.then(unsub => {
-                if (typeof unsub === "function") {
-                    unsub();
-                }
-            });
+            if (unsubscribeEvent) unsubscribeEvent();
+            if (unsubscribeRegistration) unsubscribeRegistration();
         };
-    }, []);
+    }, [eventID]);
 
     const checkForEventClash = (currentEventDetails, registeredEventList) => {
         if (!currentEventDetails || registeredEventList.length === 0) {
@@ -244,17 +269,34 @@ const EventDetailsScreen = ({ navigation, route }) => {
         registrationFormRef.current?.expand();
     }
 
-    const handleSheetClose = (index) => {
-        setIsRegistrationFormVisible(index > 0);
-        setReceiptImage('');
-        setImageError('');
-    };
+    const handleSheetClose = useCallback((index) => {
+        if (index === -1) {
+            setIsRegistrationFormVisible(index > 0);
+            setReceiptImage('');
+            setImageError('');
+        }
+    }, [setIsRegistrationFormVisible, setReceiptImage, setImageError]);
 
     const handleClosePress = useCallback(() => {
-        registrationFormRef.current?.close();
-        setReceiptImage('');
-        setImageError('');
-    }, []);
+        // Run closing animations
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: true
+            }),
+            Animated.timing(scaleAnim, {
+                toValue: 0.98,
+                duration: 200,
+                useNativeDriver: true
+            })
+        ]).start(() => {
+            registrationFormRef.current?.close();
+            setIsRegistrationFormVisible(false);
+            setReceiptImage('');
+            setImageError('');
+        });
+    }, [setIsRegistrationFormVisible, setReceiptImage, setImageError]);
 
     const pickImage = async () => {
         setImageError('');
@@ -317,46 +359,49 @@ const EventDetailsScreen = ({ navigation, route }) => {
         submitRegistration();
     }
 
+    const measureContentHeight = useCallback((event) => {
+        const { height } = event.nativeEvent.layout;
+        setContentHeight(height);
+    }, []);
+
     const submitRegistration = async () => {
         try {
-            // Validate input data
-            if (!eventID || !eventDetails) {
-                throw new Error("Missing event details");
-            }
+            if (!eventID || !eventDetails) throw new Error("Missing event details");
 
             const studentID = await getItem("studentID");
-            if (!studentID) {
-                throw new Error("studentID does not existed.");
+            if (!studentID) throw new Error("studentID does not exist.");
+
+            // Early validation to avoid wasteful operations
+            if (eventDetails.requiresPaymentProof && !receiptImage) {
+                throw new Error("Payment proof is required");
             }
 
+            // Prepare registration data
             const registrationData = {
                 studentID,
                 eventID,
                 isVerified: !eventDetails.requiresPaymentProof,
                 isAttended: false,
-            }
+            };
 
             if (eventDetails.requiresPaymentProof) {
-                if (!receiptImage) {
-                    throw new Error("Payment proof is required");
-                }
                 registrationData.paymentProofBase64 = receiptImage;
-                registrationData.isVerified = false;
             }
 
+            // Add registration first
             const registrationDocRef = await addDoc(collection(db, "registration"), registrationData);
 
+            // Run quest creation and notifications in parallel
             await Promise.all([
                 addQuest(studentID),
-                schedulePushNotification(studentID),
+                schedulePushNotification(studentID)
             ]);
 
             setRegisteredModalVisible(true);
-
             return registrationDocRef.id;
+
         } catch (error) {
-            console.error("Event Registration Error:", error);
-            // Provide user-friendly error handling
+            console.log("Event Registration Error:", error);
             Alert.alert(
                 "Registration Failed",
                 error.message || "Unable to complete event registration. Please try again."
@@ -366,44 +411,45 @@ const EventDetailsScreen = ({ navigation, route }) => {
     };
 
     const addQuest = async (studentID) => {
+        if (!studentID || !eventID) {
+            throw new Error("Missing student or event ID");
+        }
+
         const batch = writeBatch(db);
 
         try {
-            // Validate inputs
-            if (!studentID || !eventID) {
-                throw new Error("Missing student or event ID");
-            }
-
-            // Find event quest
-            const eventQuestRef = collection(db, "quest");
-            const eventQuestQuery = query(eventQuestRef, where("eventID", "==", eventID));
+            // Get the quest document for this event
+            const eventQuestQuery = query(
+                collection(db, "quest"),
+                where("eventID", "==", eventID)
+            );
             const eventQuestSnap = await getDocs(eventQuestQuery);
 
             if (eventQuestSnap.empty) {
-                throw new Error("No quests found for this event");
+                console.warn("No quests found for this event");
+                return;
             }
 
             const eventQuestDoc = eventQuestSnap.docs[0];
             const eventQuestID = eventQuestDoc.id;
 
-            // Fetch quest list
-            const questListRef = collection(db, "quest", eventQuestID, "questList");
-            const questListSnapshots = await getDocs(questListRef);
-
-            if (questListSnapshots.empty) {
-                throw new Error("No quest items found");
+            // Get the list of quest items under the quest document
+            const questListSnap = await getDocs(collection(db, "quest", eventQuestID, "questList"));
+            if (questListSnap.empty) {
+                console.warn("No quest items found");
+                return;
             }
 
-            // Create quest progress document
+            // Create quest progress doc
             const questProgressRef = doc(collection(db, "questProgress"));
             batch.set(questProgressRef, {
                 studentID,
                 eventID,
             });
 
-            // Prepare quest progress list batch writes
+            // Create quest progress list docs in batch
             const questProgressListRef = collection(questProgressRef, "questProgressList");
-            questListSnapshots.docs.forEach(questDoc => {
+            questListSnap.docs.forEach(questDoc => {
                 const questProgressListDocRef = doc(questProgressListRef);
                 batch.set(questProgressListDocRef, {
                     questID: questDoc.id,
@@ -413,20 +459,18 @@ const EventDetailsScreen = ({ navigation, route }) => {
                 });
             });
 
-            // Commit batch write
             await batch.commit();
-
             console.log("Quest progress successfully created");
             return questProgressRef.id;
+
         } catch (error) {
             console.error("Quest Progress Creation Error:", error);
             throw error;
         }
-    }
+    };
 
     const schedulePushNotification = async (studentID) => {
         try {
-            // Validate inputs
             if (!studentID || !eventDetails?.name || !eventDetails?.startTime) {
                 throw new Error('Insufficient data for notification scheduling');
             }
@@ -434,21 +478,17 @@ const EventDetailsScreen = ({ navigation, route }) => {
             const { status: existingStatus } = await Notifications.getPermissionsAsync();
             let finalStatus = existingStatus;
 
-            // If no existing permission, request
             if (existingStatus !== 'granted') {
                 const { status } = await Notifications.requestPermissionsAsync();
                 finalStatus = status;
             }
 
-            // Handle permission denial
             if (finalStatus !== 'granted') {
                 throw new Error('Notification permissions not granted');
             }
 
-            // Convert Firestore timestamp to Date object
             const eventStartTime = eventDetails.startTime.toDate();
 
-            // Notification scenarios
             const notificationScenarios = [
                 {
                     title: "Event Countdown Begins! 🚀",
@@ -464,9 +504,8 @@ const EventDetailsScreen = ({ navigation, route }) => {
                 },
             ];
 
-            // Schedule notifications
-            for (const notification of notificationScenarios) {
-                await Notifications.scheduleNotificationAsync({
+            await Promise.all(notificationScenarios.map(notification =>
+                Notifications.scheduleNotificationAsync({
                     content: {
                         title: notification.title,
                         body: notification.body,
@@ -477,19 +516,18 @@ const EventDetailsScreen = ({ navigation, route }) => {
                         type: Notifications.SchedulableTriggerInputTypes.DATE,
                         date: notification.trigger,
                     }
-                });
-            }
+                })
+            ));
 
             console.log("Notifications scheduled successfully");
         } catch (error) {
             console.error("Notification Scheduling Error:", error);
-            // Optional: Fallback notification or user alert
             Alert.alert(
                 "Notification Setup Failed",
                 "Unable to set up event reminders. You might miss event updates."
             );
         }
-    }
+    };
 
     const handleRegistrationModalClose = () => {
         setRegisteredModalVisible(false);
@@ -664,26 +702,47 @@ const EventDetailsScreen = ({ navigation, route }) => {
                 </ScrollView>
 
                 <View style={styles.footer}>
-                    {eventDetails.capacity == currentParticipantNum ?
-                        <View style={styles.maxCapacityContainer}>
-                            <CircleX color="#FF002F" size={24} />
-                            <Text style={styles.maxCapacityText}>Maximum Capacity</Text>
-                        </View> :
-                        <TouchableOpacity style={styles.registerButton} onPress={openRegistrationForm}>
-                            <Text style={styles.registerButtonText}>Register Now</Text>
-                        </TouchableOpacity>
+                    {
+                        eventDetails.capacity === currentParticipantNum ? (
+                            <View style={styles.maxCapacityContainer}>
+                                <CircleX color="#FF002F" size={24} />
+                                <Text style={styles.maxCapacityText}>Maximum Capacity</Text>
+                            </View>
+                        ) : eventDetails.isFacultyRestrict && userRegistrationInfo.facultyID.toString() !== eventDetails.organiserID ? (
+                            <View style={styles.maxCapacityContainer}>
+                                <CircleX color="#FF002F" size={24} />
+                                <Text style={styles.maxCapacityText}>
+                                    {`This event is only eligible for ${ORGANISER_MAPPING[eventDetails.organiserID]} student`}
+                                </Text>
+                            </View>
+                        ) : eventDetails.isYearRestrict && !eventDetails.yearsRestricted?.includes(userRegistrationInfo.yearOfStudy) ? (
+                            <View style={styles.maxCapacityContainer}>
+                                <CircleX color="#FF002F" size={24} />
+                                <Text style={styles.maxCapacityText}>
+                                    This event is only eligible for Year {eventDetails.yearsRestricted?.join(", ")} student
+                                </Text>
+                            </View>
+                        ) : (
+                            <TouchableOpacity style={styles.registerButton} onPress={openRegistrationForm}>
+                                <Text style={styles.registerButtonText}>Register Now</Text>
+                            </TouchableOpacity>
+                        )
                     }
                 </View>
 
                 <BottomSheet
                     ref={registrationFormRef}
-                    index={isRegistrationFormVisible ? 1 : -1}
+                    index={isRegistrationFormVisible ? 0 : -1}
                     snapPoints={snapPoints}
                     onChange={handleSheetClose}
                     enablePanDownToClose
+                    enableContentPanningGesture
+                    backdropComponent={renderBackdrop}
+                    handleIndicatorStyle={styles.handleIndicator}
                     backgroundStyle={styles.registrationFormBackground}
+                    handleStyle={styles.handle}
                 >
-                    <BottomSheetView style={{ padding: 20 }}>
+                    <BottomSheetView onLayout={measureContentHeight} style={{ padding: 20 }}>
                         <View style={styles.bsHeader}>
                             <Text style={styles.bsHeaderTitle}>Registration Form</Text>
                         </View>
@@ -797,7 +856,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
-        zIndex: 10,
+        zIndex: 2,
     },
     eventBriefDetailsContainer: {
         flex: 1,
@@ -1047,19 +1106,6 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginBottom: 8,
         color: '#333',
-    },
-    input: {
-        backgroundColor: '#FFF',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#DDD',
-        fontSize: 16,
-    },
-    disabledInput: {
-        backgroundColor: '#F0F0F0',
-        color: '#666',
     },
     helperText: {
         fontSize: 14,

@@ -32,11 +32,12 @@ export default DiamondBalance;
 const styles = StyleSheet.create({
     balanceContainer: {
         marginHorizontal: 18,
-        marginVertical: 12,
+        marginVertical: 8,
     },
     balanceGradient: {
         borderRadius: 16,
-        padding: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -61,7 +62,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     balanceValue: {
-        fontSize: 24,
+        fontSize: 20,
         fontWeight: 'bold',
         color: '#FFFFFF',
         marginRight: 4,

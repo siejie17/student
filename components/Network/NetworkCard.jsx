@@ -1,4 +1,5 @@
 import { View, Text, Animated, StyleSheet, Image } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const FACULTY_MAPPING = {
     1: "FACA",
@@ -45,9 +46,6 @@ const NetworkCard = ({ item, index, animatedValues }) => {
                 },
             ]}
         >
-            {/* Colored accent bar based on faculty */}
-            <View style={[styles.accentBar, { backgroundColor: "#3B6FC9" }]} />
-            
             <View style={styles.cardContent}>
                 <View style={[styles.profilePicContainer, { borderColor: "#3B6FC9" }]}>
                     <Image 
@@ -71,10 +69,14 @@ const NetworkCard = ({ item, index, animatedValues }) => {
                     <View style={styles.eventContainer}>
                         <Text style={styles.eventLabel}>🎯</Text>
                         <Text style={styles.eventName} numberOfLines={1}>{item.eventName}</Text>
-                        <Text style={styles.timestamp}>{formatTimestamp(item.scannedTime)}</Text>
                     </View>
                 </View>
             </View>
+
+            <View style={styles.chatPromptContainer}>
+                    <MaterialCommunityIcons name="message" size={14} color="#3B6FC9" />
+                    <Text style={styles.chatPromptText}>Press to chat...</Text>
+                </View>
         </Animated.View>
     );
 };
@@ -84,67 +86,71 @@ export default NetworkCard;
 const styles = StyleSheet.create({
     card: {
         backgroundColor: '#fff',
-        borderRadius: 16,
-        marginBottom: 16,
+        borderRadius: 12,
+        marginBottom: 12,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
         position: 'relative',
         overflow: 'hidden',
     },
     accentBar: {
-        height: 4,
+        height: 3,
         width: '100%',
     },
     cardContent: {
         flexDirection: 'row',
-        padding: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 18,
         alignItems: 'center',
     },
     profilePicContainer: {
-        padding: 2,
-        borderRadius: 30,
-        borderWidth: 2,
+        padding: 1.5,
+        borderRadius: 22,
+        borderWidth: 1.5,
     },
     profilePic: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         backgroundColor: '#f5f5f5',
     },
     infoContainer: {
-        marginLeft: 16,
+        marginLeft: 12,
         flex: 1,
     },
     nameRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     name: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '600',
         color: '#333',
         flex: 1,
     },
     yearBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 12,
-        marginLeft: 8,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
+        marginLeft: 6,
     },
     yearText: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '600',
     },
     facultyContainer: {
-        marginBottom: 6,
+        marginBottom: 2,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
     },
     faculty: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '500',
     },
     eventContainer: {
@@ -152,18 +158,33 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     eventLabel: {
-        fontSize: 12,
-        marginRight: 4,
+        fontSize: 11,
+        marginRight: 3,
     },
     eventName: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#555',
         fontWeight: '500',
         flex: 1,
     },
     timestamp: {
-        fontSize: 11,
+        fontSize: 10,
         color: '#888',
-        marginLeft: 6,
     },
+    chatPromptContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#f8fafd',
+    },
+    chatPromptText: {
+        fontSize: 11,
+        color: '#3B6FC9',
+        fontWeight: '500',
+        marginLeft: 6,
+    }
 });

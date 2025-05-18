@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, {
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState
@@ -23,11 +22,13 @@ import {
 
 import { getItem } from '../utils/asyncStorage';
 
-import { collection, getDocs, onSnapshot, orderBy, query, Timestamp, where } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, Timestamp, where, limit, getDoc, doc, onSnapshot } from "firebase/firestore";
 import { db } from '../utils/firebaseConfig';
 
 import EventCard from '../components/EventListing/EventCard';
 import SearchBar from '../components/EventListing/SearchBar';
+
+const ITEMS_PER_PAGE = 5;
 
 const CATEGORIES = [
   "All",
@@ -56,104 +57,297 @@ const EventListingScreen = ({ route, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [registeredEventIDs, setRegisteredEventIDs] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+  const flatListRef = useRef(null);
 
   const unsubscribeRegistrationRef = useRef(null);
   const unsubscribeEventRef = useRef(null);
-  const unsubscribeTotalParticipantsRef = useRef(null);
 
   const autoFocusSearch = route.params?.autoFocusSearch ?? false;
 
-  const fetchEventCatalogue = useCallback(async () => {
-    try {
-      setIsLoading(true);
+  const getUserProfile = async (studentID) => {
+    const userQuery = doc(db, "user", studentID);
+    const userSnap = await getDoc(userQuery);
+    return userSnap.data(); // assuming studentID is unique
+  };
 
+  const getTotalItems = async () => {
+    try {
       const studentID = await getItem("studentID");
-      if (!studentID) {
-        setIsLoading(false);
-        setRefreshing(false); // ← Add this line
-        return;
+      if (!studentID) return;
+
+      const user = await getUserProfile(studentID);
+      if (!user) return;
+
+      const { yearOfStudy, facultyID } = user;
+
+      let baseQuery = query(
+        collection(db, "event"),
+        where("registrationClosingDate", ">", Timestamp.now()),
+        where("status", "not-in", ["Completed", "Cancelled"])
+      );
+
+      if (selectedCategory !== 'All') {
+        const categoryID = CATEGORIES_MAPPING[selectedCategory];
+        baseQuery = query(
+          collection(db, "event"),
+          where("registrationClosingDate", ">", Timestamp.now()),
+          where("status", "not-in", ["Completed", "Cancelled"]),
+          where("category", "==", categoryID)
+        );
       }
 
-      // Unsubscribe previous listeners
-      unsubscribeRegistrationRef.current?.();
-      unsubscribeEventRef.current?.();
-
-      // Listen to student registrations
       const registrationQuery = query(
         collection(db, "registration"),
         where("studentID", "==", studentID)
       );
-
-      unsubscribeRegistrationRef.current = onSnapshot(registrationQuery, async (registrationSnap) => {
+      // Set up real-time listener for registrations
+      unsubscribeRegistrationRef.current = onSnapshot(registrationQuery, (registrationSnap) => {
         const registeredEventIDs = registrationSnap.docs.map(doc => doc.data().eventID);
 
-        // Listen to current events (not completed or cancelled)
-        const eventsQuery = query(
+        // Set up real-time listener for events
+        unsubscribeEventRef.current = onSnapshot(baseQuery, (eventSnap) => {
+          const filtered = eventSnap.docs.filter(doc => {
+            const event = doc.data();
+            const alreadyRegistered = registeredEventIDs.includes(doc.id);
+            if (alreadyRegistered) return false;
+
+            // Year restriction
+            if (event.isYearRestrict && Array.isArray(event.yearsRestricted)) {
+              if (!event.yearsRestricted.includes(yearOfStudy)) return false;
+            }
+
+            // Faculty restriction
+            if (event.isFacultyRestrict && event.organiserID !== Number(facultyID)) {
+              return false;
+            }
+
+            return true;
+          });
+
+          setTotalItems(filtered.length);
+          setTotalPages(Math.ceil(filtered.length / ITEMS_PER_PAGE));
+        });
+      });
+    } catch (error) {
+      console.error("Error getting total events:", error);
+    }
+  };
+
+  const fetchPage = async (pageNumber) => {
+    try {
+      setIsLoading(true);
+      const studentID = await getItem("studentID");
+      if (!studentID) {
+        setIsLoading(false);
+        return;
+      }
+
+      const user = await getUserProfile(studentID);
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+      const { yearOfStudy, facultyID } = user;
+
+      // Get registered events
+      const registrationQuery = query(
+        collection(db, "registration"),
+        where("studentID", "==", studentID)
+      );
+      const registrationSnap = await getDocs(registrationQuery);
+      const registeredEventIDs = registrationSnap.docs.map(doc => doc.data().eventID);
+
+      // Query events
+      let eventsQuery = query(
+        collection(db, "event"),
+        where("registrationClosingDate", ">", Timestamp.now()),
+        where("status", "not-in", ["Completed", "Cancelled"]),
+        orderBy("registrationClosingDate", "asc"),
+        limit(pageNumber * ITEMS_PER_PAGE)
+      );
+
+      if (selectedCategory !== 'All') {
+        const categoryID = CATEGORIES_MAPPING[selectedCategory];
+        eventsQuery = query(
           collection(db, "event"),
           where("registrationClosingDate", ">", Timestamp.now()),
           where("status", "not-in", ["Completed", "Cancelled"]),
-          orderBy("lastAdded", "desc")
+          where("category", "==", categoryID),
+          orderBy("registrationClosingDate", "asc"),
+          limit(pageNumber * ITEMS_PER_PAGE)
         );
+      }
 
-        unsubscribeEventRef.current = onSnapshot(eventsQuery, async (eventSnap) => {
-          const allEvents = eventSnap.docs
-            .filter(doc => !registeredEventIDs.includes(doc.id))
-            .map(doc => ({ id: doc.id, ...doc.data() }));
+      unsubscribeEventRef.current = onSnapshot(eventsQuery, async (eventSnap) => {
+        let allEvents = eventSnap.docs
+          .filter(doc => {
+            const event = doc.data();
 
-          // Fetch all event thumbnails in one go
-          if (allEvents.length > 0) {
-            const eventIDs = allEvents.map(e => e.id);
+            // Skip if already registered
+            if (registeredEventIDs.includes(doc.id)) return false;
 
-            const imagesQuery = query(
-              collection(db, "eventImages"),
-              where("eventID", "in", eventIDs.slice(0, 10)) // Firestore 'in' max 10 items
-            );
-            const imageDocs = await getDocs(imagesQuery);
+            // Year restriction
+            if (event.isYearRestrict && Array.isArray(event.yearsRestricted)) {
+              if (!event.yearsRestricted.includes(yearOfStudy)) return false;
+            }
 
-            const imageMap = new Map();
-            imageDocs.forEach(doc => {
-              const { eventID, images } = doc.data();
-              if (images && images.length > 0) imageMap.set(eventID, images[0]);
-            });
+            // Faculty restriction
+            if (event.isFacultyRestrict && event.organiserID !== Number(facultyID)) {
+              return false;
+            }
 
-            const enrichedEvents = allEvents.map(event => ({
-              ...event,
-              thumbnail: imageMap.get(event.id) || null
-            }));
+            return true;
+          })
+          .map(doc => ({ id: doc.id, ...doc.data() }));
 
-            setEvents(enrichedEvents);
-          } else {
-            setEvents([]);
-          }
-        });
+        // Get only the current page's events
+        const startIndex = (pageNumber - 1) * ITEMS_PER_PAGE;
+        let paginatedEvents = allEvents.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+        // Fetch thumbnails for the current page
+        if (paginatedEvents.length > 0) {
+          const eventIDs = paginatedEvents.map(e => e.id);
+          const imagesQuery = query(
+            collection(db, "eventImages"),
+            where("eventID", "in", eventIDs)
+          );
+          const imageDocs = await getDocs(imagesQuery);
+
+          const imageMap = new Map();
+          imageDocs.forEach(doc => {
+            const { eventID, images } = doc.data();
+            if (images && images.length > 0) imageMap.set(eventID, images[0]);
+          });
+
+          paginatedEvents = paginatedEvents.map(event => ({
+            ...event,
+            thumbnail: imageMap.get(event.id) || null
+          }));
+        }
+
+        // Update state
+        setEvents(paginatedEvents);
+        setTotalItems(allEvents.length);
+        setTotalPages(Math.ceil(allEvents.length / ITEMS_PER_PAGE));
+        setCurrentPage(pageNumber);
       });
     } catch (error) {
       console.error("Error fetching events:", error);
     } finally {
       setIsLoading(false);
-      setRefreshing(false);
     }
-  }, []);
+  };
 
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchEventCatalogue();
-  }, [fetchEventCatalogue]);
+  const handlePageChange = (pageNumber) => {
+    if (pageNumber < 1 || pageNumber > totalPages) return;
+    fetchPage(pageNumber);
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
+  const PageSelector = () => {
+    const pageNumbers = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i);
+    }
+
+    return (
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity
+          style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
+          onPress={() => handlePageChange(1)}
+          disabled={currentPage === 1}
+        >
+          <Text style={styles.pageButtonText}>{"<<"}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
+          onPress={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          <Text style={styles.pageButtonText}>{"<"}</Text>
+        </TouchableOpacity>
+
+        {startPage > 1 && (
+          <Text style={styles.pageEllipsis}>...</Text>
+        )}
+
+        {pageNumbers.map(number => (
+          <TouchableOpacity
+            key={number}
+            style={[
+              styles.pageButton,
+              currentPage === number && styles.pageButtonActive
+            ]}
+            onPress={() => handlePageChange(number)}
+          >
+            <Text style={[
+              styles.pageButtonText,
+              currentPage === number && styles.pageButtonTextActive
+            ]}>
+              {number}
+            </Text>
+          </TouchableOpacity>
+        ))}
+
+        {endPage < totalPages && (
+          <Text style={styles.pageEllipsis}>...</Text>
+        )}
+
+        <TouchableOpacity
+          style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
+          onPress={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          <Text style={styles.pageButtonText}>{">"}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
+          onPress={() => handlePageChange(totalPages)}
+          disabled={currentPage === totalPages}
+        >
+          <Text style={styles.pageButtonText}>{">>"}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   useFocusEffect(
     useCallback(() => {
-      fetchEventCatalogue();
+      const loadData = async () => {
+        await getTotalItems();
+        await fetchPage(1);
+      };
+      loadData();
       return () => {
         unsubscribeRegistrationRef.current?.();
         unsubscribeEventRef.current?.();
-        unsubscribeTotalParticipantsRef.current?.();
       };
-    }, [])
+    }, [selectedCategory])
   );
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    Promise.all([
+      getTotalItems(),
+      fetchPage(1)
+    ]).finally(() => setRefreshing(false));
+  }, [selectedCategory]);
 
   const filteredEvents = useMemo(() => {
     let filtered = events;
@@ -281,23 +475,42 @@ const EventListingScreen = ({ route, navigation }) => {
             <ActivityIndicator size="large" color="#6284bf" />
             <Text style={styles.loadingText}>Loading available events...</Text>
           </View>
+        ) : events.length === 0 && selectedCategory === "All" ? (
+          <View style={[styles.emptyContainer, { flexGrow: 1 }]}>
+            <Ionicons name="calendar-outline" size={50} color="#CCCCCC" />
+            <Text style={styles.emptyText}>No events have been posted yet</Text>
+            <Text style={styles.emptySubText}>
+              Please check back soon for new event postings!
+            </Text>
+          </View>
         ) : (
-          <FlatList
-            data={filteredEvents}
-            renderItem={renderCard}
-            keyExtractor={item => item.id}
-            contentContainerStyle={[styles.listContainer, filteredEvents.length === 0 && { justifyContent: 'center' }]}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={['#0066cc']}
-              />
-            }
-            ListEmptyComponent={ListEmptyComponent}
-          />
+          <>
+            <FlatList
+              ref={flatListRef}
+              data={filteredEvents}
+              renderItem={renderCard}
+              keyExtractor={item => item.id}
+              contentContainerStyle={[
+                styles.listContainer,
+                filteredEvents.length === 0 && styles.emptyListContainer
+              ]}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={['#0066cc']}
+                />
+              }
+              ListEmptyComponent={
+                selectedCategory !== 'All' || searchQuery.trim() !== '' ? (
+                  ListEmptyComponent
+                ) : null
+              }
+            />
+          </>
         )}
+        {events.length > 0 && totalPages > 1 && !searchQuery && <PageSelector />}
       </View>
     </View>
   );
@@ -392,5 +605,45 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 8,
     textAlign: 'center',
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  pageButton: {
+    minWidth: 35,
+    height: 35,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 4,
+    backgroundColor: '#f5f5f5',
+  },
+  pageButtonActive: {
+    backgroundColor: '#3f6bc4',
+  },
+  pageButtonDisabled: {
+    backgroundColor: '#f5f5f5',
+    opacity: 0.5,
+  },
+  pageButtonText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pageButtonTextActive: {
+    color: 'white',
+  },
+  pageEllipsis: {
+    marginHorizontal: 8,
+    color: '#666',
+  },
+  emptyListContainer: {
+    justifyContent: 'center',
   },
 });

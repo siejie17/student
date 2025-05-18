@@ -1,5 +1,5 @@
 import { View, Text, ActivityIndicator, StyleSheet, Animated, TouchableOpacity, FlatList } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Entypo } from '@expo/vector-icons';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
@@ -9,10 +9,17 @@ import { getItem } from '../utils/asyncStorage';
 
 import NetworkCard from '../components/Network/NetworkCard';
 import EmptyNetworkState from '../components/Network/EmptyNetworkState';
+import SearchBar from '../components/EventListing/SearchBar';
+
+const ITEMS_PER_PAGE = 5; // Number of items to load per page
 
 const NetworkScreen = () => {
     const [networks, setNetworks] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
 
     const animatedValues = networks.map(() => new Animated.Value(0.95));
 
@@ -62,6 +69,7 @@ const NetworkScreen = () => {
                     return (userSnap.exists() && eventSnap.exists())
                         ? {
                             id: network.id,
+                            studentID: userSnap.id,
                             networkName: userSnap.data().firstName + " " + userSnap.data().lastName,
                             yearOfStudy: userSnap.data().yearOfStudy,
                             facultyID: userSnap.data().facultyID,
@@ -73,7 +81,9 @@ const NetworkScreen = () => {
                 });
 
                 const resolvedNetworkList = (await Promise.all(networkListDetailsPromises)).filter(Boolean);
-
+                
+                setTotalItems(resolvedNetworkList.length);
+                setTotalPages(Math.ceil(resolvedNetworkList.length / ITEMS_PER_PAGE));
                 setNetworks(resolvedNetworkList);
             } catch (error) {
                 console.error("Error when fetching network information,", error);
@@ -117,11 +127,119 @@ const NetworkScreen = () => {
         ]).start();
     }
 
+    const handleNetworkCardPress = (item, index) => {
+        handleCardPress(index);
+        navigation.navigate("Messaging", { studentID: item.studentID,fullName: item.networkName, profilePic: item.profilePic });
+    }
+
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        setCurrentPage(1);
+    };
+
+    const handlePageChange = (pageNumber) => {
+        if (pageNumber < 1 || pageNumber > totalPages) return;
+        setCurrentPage(pageNumber);
+    };
+
+    const PageSelector = () => {
+        const pageNumbers = [];
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(i);
+        }
+
+        return (
+            <View style={styles.paginationContainer}>
+                <TouchableOpacity 
+                    style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
+                    onPress={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                >
+                    <Text style={styles.pageButtonText}>{"<<"}</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                    style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
+                    onPress={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                >
+                    <Text style={styles.pageButtonText}>{"<"}</Text>
+                </TouchableOpacity>
+
+                {startPage > 1 && (
+                    <Text style={styles.pageEllipsis}>...</Text>
+                )}
+
+                {pageNumbers.map(number => (
+                    <TouchableOpacity
+                        key={number}
+                        style={[
+                            styles.pageButton,
+                            currentPage === number && styles.pageButtonActive
+                        ]}
+                        onPress={() => handlePageChange(number)}
+                    >
+                        <Text style={[
+                            styles.pageButtonText,
+                            currentPage === number && styles.pageButtonTextActive
+                        ]}>
+                            {number}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+
+                {endPage < totalPages && (
+                    <Text style={styles.pageEllipsis}>...</Text>
+                )}
+
+                <TouchableOpacity 
+                    style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
+                    onPress={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                >
+                    <Text style={styles.pageButtonText}>{">"}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
+                    onPress={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                >
+                    <Text style={styles.pageButtonText}>{">>"}</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    };
+
+    const filteredAndPaginatedNetworks = useMemo(() => {
+        let filtered = networks;
+
+        if (searchQuery.trim()) {
+            filtered = filtered.filter(item =>
+                item.networkName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                item.eventName.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        const endIndex = startIndex + ITEMS_PER_PAGE;
+        
+        return filtered.slice(startIndex, endIndex);
+    }, [networks, searchQuery, currentPage]);
+
     const renderNetworkCard = (item, index) => {
         return (
             <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={() => handleCardPress(index)}
+                onPress={() => handleNetworkCardPress(item, index)}
             >
                 <NetworkCard
                     item={item}
@@ -157,22 +275,29 @@ const NetworkScreen = () => {
                     </View>
                 </View>
 
+                <SearchBar
+                    onSearch={handleSearch}
+                    placeholder="Search networks..."
+                    style={styles.searchBar}
+                />
+
                 <View style={styles.promptContainer}>
                     <Text style={styles.promptText}>Explore all the connections you've made by scanning QR codes at various events around campus.</Text>
                 </View>
 
                 <FlatList
-                    data={networks}
+                    data={filteredAndPaginatedNetworks}
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={[
                         styles.cardList, 
-                        networks.length === 0 && styles.emptyListContainer
+                        filteredAndPaginatedNetworks.length === 0 && styles.emptyListContainer
                     ]}
                     renderItem={({ item, index }) => renderNetworkCard(item, index)}
                     ListEmptyComponent={
                         <EmptyNetworkState />
                     }
                 />
+                {filteredAndPaginatedNetworks.length > 0 && totalPages > 1 && <PageSelector />}
             </View>
     )
 }
@@ -241,6 +366,46 @@ const styles = StyleSheet.create({
     },
     emptyListContainer: {
         flexGrow: 1,
+    },
+    searchBar: {
+        marginBottom: 5,
+    },
+    paginationContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 16,
+        backgroundColor: 'white',
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+    },
+    pageButton: {
+        minWidth: 35,
+        height: 35,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginHorizontal: 4,
+        backgroundColor: '#f5f5f5',
+    },
+    pageButtonActive: {
+        backgroundColor: '#6284bf',
+    },
+    pageButtonDisabled: {
+        backgroundColor: '#f5f5f5',
+        opacity: 0.5,
+    },
+    pageButtonText: {
+        color: '#666',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    pageButtonTextActive: {
+        color: 'white',
+    },
+    pageEllipsis: {
+        marginHorizontal: 8,
+        color: '#666',
     },
 });
 

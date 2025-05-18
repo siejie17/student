@@ -135,10 +135,9 @@ const AttendanceQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
                     if (registrationSnap.exists()) {
                         await updateDoc(registrationRef, {
                             isAttended: true,
+                            manualAttended: false,
                             attendanceScannedTime: serverTimestamp(),
                         })
-                    } else {
-                        console.log("No such registration exists");
                     }
 
                     const studentID = await getItem("studentID");

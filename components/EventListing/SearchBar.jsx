@@ -69,14 +69,9 @@ const SearchBar = ({
 
   return (
     <View style={[styles.outerContainer, style]}>
-      <Animated.View
+      <View
         style={[
           styles.container,
-          {
-            transform: [{ scale: containerScale }],
-            shadowOpacity: shadowOpacity,
-            borderColor: isFocused ? accentColor : 'transparent',
-          }
         ]}
       >
         <TouchableOpacity
@@ -123,7 +118,7 @@ const SearchBar = ({
             </Animated.View>
           </TouchableOpacity>
         )}
-      </Animated.View>
+      </View>
     </View>
   );
 };
