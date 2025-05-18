@@ -79,3 +79,32 @@ exports.monthlyLeaderboardRefresh = onSchedule(
     return null;
   }
 );
+
+exports.incrementUserYearly = onSchedule(
+  {
+    schedule: "0 0 1 10 *", // Every October 1st at midnight
+    timeZone: "Asia/Kuala_Lumpur",
+  },
+  async (context) => {
+    const usersRef = db.collection("user");
+    const snapshot = await usersRef.get();
+
+    const batch = db.batch();
+
+    snapshot.forEach((doc) => {
+      const userData = doc.data();
+      const currentYear = userData.yearOfStudy ?? 1;
+      const facultyID = userData.facultyID?.toString() ?? "";
+
+      const maxYear = facultyID === "8" ? 5 : 4;
+
+      if (typeof currentYear === "number" && currentYear < maxYear) {
+        batch.update(doc.ref, { yearOfStudy: currentYear + 1 });
+      }
+    });
+
+    await batch.commit();
+    logger.log("User yearOfStudy incremented for eligible users.");
+    return null;
+  }
+);
