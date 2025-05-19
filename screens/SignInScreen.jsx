@@ -83,7 +83,8 @@ const SignInScreen = () => {
             facultyID: userSignedUpData.facultyID.value,
             diamonds: 0,
             totalPointsGained: 0,
-            profilePicture: ProfilePicBase64
+            profilePicture: ProfilePicBase64,
+            expoPushToken: userSignedUpData.expoPushToken || null,
           });
 
           const badgeProgressCollectionRef = collection(db, "badgeProgress");

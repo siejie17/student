@@ -8,7 +8,10 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "extra": {
-      "encryptionKey": "UniEXP_25"
+      "encryptionKey": "UniEXP_25",
+      "eas": {
+        "projectId": "ddfc0801-bc5c-4c5a-81ae-29f43c63ed75"
+      }
     },
     "splash": {
       "image": "./assets/logo.png",
@@ -34,9 +37,12 @@
         {
           "icon": "./assets/notification/notification-icon.png",
           "color": "#ffffff",
-          "sounds": ["./assets/notification/notification-sound.wav"]
+          "sounds": [
+            "./assets/notification/notification-sound.wav"
+          ]
         }
       ]
-    ]
+    ],
+    "owner": "uniexp"
   }
 }

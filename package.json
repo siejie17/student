@@ -20,10 +20,14 @@
     "date-fns": "^4.1.0",
     "expo": "~52.0.35",
     "expo-asset": "~11.0.4",
+    "expo-av": "~15.0.2",
     "expo-blur": "~14.0.3",
     "expo-camera": "~16.0.18",
     "expo-constants": "~17.0.8",
+    "expo-device": "~7.0.3",
     "expo-file-system": "~18.0.11",
+    "expo-haptics": "~14.0.1",
+    "expo-image-manipulator": "~13.0.6",
     "expo-image-picker": "~16.0.6",
     "expo-linear-gradient": "^14.0.2",
     "expo-location": "~18.0.8",
@@ -33,6 +37,7 @@
     "geolib": "^3.3.4",
     "lottie-react-native": "^7.2.2",
     "lucide-react-native": "^0.475.0",
+    "node-fetch": "^3.3.2",
     "react": "18.3.1",
     "react-native": "0.76.7",
     "react-native-animatable": "^1.4.0",
@@ -51,10 +56,7 @@
     "react-native-screens": "^4.7.0",
     "react-native-status-bar-height": "^2.6.0",
     "react-native-svg": "15.8.0",
-    "react-native-vector-icons": "^10.2.0",
-    "expo-image-manipulator": "~13.0.6",
-    "expo-haptics": "~14.0.1",
-    "expo-av": "~15.0.2"
+    "react-native-vector-icons": "^10.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"

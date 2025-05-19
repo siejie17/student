@@ -1,6 +1,7 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
+const fetch = require("node-fetch");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -108,3 +109,65 @@ exports.incrementUserYearly = onSchedule(
     return null;
   }
 );
+
+exports.sendScheduledNotifications = onSchedule(
+  {
+    schedule: "every 5 minutes",
+    timeZone: "Asia/Kuala_Lumpur",
+  },
+  async (context) => {
+    const now = admin.firestore.Timestamp.now();
+    const snapshot = await db
+      .collection("scheduled_notifications")
+      .where("sendAt", "<=", now)
+      .get();
+
+    if (snapshot.empty) {
+      logger.log("No notifications to send.");
+      return;
+    }
+
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+
+      // Prepare payload
+      const message = {
+        to: data.to,
+        sound: "default",
+        title: data.title,
+        body: data.body,
+        data: {
+          eventID: data.eventID,
+          studentID: data.studentID,
+          notificationID: data.notificationID,
+        },
+      };
+
+      try {
+        const response = await fetch("https://exp.host/--/api/v2/push/send", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Accept-Encoding": "gzip, deflate",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(message),
+        });
+
+        const responseData = await response.json();
+
+        if (response.ok) {
+          logger.log(`Notification sent: ${data.notificationID}`, responseData);
+          await doc.ref.delete(); // delete after sending
+        } else {
+          logger.error("Failed to send notification", responseData);
+        }
+      } catch (error) {
+        logger.error("Error sending notification:", error);
+      }
+    }
+
+    return null;
+  }
+);
+

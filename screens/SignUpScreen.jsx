@@ -1,7 +1,10 @@
-import { View, Text, TouchableWithoutFeedback, KeyboardAvoidingView, StyleSheet, Modal, Image, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableWithoutFeedback, KeyboardAvoidingView, StyleSheet, Modal, Image, TouchableOpacity, Keyboard } from 'react-native';
 import { useState, memo } from 'react';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import { getExpoPushTokenAsync } from 'expo-notifications';
 
 import BackButton from '../components/Authentication/BackButton';
 import Header from '../components/Authentication/Header';
@@ -88,7 +91,7 @@ const SignUpScreen = () => {
     if (!email.value.trim()) {
       email.error = 'Email is required';
       newError++;
-    } 
+    }
     else if (!validateEmail(email.value)) {
       email.error = 'Email must be in format: {matric_number}@siswa.unimas.my';
       newError++;
@@ -122,16 +125,36 @@ const SignUpScreen = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, email.value, password.value);
       const user = userCredential.user;
 
+      await updateProfile(user, {
+        displayName: `${firstName.value} ${lastName.value}`
+      });
+
+      let expoPushToken = null;
+      if (Device.isDevice) {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        const finalStatus = existingStatus === 'granted'
+          ? existingStatus
+          : (await Notifications.requestPermissionsAsync()).status;
+
+        if (finalStatus === 'granted') {
+          expoPushToken = (await getExpoPushTokenAsync({
+            projectId: "ddfc0801-bc5c-4c5a-81ae-29f43c63ed75",
+          })).data;
+        } else {
+          console.warn('Push notification permission not granted');
+        }
+      }
+
       await setItem('@userSignedUpData', JSON.stringify({
         firstName: firstName.value,
         lastName: lastName.value,
         email: email.value,
         yearOfStudy: year,
         facultyID: faculty,
+        expoPushToken: expoPushToken || null,
       }));
 
       await sendEmailVerification(user);
-
       setIsEmailSentModalVisible(true);
     } catch (error) {
       console.error('Error', error.message);
@@ -147,106 +170,106 @@ const SignUpScreen = () => {
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <View style={styles.background}>
         <BackButton goBack={() => navigation.navigate("SignIn")} />
-          <KeyboardAvoidingView style={styles.container} behavior='padding'>
-            <Header>Let's Sign Up</Header>
+        <KeyboardAvoidingView style={styles.container} behavior='padding'>
+          <Header>Let's Sign Up</Header>
 
-            <TextInput
-              label="First Name"
-              returnKeyType="next"
-              value={firstName.value}
-              onChangeText={text => setFirstName({ value: text, error: '' })}
-              error={!!firstName.error}
-              errorText={firstName.error}
-            />
+          <TextInput
+            label="First Name"
+            returnKeyType="next"
+            value={firstName.value}
+            onChangeText={text => setFirstName({ value: text, error: '' })}
+            error={!!firstName.error}
+            errorText={firstName.error}
+          />
 
-            <TextInput
-              label="Last Name"
-              returnKeyType="next"
-              value={lastName.value}
-              onChangeText={text => setLastName({ value: text, error: '' })}
-              error={!!lastName.error}
-              errorText={lastName.error}
-            />
+          <TextInput
+            label="Last Name"
+            returnKeyType="next"
+            value={lastName.value}
+            onChangeText={text => setLastName({ value: text, error: '' })}
+            error={!!lastName.error}
+            errorText={lastName.error}
+          />
 
-            <TextInput
-              label="Email Address"
-              returnKeyType="next"
-              value={email.value}
-              onChangeText={text => {
-                setEmail({ 
-                  value: text, 
-                  error: validateEmail(text) ? '' : 'Please enter a valid student email'
-                })
-              }}
-              errorText={email.error}
-              autoCapitalize="none"
-              autoCompleteType="email"
-              textContentType="emailAddress"
-              keyboardType="email-address"
-              disabled={loading}
-              description="Only accept student emails (XXXXXX@siswa.unimas.my)"
-            />
+          <TextInput
+            label="Email Address"
+            returnKeyType="next"
+            value={email.value}
+            onChangeText={text => {
+              setEmail({
+                value: text,
+                error: validateEmail(text) ? '' : 'Please enter a valid student email'
+              })
+            }}
+            errorText={email.error}
+            autoCapitalize="none"
+            autoCompleteType="email"
+            textContentType="emailAddress"
+            keyboardType="email-address"
+            disabled={loading}
+            description="Only accept student emails (XXXXXX@siswa.unimas.my)"
+          />
 
-            <TextInput
-              label="Password"
-              returnKeyType="done"
-              value={password.value}
-              onChangeText={text => setPassword({ value: text, error: '' })}
-              errorText={password.error}
-              secureTextEntry
-              disabled={loading}
-            />
+          <TextInput
+            label="Password"
+            returnKeyType="done"
+            value={password.value}
+            onChangeText={text => setPassword({ value: text, error: '' })}
+            errorText={password.error}
+            secureTextEntry
+            disabled={loading}
+          />
 
-            <DropdownList
-              data={faculties}
-              value={faculty}
-              onChange={handleFacultyChange}
-              placeholder="Select Faculty"
-              errorText={facultyError}
-            />
+          <DropdownList
+            data={faculties}
+            value={faculty}
+            onChange={handleFacultyChange}
+            placeholder="Select Faculty"
+            errorText={facultyError}
+          />
 
-            <DropdownList
-              data={getYears()}
-              value={year}
-              onChange={handleYearChange}
-              placeholder="Select Year of Study"
-              disabled={!faculty}
-              errorText={yearError}
-            />
+          <DropdownList
+            data={getYears()}
+            value={year}
+            onChange={handleYearChange}
+            placeholder="Select Year of Study"
+            disabled={!faculty}
+            errorText={yearError}
+          />
 
-            <Button mode="contained" onPress={_onSignUpPressed} style={styles.button}>
-              Sign Up
-            </Button>
+          <Button mode="contained" onPress={_onSignUpPressed} style={styles.button}>
+            Sign Up
+          </Button>
 
-            <Modal
-              visible={isEmailSentModalVisible}
-              transparent
-              animationType='slide'
-            >
-              <View style={styles.modalBackground}>
-                <View style={styles.emailSentModal}>
-                  <Image
-                    source={require('../assets/auth/email-sent.png')}
-                    style={styles.emailSentImage}
-                  />
+          <Modal
+            visible={isEmailSentModalVisible}
+            transparent
+            animationType='slide'
+          >
+            <View style={styles.modalBackground}>
+              <View style={styles.emailSentModal}>
+                <Image
+                  source={require('../assets/auth/email-sent.png')}
+                  style={styles.emailSentImage}
+                />
 
-                  <Text style={styles.emailSentTitle}>Verification Email Sent!</Text>
-                  <Text style={styles.emailSentText}>
-                    We've just launched a magical verification link to your inbox! 
-                    Check your email, click that sparkly link, and unlock the full 
-                    adventure waiting for you! ✨
-                  </Text>
+                <Text style={styles.emailSentTitle}>Verification Email Sent!</Text>
+                <Text style={styles.emailSentText}>
+                  We've just launched a magical verification link to your inbox!
+                  Check your email, click that sparkly link, and unlock the full
+                  adventure waiting for you! ✨
+                </Text>
 
-                  <TouchableOpacity
-                    style={styles.closeButton}
-                    onPress={closeEmailSentModal}
-                  >
-                    <Text style={styles.closeButtonText}>I'm on it!</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={closeEmailSentModal}
+                >
+                  <Text style={styles.closeButtonText}>I'm on it!</Text>
+                </TouchableOpacity>
               </View>
-            </Modal>
-          </KeyboardAvoidingView>
+            </View>
+          </Modal>
+        </KeyboardAvoidingView>
       </View>
     </TouchableWithoutFeedback>
   )

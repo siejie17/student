@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StatusBar, StyleSheet, TouchableOpacity, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
@@ -7,6 +7,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import * as Device from 'expo-device';
 
 import SignInScreen from './screens/SignInScreen.jsx';
 import SignUpScreen from './screens/SignUpScreen.jsx';
@@ -31,7 +34,16 @@ import MessagingScreen from './screens/MessagingScreen.jsx';
 import LoadingIndicator from './components/General/LoadingIndicator.jsx';
 
 import { getItem } from './utils/asyncStorage.js';
-import { auth } from './utils/firebaseConfig';
+import { auth, db } from './utils/firebaseConfig';
+
+// Show notifications when app is foregrounded
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true, // show banner on screen
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
 
 const MainStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
@@ -49,6 +61,9 @@ export default function App() {
   const [studentID, setStudentID] = useState(null);
   const [student, setStudent] = useState({});
   const [loading, setLoading] = useState(true);
+
+  const notificationListener = useRef();
+  const responseListener = useRef();
 
   useEffect(() => {
     const checkIfAlreadyOnboarded = async () => {
@@ -68,6 +83,31 @@ export default function App() {
           if (storedStudentID) {
             setStudent(user);
             setStudentID(storedStudentID);
+
+            // Register and store push token
+            if (Device.isDevice) {
+              const { status: existingStatus } = await Notifications.getPermissionsAsync();
+              let finalStatus = existingStatus;
+
+              if (existingStatus !== 'granted') {
+                const { status } = await Notifications.requestPermissionsAsync();
+                finalStatus = status;
+              }
+
+              if (finalStatus === 'granted') {
+                const tokenData = await Notifications.getExpoPushTokenAsync();
+                const expoPushToken = tokenData.data;
+
+                const userRef = doc(db, 'user', storedStudentID);
+                const userSnap = await getDoc(userRef);
+
+                const currentToken = userSnap.exists() ? userSnap.data().expoPushToken : null;
+
+                if (expoPushToken !== currentToken) {
+                  await setDoc(userRef, { expoPushToken }, { merge: true });
+                }
+              }
+            }
           } else {
             setStudent({});
             setStudentID(null);
@@ -76,11 +116,29 @@ export default function App() {
           setStudent({});
           setStudentID(null);
         }
+
         setLoading(false);
-      })
-    }
+      });
+    };
 
     checkAuth();
+  }, []);
+
+  useEffect(() => {
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log("📬 Notification received in foreground:", notification);
+      // Optional: trigger app-level UI feedback here
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log("👆 User tapped the notification:", response);
+      // Optional: navigate somewhere based on notification data
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(notificationListener.current);
+      Notifications.removeNotificationSubscription(responseListener.current);
+    };
   }, []);
 
   if (loading) {

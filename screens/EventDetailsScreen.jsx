@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import MapView, { Marker } from 'react-native-maps';
 import { GestureHandlerRootView, TextInput } from 'react-native-gesture-handler';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, writeBatch } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, writeBatch, Timestamp } from "firebase/firestore";
 import { Entypo, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -475,16 +475,29 @@ const EventDetailsScreen = ({ navigation, route }) => {
                 throw new Error('Insufficient data for notification scheduling');
             }
 
-            const { status: existingStatus } = await Notifications.getPermissionsAsync();
-            let finalStatus = existingStatus;
+            // const { status: existingStatus } = await Notifications.getPermissionsAsync();
+            // let finalStatus = existingStatus;
 
-            if (existingStatus !== 'granted') {
-                const { status } = await Notifications.requestPermissionsAsync();
-                finalStatus = status;
+            // if (existingStatus !== 'granted') {
+            //     const { status } = await Notifications.requestPermissionsAsync();
+            //     finalStatus = status;
+            // }
+
+            // if (finalStatus !== 'granted') {
+            //     throw new Error('Notification permissions not granted');
+            // }
+
+            // 1. Get user token from Firestore
+            const userDocRef = doc(db, 'user', studentID);
+            const userDocSnap = await getDoc(userDocRef);
+
+            if (!userDocSnap.exists()) {
+                throw new Error('User not found');
             }
 
-            if (finalStatus !== 'granted') {
-                throw new Error('Notification permissions not granted');
+            const expoPushToken = userDocSnap.data().expoPushToken;
+            if (!expoPushToken) {
+                throw new Error('Expo push token is missing for this user');
             }
 
             const eventStartTime = eventDetails.startTime.toDate();
@@ -504,22 +517,38 @@ const EventDetailsScreen = ({ navigation, route }) => {
                 },
             ];
 
-            await Promise.all(notificationScenarios.map(notification =>
-                Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: notification.title,
-                        body: notification.body,
-                        sound: true,
-                        data: { id: notification.id }
-                    },
-                    trigger: {
-                        type: Notifications.SchedulableTriggerInputTypes.DATE,
-                        date: notification.trigger,
-                    }
-                })
-            ));
+            // await Promise.all(notificationScenarios.map(notification =>
+            //     Notifications.scheduleNotificationAsync({
+            //         content: {
+            //             title: notification.title,
+            //             body: notification.body,
+            //             sound: true,
+            //             data: { id: notification.id }
+            //         },
+            //         trigger: {
+            //             type: Notifications.SchedulableTriggerInputTypes.DATE,
+            //             date: notification.trigger,
+            //         }
+            //     })
+            // ));
 
-            console.log("Notifications scheduled successfully");
+            // console.log("Notifications scheduled successfully");
+
+            const batch = notificationScenarios.map(notification =>
+                addDoc(collection(db, 'scheduled_notifications'), {
+                    to: expoPushToken,
+                    studentID,
+                    eventID,
+                    title: notification.title,
+                    body: notification.body,
+                    sendAt: Timestamp.fromDate(notification.trigger),
+                    notificationID: notification.id
+                })
+            );
+
+            await Promise.all(batch);
+
+            console.log("Scheduled notification requests stored in Firestore");
         } catch (error) {
             console.error("Notification Scheduling Error:", error);
             Alert.alert(
