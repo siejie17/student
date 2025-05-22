@@ -15,6 +15,7 @@ import NetworkingQuestSheet from '../components/Quests/NetworkingQuestSheet';
 import AttendanceQuestSheet from '../components/Quests/AttendanceQuestSheet';
 import EventQuestsTimeRestrictedEmptyState from '../components/QuestCard/EventQuestsTimeRestrictedEmptyState';
 import EventCancelledQuestState from '../components/QuestCard/EventCancelledQuestState';
+import { useFocusEffect } from '@react-navigation/native';
 
 const EventQuestsScreen = ({ route, navigation }) => {
   const { eventID, categoryID, eventStart, latitude, longitude, registrationID, status } = route.params || {};
@@ -29,6 +30,16 @@ const EventQuestsScreen = ({ route, navigation }) => {
   const snapPoints = useMemo(() => ['50%'], []);
 
   const bottomSheetRef = useRef(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Screen is focused, do nothing
+      return () => {
+        // Screen is unfocused, close the bottom sheet
+        bottomSheetRef.current?.close();
+      };
+    }, [])
+  );
 
   const updateQuestStatus = async () => {
     try {
@@ -62,7 +73,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
       if (status === "Cancelled") {
         console.log("Event is cancelled - skipping quest fetch.");
         setIsLoading(false);
-        return () => {}; // Return empty cleanup
+        return () => { }; // Return empty cleanup
       }
 
       setIsLoading(true);
@@ -119,9 +130,9 @@ const EventQuestsScreen = ({ route, navigation }) => {
               const order = ["attendance", "earlyBird", "q&a", "networking", "feedback"];
               const aIndex = order.indexOf(a.questType);
               const bIndex = order.indexOf(b.questType);
-  
+
               if (aIndex !== bIndex) return aIndex - bIndex;
-  
+
               if (a.questType === "q&a" && b.questType === "q&a") {
                 const getNumber = (name) => {
                   const match = name.match(/\[#(\d+)\]/);
@@ -129,7 +140,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
                 };
                 return getNumber(a.questName) - getNumber(b.questName);
               }
-  
+
               return 0;
             });
 
@@ -181,18 +192,18 @@ const EventQuestsScreen = ({ route, navigation }) => {
   useEffect(() => {
     let unsubscribe = () => { };
     let timer;
-  
+
     if (status === "Cancelled") {
       console.log("Event is cancelled - skipping quest setup.");
       return () => { };
     }
-  
+
     const currentTimestamp = Math.floor(Date.now() / 1000);
     const timeUntilQuestsAvailable = eventStart.seconds - 3600 - currentTimestamp;
-  
+
     const checkQuestAvailability = () => {
       const now = Math.floor(Date.now() / 1000);
-  
+
       if (now >= eventStart.seconds - 3600) {
         fetchUserQuests().then((cleanup) => {
           if (typeof cleanup === "function") {
@@ -202,7 +213,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
         if (timer) clearTimeout(timer);
       }
     };
-  
+
     if (timeUntilQuestsAvailable > 0) {
       timer = setTimeout(checkQuestAvailability, timeUntilQuestsAvailable * 1000);
     } else {
@@ -212,12 +223,12 @@ const EventQuestsScreen = ({ route, navigation }) => {
         }
       });
     }
-  
+
     return () => {
       if (timer) clearTimeout(timer);
       unsubscribe();
     };
-  }, []);  
+  }, []);
 
   const handleSheetClose = (index) => {
     setIsQuestSheetVisible(index > 0);

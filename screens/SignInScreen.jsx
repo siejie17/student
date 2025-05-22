@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Image, KeyboardAvoidingView, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal } from 'react-native';
-import { useRef, useState, memo } from 'react';
+import { useRef, useState, memo, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
@@ -27,6 +27,11 @@ const SignInScreen = () => {
 
   const navigation = useNavigation();
 
+  useEffect(() => {
+    setLoading(false);
+
+  }, []);
+
   const _onLoginPressed = async () => {
     // Reset errors
     const emailError = email.value ? '' : 'Email cannot be empty';
@@ -45,14 +50,21 @@ const SignInScreen = () => {
       const userCredential = await signInWithEmailAndPassword(auth, email.value, password.value);
       const user = userCredential.user;
 
+      if (!user.uid) {
+        setLoading(false);
+        setPassword({ ...password, error: 'User not found. Please sign up first!' });
+        return;
+      }
+
       const isAdminRef = query(collection(db, "admin"), where("adminID", "==", user.uid));
       const isAdminSnapshot = await getDocs(isAdminRef);
 
       if (!isAdminSnapshot.empty) {
         setIsAdminModalVisible(true);
+        await auth.signOut();
+        setLoading(false);
         return;
       }
-      console.log("Here");
 
       if (!user.emailVerified) {
         setLoading(false);
@@ -66,8 +78,9 @@ const SignInScreen = () => {
 
       if (!userDocSnap.exists()) {
         const userSignedUpDataJSON = await getItem('@userSignedUpData');
-        if (userSignedUpDataJSON) {
-          const userSignedUpData = JSON.parse(userSignedUpDataJSON);
+        const userSignedUpData = JSON.parse(userSignedUpDataJSON);
+
+        if (userSignedUpData) {
           const imageAsset = Asset.fromModule(require('../assets/auth/defaultProfilePic.png'));
           await imageAsset.downloadAsync();
 
@@ -87,13 +100,9 @@ const SignInScreen = () => {
             expoPushToken: userSignedUpData.expoPushToken || null,
           });
 
-          const badgeProgressCollectionRef = collection(db, "badgeProgress");
-          const badgeProgressDocRef = await addDoc(badgeProgressCollectionRef, {
-            studentID: user.uid
-          });
+          const badgeProgressDocRef = await addDoc(collection(db, "badgeProgress"), { studentID: user.uid });
 
-          const badgeCollectionRef = collection(db, "badge");
-          const badgeSnapshot = await getDocs(badgeCollectionRef);
+          const badgeSnapshot = await getDocs(collection(db, "badge"));
 
           const batchPromises = badgeSnapshot.docs.map(async (badgeDoc) => {
             const badgeID = badgeDoc.id;

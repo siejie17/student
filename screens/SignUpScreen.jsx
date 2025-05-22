@@ -13,7 +13,7 @@ import DropdownList from '../components/Authentication/DropdownList';
 import Button from '../components/Authentication/Button';
 
 import { auth } from '../utils/firebaseConfig';
-import { setItem } from '../utils/asyncStorage';
+import { getItem, setItem } from '../utils/asyncStorage';
 import { theme } from '../core/theme';
 
 const SignUpScreen = () => {
@@ -32,7 +32,7 @@ const SignUpScreen = () => {
   const navigation = useNavigation();
 
   const validateEmail = (email) => {
-    const emailRegex = /^[a-zA-Z0-9._-]+@siswa\.unimas\.my$/;
+    const emailRegex = /^[0-9._-]+@siswa\.unimas\.my$/;
     return emailRegex.test(email);
   };
 
@@ -119,7 +119,12 @@ const SignUpScreen = () => {
   }
 
   const _onSignUpPressed = async () => {
-    if (!validateForm()) return;
+    setLoading(true);
+
+    if (!validateForm()) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email.value, password.value);
@@ -153,6 +158,9 @@ const SignUpScreen = () => {
         facultyID: faculty,
         expoPushToken: expoPushToken || null,
       }));
+      
+      const getUserItem = await getItem('@userSignedUpData');
+      console.log('User data:', JSON.parse(getUserItem));
 
       await sendEmailVerification(user);
       setIsEmailSentModalVisible(true);
@@ -218,6 +226,7 @@ const SignUpScreen = () => {
             errorText={password.error}
             secureTextEntry
             disabled={loading}
+            description="Password must be at least 6 characters"
           />
 
           <DropdownList
@@ -237,7 +246,13 @@ const SignUpScreen = () => {
             errorText={yearError}
           />
 
-          <Button mode="contained" onPress={_onSignUpPressed} style={styles.button}>
+          <Button 
+            mode="contained" 
+            onPress={_onSignUpPressed} 
+            loading={loading}
+            disabled={loading}
+            style={styles.button}
+          >
             Sign Up
           </Button>
 
@@ -255,7 +270,7 @@ const SignUpScreen = () => {
 
                 <Text style={styles.emailSentTitle}>Verification Email Sent!</Text>
                 <Text style={styles.emailSentText}>
-                  We've just launched a magical verification link to your inbox!
+                  We've just sent a verification link to your inbox!
                   Check your email, click that sparkly link, and unlock the full
                   adventure waiting for you! ✨
                 </Text>

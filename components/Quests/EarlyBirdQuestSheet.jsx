@@ -38,7 +38,12 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
                 const studentID = await getItem("studentID");
 
                 const currentEarlyBirdiesRef = collection(db, "registration");
-                const currentEarlyBirdiesQuery = query(currentEarlyBirdiesRef, where("eventID", "==", eventID), where("isAttended", "==", true), orderBy("attendanceScannedTime", "asc"), limit(selectedQuest.maxEarlyBird));
+                const currentEarlyBirdiesQuery = query(currentEarlyBirdiesRef, 
+                    where("eventID", "==", eventID), 
+                    where("isAttended", "==", true), 
+                    orderBy("attendanceScannedTime", "asc"), 
+                    limit(selectedQuest.maxEarlyBird)
+                );
 
                 const unsubscribeEarlyBirdies = onSnapshot(currentEarlyBirdiesQuery, async (earlyBirdiesSnap) => {
                     setCurrentEarlyBirdAttendees(earlyBirdiesSnap.size);

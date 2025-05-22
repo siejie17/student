@@ -3,7 +3,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import MapView, { Marker } from 'react-native-maps';
 import { GestureHandlerRootView, TextInput } from 'react-native-gesture-handler';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, writeBatch, Timestamp } from "firebase/firestore";
-import { Entypo, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { Entypo, MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Notifications from 'expo-notifications';
@@ -475,18 +475,6 @@ const EventDetailsScreen = ({ navigation, route }) => {
                 throw new Error('Insufficient data for notification scheduling');
             }
 
-            // const { status: existingStatus } = await Notifications.getPermissionsAsync();
-            // let finalStatus = existingStatus;
-
-            // if (existingStatus !== 'granted') {
-            //     const { status } = await Notifications.requestPermissionsAsync();
-            //     finalStatus = status;
-            // }
-
-            // if (finalStatus !== 'granted') {
-            //     throw new Error('Notification permissions not granted');
-            // }
-
             // 1. Get user token from Firestore
             const userDocRef = doc(db, 'user', studentID);
             const userDocSnap = await getDoc(userDocRef);
@@ -517,28 +505,13 @@ const EventDetailsScreen = ({ navigation, route }) => {
                 },
             ];
 
-            // await Promise.all(notificationScenarios.map(notification =>
-            //     Notifications.scheduleNotificationAsync({
-            //         content: {
-            //             title: notification.title,
-            //             body: notification.body,
-            //             sound: true,
-            //             data: { id: notification.id }
-            //         },
-            //         trigger: {
-            //             type: Notifications.SchedulableTriggerInputTypes.DATE,
-            //             date: notification.trigger,
-            //         }
-            //     })
-            // ));
-
-            // console.log("Notifications scheduled successfully");
-
             const batch = notificationScenarios.map(notification =>
                 addDoc(collection(db, 'scheduled_notifications'), {
                     to: expoPushToken,
                     studentID,
                     eventID,
+                    isSent: false,
+                    isRead: false,
                     title: notification.title,
                     body: notification.body,
                     sendAt: Timestamp.fromDate(notification.trigger),
@@ -666,6 +639,34 @@ const EventDetailsScreen = ({ navigation, route }) => {
                                 <View style={styles.infoRow}>
                                     <MaterialIcons name="people-alt" size={20} color="#666" marginRight="10" />
                                     <Text style={styles.infoText}>Limited to {eventDetails.capacity} people ONLY!</Text>
+                                </View>
+                            )}
+
+                            {(eventDetails.isFacultyRestrict || eventDetails.isYearRestrict) && (
+                                <View style={styles.infoRow}>
+                                    <MaterialCommunityIcons name="pin" size={20} color="#666" marginRight="10" />
+                                    <Text style={styles.infoText}>
+                                        {(() => {
+                                            const facultyName =
+                                                ORGANISER_MAPPING[eventDetails.organiserID] || 'faculty';
+
+                                            let message = eventDetails.isFacultyRestrict ? `Only allowed to ${facultyName}'s` : 'Only allowed to';
+
+                                            if (
+                                                eventDetails.isYearRestrict &&
+                                                Array.isArray(eventDetails.yearsRestricted)
+                                            ) {
+                                                const years = eventDetails.yearsRestricted
+                                                    .map((year) => `${year}`)
+                                                    .join(', ');
+                                                message += ` Year ${years} students`;
+                                            } else {
+                                                message += ` students`;
+                                            }
+
+                                            return message;
+                                        })()}
+                                    </Text>
                                 </View>
                             )}
                         </View>
@@ -799,7 +800,7 @@ const EventDetailsScreen = ({ navigation, route }) => {
                                 <View style={styles.fieldContainer}>
                                     <Text style={styles.label}>Receipt Proof <Text style={{ color: "red" }}>*</Text></Text>
                                     <Text style={styles.helperText}>
-                                        Please upload a receipt image (maximum 100KB)
+                                        Please upload a receipt image. Advisable file size - within 3MB.
                                     </Text>
 
                                     {receiptImage ? (
@@ -885,7 +886,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
-        zIndex: 2,
     },
     eventBriefDetailsContainer: {
         flex: 1,

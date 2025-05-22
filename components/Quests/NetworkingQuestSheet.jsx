@@ -311,7 +311,6 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                         networkID: parsedData.networkID,
                         scannedTime: serverTimestamp(),
                     });
-                    console.log("New network document created.");
                 } else {
                     // Use exisitng document
                     studentDocRef = doc(db, "network", networkSnap.docs[0].id);

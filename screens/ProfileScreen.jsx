@@ -8,13 +8,15 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
-  Alert
+  Alert,
+  Modal
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { getItem, removeItem } from '../utils/asyncStorage';
 import { collection, doc, getDoc, getDocs, query, where, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../utils/firebaseConfig';
-import { useNavigation } from '@react-navigation/native';
+import { theme } from '../core/theme';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { signOut } from 'firebase/auth';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -57,7 +59,19 @@ const ProfileScreen = () => {
   const snapPoints = useMemo(() => ['10%'], []);
   const bottomSheetRef = useRef(null);
 
+  const [isSignOutModalVisible, setIsSignOutModalVisible] = useState(false);
+
   const navigation = useNavigation();
+
+  useFocusEffect(
+    useCallback(() => {
+      // Screen is focused, do nothing
+      return () => {
+        // Screen is unfocused, close the bottom sheet
+        bottomSheetRef.current?.close();
+      };
+    }, [])
+  );
 
   useEffect(() => {
     let userUnsub = null;
@@ -283,7 +297,6 @@ const ProfileScreen = () => {
       await signOut(auth); // Sign out user
       removeItem("studentID");
       removeItem("facultyID");
-      Alert.alert("Success", "You have been logged out!");
     } catch (error) {
       Alert.alert("Error", error.message);
     }
@@ -312,7 +325,7 @@ const ProfileScreen = () => {
           <Text style={styles.errorText}>Unable to load profile data</Text>
           <TouchableOpacity
             style={styles.signOutButton}
-            onPress={() => navigation.replace("Login")}
+            onPress={handleSignOut}
           >
             <Text style={styles.signOutText}>Return to Login</Text>
           </TouchableOpacity>
@@ -413,9 +426,9 @@ const ProfileScreen = () => {
           </View>
 
           <View style={styles.achievementsFrame}>
-              <View style={styles.achievementsContainer}>
-                {badgeProgressList.map(badge => renderBadge(badge))}
-              </View>
+            <View style={styles.achievementsContainer}>
+              {badgeProgressList.map(badge => renderBadge(badge))}
+            </View>
           </View>
         </View>
 
@@ -448,11 +461,47 @@ const ProfileScreen = () => {
 
         <TouchableOpacity
           style={styles.signOutButton}
-          onPress={handleSignOut}
+          onPress={() => setIsSignOutModalVisible(true)}
           activeOpacity={0.8}
         >
           <Text style={styles.signOutButtonText}>Sign Out</Text>
         </TouchableOpacity>
+
+        <Modal
+          visible={isSignOutModalVisible}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalBackground}>
+            <View style={styles.signOutModal}>
+              <Image
+                source={require('../assets/icons/signout-warning.png')} // use your icon or placeholder
+                style={styles.signOutImage}
+              />
+
+              <Text style={styles.signOutTitle}>Ready to Sign Out?</Text>
+              <Text style={styles.signOutText}>
+                You're about to leave your quest. Are you sure you want to sign out?
+              </Text>
+
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.confirmButton]}
+                  onPress={handleSignOut}
+                >
+                  <Text style={styles.confirmButtonText}>Sign Out</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setIsSignOutModalVisible(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
 
       <BottomSheet
@@ -787,6 +836,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.3,
   },
+  background: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -946,5 +999,67 @@ const styles = StyleSheet.create({
     height: '80%',
     backgroundColor: 'rgba(169, 169, 169, 0.2)',
     marginHorizontal: 6,
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  signOutModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxWidth: 340,
+    alignItems: 'center',
+  },
+  signOutImage: {
+    width: 100,
+    height: 100,
+    marginBottom: 16,
+  },
+  signOutTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  signOutText: {
+    fontSize: 16,
+    color: theme.colors.secondary,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  buttonRow: {
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 12,
+  },
+  modalButton: {
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+  },
+  confirmButton: {
+    backgroundColor: '#EF4444',
+  },
+  cancelButtonText: {
+    color: theme.colors.secondary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  confirmButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

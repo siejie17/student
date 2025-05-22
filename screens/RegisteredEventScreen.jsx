@@ -195,20 +195,6 @@ const RegisteredEventScreen = ({ route }) => {
         const studentID = await getItem("studentID");
         if (!studentID || !eventID) return;
 
-        // const notificationArr = [`${eventID}_${studentID}_1D`, `${eventID}_${studentID}_1H`];
-        // const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-
-        // const cancelPromises = notificationArr.map((notificationID) => {
-        //     const matchedNotification = scheduledNotifications.find(
-        //         notification => notification.content.data?.id === notificationID
-        //     );
-        //     if (matchedNotification) {
-        //         return Notifications.cancelScheduledNotificationAsync(matchedNotification.identifier);
-        //     }
-        // });
-
-        // await Promise.all(cancelPromises);
-
         const q = query(
             collection(db, 'scheduled_notifications'),
             where('studentID', '==', studentID),

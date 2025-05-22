@@ -15,12 +15,17 @@ import Button from '../components/Authentication/Button';
 const PasswordResetScreen = () => {
   const [email, setEmail] = useState({ value: '', error: '' });
   const [isPasswordResetModalVisible, setIsPasswordResetModalVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const navigation = useNavigation();
 
   const _onSendPressed = async () => {
+    setIsLoading(true);
+    setEmail({ ...email, error: '' });
+
     if (!email.value) {
       setEmail({ ...email, error: 'Email cannot be empty' });
+      setIsLoading(false);
       return;
     }
 
@@ -64,7 +69,13 @@ const PasswordResetScreen = () => {
           textContentType="emailAddress"
           keyboardType="email-address"
         />
-        <Button mode="contained" onPress={_onSendPressed} style={styles.button}>
+        <Button 
+          mode="contained" 
+          onPress={_onSendPressed} 
+          style={styles.button}
+          loading={isLoading}
+          disabled={isLoading}
+        >
           Send Reset Instructions Email
         </Button>
       </View>

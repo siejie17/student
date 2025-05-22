@@ -117,9 +117,11 @@ exports.sendScheduledNotifications = onSchedule(
   },
   async (context) => {
     const now = admin.firestore.Timestamp.now();
+
     const snapshot = await db
       .collection("scheduled_notifications")
       .where("sendAt", "<=", now)
+      .where("isSent", "==", false) // Only unsent notifications
       .get();
 
     if (snapshot.empty) {
@@ -130,7 +132,6 @@ exports.sendScheduledNotifications = onSchedule(
     for (const doc of snapshot.docs) {
       const data = doc.data();
 
-      // Prepare payload
       const message = {
         to: data.to,
         sound: "default",
@@ -158,7 +159,7 @@ exports.sendScheduledNotifications = onSchedule(
 
         if (response.ok) {
           logger.log(`Notification sent: ${data.notificationID}`, responseData);
-          await doc.ref.delete(); // delete after sending
+          await doc.ref.update({ isSent: true }); // mark as sent
         } else {
           logger.error("Failed to send notification", responseData);
         }
@@ -170,4 +171,3 @@ exports.sendScheduledNotifications = onSchedule(
     return null;
   }
 );
-

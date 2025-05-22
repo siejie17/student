@@ -490,7 +490,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   backButton: {
+    width: 35,
+    height: 35,
     marginRight: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(165, 165, 165, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
