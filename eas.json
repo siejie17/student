@@ -1,12 +1,24 @@
 {
-  "build": {
-    "production": {
-      "releaseChannel": "default",
-      "developmentClient": false,
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
+    "cli": {
+        "appVersionSource": "remote"
+    },
+    "build": {
+        "preview": {
+            "android": {
+                "buildType": "apk"
+            }
+        },
+        "preview2": {
+            "android": {
+                "gradleCommand": ":app:assembleRelease"
+            }
+        },
+        "preview3": {
+            "developmentClient": true
+        },
+        "preview4": {
+            "distribution": "internal"
+        },
+        "production": {}
     }
-  }
 }

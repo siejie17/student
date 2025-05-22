@@ -4,7 +4,7 @@
     "slug": "student",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo.png",
+    "icon": "./assets/device_logo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "extra": {
@@ -14,7 +14,7 @@
       }
     },
     "splash": {
-      "image": "./assets/logo.png",
+      "image": "./assets/device_logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -25,7 +25,7 @@
       "package": "com.lingsiejie.uniexp",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo.png",
+        "foregroundImage": "./assets/device_logo.png",
         "backgroundColor": "#ffffff"
       }
     },

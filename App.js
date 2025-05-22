@@ -147,8 +147,6 @@ export default function App() {
     );
   }
 
-  if (showOnboarding === null) return null;
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar
