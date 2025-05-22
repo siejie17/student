@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "376632403855",
+    "firebase_url": "https://uniexp-bfc54-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "uniexp-bfc54",
+    "storage_bucket": "uniexp-bfc54.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:376632403855:android:fd0c3716aaad2c8aae8dfa",
+        "android_client_info": {
+          "package_name": "com.lingsiejie.uniexp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLdDvX7hdQYH4EsSzTghij2p0B7lHWijs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

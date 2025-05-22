@@ -22,6 +22,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.lingsiejie.uniexp",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
