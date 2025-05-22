@@ -264,7 +264,7 @@ const SignUpScreen = () => {
             <View style={styles.modalBackground}>
               <View style={styles.emailSentModal}>
                 <Image
-                  source={require('../assets/auth/email-sent.png')}
+                  source={require('../assets/auth/email_sent.png')}
                   style={styles.emailSentImage}
                 />
 

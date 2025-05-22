@@ -283,7 +283,7 @@ const RegisteredEventScreen = ({ route }) => {
                                 <Image
                                     source={{ uri: `data:image/png;base64,${image}` }}
                                     style={styles.image}
-                                    defaultSource={require('../assets/images/image-not-found.png')}
+                                    defaultSource={require('../assets/images/image_not_found.png')}
                                     onError={(e) => console.log(`Image ${index} load error`, e.nativeEvent.error)}
                                 />
                                 <View style={styles.indicator}>

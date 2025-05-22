@@ -152,7 +152,7 @@ const MessagingScreen = ({ navigation, route }) => {
     const playMessageSound = async () => {
         try {
             const { sound } = await Audio.Sound.createAsync(
-                require('../assets/sound/message-sent.mp3')
+                require('../assets/sound/message_sent.mp3')
             );
             await sound.playAsync();
         } catch (error) {

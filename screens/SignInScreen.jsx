@@ -228,7 +228,7 @@ const SignInScreen = () => {
           <View style={styles.modalBackground}>
             <View style={styles.verificationModal}>
               <Image
-                source={require('../assets/auth/email-send.png')}
+                source={require('../assets/auth/email_send.png')}
                 style={styles.verificationImage}
               />
 
@@ -256,7 +256,7 @@ const SignInScreen = () => {
           <View style={styles.modalBackground}>
             <View style={styles.verificationModal}>
               <Image
-                source={require('../assets/auth/access-denied.png')}
+                source={require('../assets/auth/access_denied.png')}
                 style={styles.verificationImage}
               />
 

@@ -16,7 +16,7 @@ const EmptyNetworkState = ({ onScanQRPress }) => {
         useNativeDriver
       >
         <Image 
-          source={require('../../assets/network/lonely-student.png')} 
+          source={require('../../assets/network/lonely_student.png')} 
           style={styles.image}
           resizeMode="contain"
         />

@@ -285,7 +285,7 @@ const LeaderboardScreen = () => {
         <Image
           source={item.profilePic
             ? { uri: `data:image/png;base64,${item.profilePic}` }
-            : require('../assets/leaderboard/unknown-profile.png')}
+            : require('../assets/leaderboard/unknown_profile.png')}
           style={[styles.listAvatar]}
         />
 
@@ -336,12 +336,12 @@ const LeaderboardScreen = () => {
               <Image
                 source={secondPlace?.profilePic
                   ? { uri: `data:image/png;base64,${secondPlace.profilePic}` }
-                  : require('../assets/leaderboard/unknown-profile.png')}
+                  : require('../assets/leaderboard/unknown_profile.png')}
                 style={[styles.podiumAvatar, styles.secondAvatar]}
               />
               <View style={styles.medalContainer}>
                 <Image
-                  source={require('../assets/leaderboard/second-place.png')}
+                  source={require('../assets/leaderboard/second_place.png')}
                   style={styles.image}
                 />
               </View>
@@ -361,12 +361,12 @@ const LeaderboardScreen = () => {
               <Image
                 source={firstPlace?.profilePic
                   ? { uri: `data:image/png;base64,${firstPlace.profilePic}` }
-                  : require('../assets/leaderboard/unknown-profile.png')}
+                  : require('../assets/leaderboard/unknown_profile.png')}
                 style={[styles.podiumAvatar, styles.firstAvatar]}
               />
               <View style={[styles.medalContainer, styles.goldMedal]}>
                 <Image
-                  source={require('../assets/leaderboard/first-place.png')}
+                  source={require('../assets/leaderboard/first_place.png')}
                   style={styles.image}
                 />
               </View>
@@ -385,12 +385,12 @@ const LeaderboardScreen = () => {
               <Image
                 source={thirdPlace?.profilePic
                   ? { uri: `data:image/png;base64,${thirdPlace.profilePic}` }
-                  : require('../assets/leaderboard/unknown-profile.png')}
+                  : require('../assets/leaderboard/unknown_profile.png')}
                 style={[styles.podiumAvatar, styles.thirdAvatar]}
               />
               <View style={[styles.medalContainer, styles.bronzeMedal]}>
                 <Image
-                  source={require('../assets/leaderboard/third-place.png')}
+                  source={require('../assets/leaderboard/third_place.png')}
                   style={styles.image}
                 />
               </View>

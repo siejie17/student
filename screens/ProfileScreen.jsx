@@ -475,7 +475,7 @@ const ProfileScreen = () => {
           <View style={styles.modalBackground}>
             <View style={styles.signOutModal}>
               <Image
-                source={require('../assets/icons/signout-warning.png')} // use your icon or placeholder
+                source={require('../assets/icons/signout_warning.png')} // use your icon or placeholder
                 style={styles.signOutImage}
               />
 

@@ -88,7 +88,7 @@ const PasswordResetScreen = () => {
         <View style={styles.modalBackground}>
           <View style={styles.passwordResetModal}>
             <Image
-              source={require('../assets/auth/password-reset.png')}
+              source={require('../assets/auth/password_reset.png')}
               style={styles.passwordResetImage}
             />
 

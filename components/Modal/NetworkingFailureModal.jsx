@@ -16,7 +16,7 @@ const NetworkingFailureModal = ({
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContainer}>
                     <Image
-                        source={require('../../assets/icons/exclamation-mark.png')}
+                        source={require('../../assets/icons/exclamation_mark.png')}
                         style={styles.failureImage}
                     />
 

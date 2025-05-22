@@ -46,7 +46,7 @@ const PaymentProofModal = ({
                         source={{ uri: `data:image/jpeg;base64,${paymentProofBase64}` }}
                         style={styles.paymentProofImage}
                         resizeMode="contain"
-                        defaultSource={require('../../assets/images/image-not-found.png')} // Add a placeholder
+                        defaultSource={require('../../assets/images/image_not_found.png')} // Add a placeholder
                         onError={(e) => console.log('Payment proof image load error', e.nativeEvent.error)}
                         accessibilityLabel="Payment Proof Image"
                     />

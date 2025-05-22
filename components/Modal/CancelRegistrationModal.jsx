@@ -105,7 +105,7 @@ const CancelRegistrationModal = ({
                 >
                     <View style={styles.imageContainer}>
                         <Image
-                            source={require('../../assets/icons/cancel-icon.png')}
+                            source={require('../../assets/icons/cancel_icon.png')}
                             style={styles.modalImage}
                             resizeMode="contain"
                             accessibilityLabel="Cancel registration icon"
