@@ -24,14 +24,14 @@
     "android": {
       "package": "com.lingsiejie.uniexp",
       "googleServicesFile": "./android/app/google-services.json",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/device_logo.png",
-        "backgroundColor": "#ffffff"
-      },
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCh4pevCllhwWP35yeAwWSU87vjJ0q34ok"
         }
+      },
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/device_logo.png",
+        "backgroundColor": "#ffffff"
       }
     },
     "web": {
@@ -50,6 +50,11 @@
         }
       ]
     ],
-    "owner": "uniexp"
+    "owner": "uniexp",
+    "sdkVersion": "52.0.0",
+    "platforms": [
+      "ios",
+      "android"
+    ]
   }
 }
