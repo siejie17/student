@@ -1,8 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions, Image, TouchableOpacity } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-import MapView, { Marker } from 'react-native-maps';
-import * as Notifications from 'expo-notifications';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { doc, onSnapshot, collection, query, where, deleteDoc, Timestamp, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
 
@@ -71,10 +70,10 @@ const RegisteredEventScreen = ({ route }) => {
     const fetchEventData = useCallback(() => {
         if (!registrationID) return () => { };
 
+        let isActive = true;
         setIsLoading(true);
         setError(null);
 
-        let isActive = true;
         const unsubscribeFunctions = [];
 
         const registrationRef = doc(db, "registration", registrationID);
@@ -84,15 +83,15 @@ const RegisteredEventScreen = ({ route }) => {
 
             if (!registrationSnap.exists()) {
                 console.log("No such registration!");
-                setIsLoading(false);
+                if (isActive) {
+                    setError("No such registration");
+                    setIsLoading(false);
+                }
                 return;
             }
 
             const registrationData = registrationSnap.data();
-
-            if (isActive) {
-                setRegistrationDetails(registrationData);
-            }
+            if (isActive) setRegistrationDetails(registrationData);
 
             const eventRef = doc(db, "event", registrationData.eventID);
             const unsubscribeEvent = onSnapshot(eventRef, (eventSnap) => {
@@ -100,11 +99,15 @@ const RegisteredEventScreen = ({ route }) => {
 
                 if (!eventSnap.exists()) {
                     console.log("No such event!");
-                    setIsLoading(false);
+                    if (isActive) {
+                        setError("No such event");
+                        setIsLoading(false);
+                    }
                     return;
                 }
 
                 const eventData = eventSnap.data();
+
                 const eventImagesRef = collection(db, "eventImages");
                 const eventImagesQuery = query(eventImagesRef, where("eventID", "==", registrationData.eventID));
 
@@ -112,25 +115,25 @@ const RegisteredEventScreen = ({ route }) => {
                     if (!isActive) return;
 
                     const images = eventImagesSnap.docs.flatMap(doc =>
-                        doc.data().images ? doc.data().images : []
+                        doc.data().images || []
                     );
 
+                    const processedEventDetails = {
+                        ...eventData,
+                        name: eventData.eventName,
+                        description: eventData.eventDescription,
+                        startTime: eventData.eventStartDateTime,
+                        endTime: eventData.eventEndDateTime,
+                        images,
+                    };
+
+                    if (eventData.requiresCapacity) {
+                        processedEventDetails.capacity = eventData.capacity;
+                    }
+
                     if (isActive) {
-                        const processedEventDetails = {
-                            ...eventData,
-                            name: eventData.eventName,
-                            description: eventData.eventDescription,
-                            startTime: eventData.eventStartDateTime,
-                            endTime: eventData.eventEndDateTime,
-                            images,
-                        };
-
-                        if (processedEventDetails.requiresCapacity) {
-                            processedEventDetails.capacity = eventData.capacity;
-                        }
-
-                        setRegistrationDetails(registrationData);
                         setEventDetails(processedEventDetails);
+                        setRegistrationDetails(registrationData);
                         setIsLoading(false);
                     }
                 });
@@ -141,9 +144,11 @@ const RegisteredEventScreen = ({ route }) => {
             unsubscribeFunctions.push(unsubscribeEvent);
         });
 
+        unsubscribeFunctions.push(unsubscribeRegistration);
+
         return () => {
             isActive = false;
-            unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
+            unsubscribeFunctions.forEach(unsub => unsub?.());
         };
     }, [registrationID]);
 
@@ -151,12 +156,13 @@ const RegisteredEventScreen = ({ route }) => {
     useFocusEffect(
         useCallback(() => {
             const unsubscribe = fetchEventData();
+
             return () => {
-                unsubscribe();
-                // Reset states when screen loses focus to prevent stale data
+                unsubscribe?.(); // Cleanup Firestore listeners
                 setEventDetails({});
                 setRegistrationDetails({});
                 setIsLoading(false);
+                setError(null);
             };
         }, [fetchEventData])
     );
@@ -441,6 +447,7 @@ const RegisteredEventScreen = ({ route }) => {
                         <View style={styles.mapContainer}>
                             {eventDetails.locationLatitude != null && eventDetails.locationLongitude != null && (
                                 <MapView
+                                    provider={PROVIDER_GOOGLE}
                                     style={styles.map}
                                     region={{
                                         latitude: eventDetails.locationLatitude,

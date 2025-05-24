@@ -1,24 +1,22 @@
 {
     "cli": {
-        "appVersionSource": "remote"
+        "appVersionSource": "remote",
+        "version": ">= 3.0.0"
     },
     "build": {
         "preview": {
+            "developmentClient": false,
+            "distribution": "internal",
             "android": {
                 "buildType": "apk"
             }
         },
-        "preview2": {
+        "production": {
+            "developmentClient": false,
+            "distribution": "store",
             "android": {
-                "gradleCommand": ":app:assembleRelease"
+                "buildType": "apk"
             }
-        },
-        "preview3": {
-            "developmentClient": true
-        },
-        "preview4": {
-            "distribution": "internal"
-        },
-        "production": {}
+        }
     }
 }

@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Image, Dimensions, Platform, Alert, Animated } from 'react-native';
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { GestureHandlerRootView, TextInput } from 'react-native-gesture-handler';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, writeBatch, Timestamp } from "firebase/firestore";
 import { Entypo, MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,7 +8,6 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Notifications from 'expo-notifications';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
-import { CircleX } from 'lucide-react-native';
 
 import { db } from '../utils/firebaseConfig';
 import { getItem } from '../utils/asyncStorage';
@@ -69,6 +68,7 @@ const EventDetailsScreen = ({ navigation, route }) => {
 
     const scrollViewRef = useRef(null);
     const registrationFormRef = useRef(null);
+    const abortControllerRef = useRef(new AbortController());
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.98)).current;
@@ -91,11 +91,34 @@ const EventDetailsScreen = ({ navigation, route }) => {
     );
 
     useEffect(() => {
+        const unsubscribe = navigation.addListener('blur', () => {
+            // Clean up when screen loses focus
+            registrationFormRef.current?.close();
+        });
+
+        return unsubscribe;
+    }, [navigation]);
+
+    useEffect(() => {
+        const fadeAnim = new Animated.Value(0);
+        const scaleAnim = new Animated.Value(0.98);
+
+        return () => {
+            // Clean up animations
+            fadeAnim.removeAllListeners();
+            scaleAnim.removeAllListeners();
+            abortControllerRef.current.abort();
+        };
+    }, []);
+
+    useEffect(() => {
         let unsubscribeEvent = null;
         let unsubscribeRegistration = null;
+        let isMounted = true;
 
         const fetchData = async () => {
             try {
+                if (!isMounted) return;
                 setIsLoading(true);
 
                 if (!eventID) return;
@@ -202,13 +225,16 @@ const EventDetailsScreen = ({ navigation, route }) => {
                     setIsLoading(false);
                 });
             } catch (error) {
-                console.error("Error when fetching data,", error.message);
+                if (isMounted) {
+                    console.error("Error when fetching data,", error.message);
+                }
             }
         };
 
         fetchData();
 
         return () => {
+            isMounted = false;
             if (unsubscribeEvent) unsubscribeEvent();
             if (unsubscribeRegistration) unsubscribeRegistration();
         };
@@ -366,10 +392,19 @@ const EventDetailsScreen = ({ navigation, route }) => {
 
     const submitRegistration = async () => {
         try {
-            if (!eventID || !eventDetails) throw new Error("Missing event details");
+            const signal = abortControllerRef.current.signal;
+            if (!eventID || !eventDetails) {
+                throw new Error("Missing event details");
+            }
 
             const studentID = await getItem("studentID");
-            if (!studentID) throw new Error("studentID does not exist.");
+            if (!studentID) {
+                throw new Error("studentID does not exist.");
+            }
+
+            if (abortControllerRef.current.signal.aborted) {
+                return;
+            }
 
             // Early validation to avoid wasteful operations
             if (eventDetails.requiresPaymentProof && !receiptImage) {
@@ -401,11 +436,13 @@ const EventDetailsScreen = ({ navigation, route }) => {
             return registrationDocRef.id;
 
         } catch (error) {
-            console.log("Event Registration Error:", error);
-            Alert.alert(
-                "Registration Failed",
-                error.message || "Unable to complete event registration. Please try again."
-            );
+            if (error.name === 'AbortError') {
+                console.log("Event Registration Error:", error);
+                Alert.alert(
+                    "Registration Failed",
+                    error.message || "Unable to complete event registration. Please try again."
+                );
+            }
             throw error;
         }
     };
@@ -690,16 +727,17 @@ const EventDetailsScreen = ({ navigation, route }) => {
                                 <Text style={[styles.infoText, { marginBottom: "16" }]}>{eventDetails.locationName}</Text>
 
                                 <View style={styles.mapContainer}>
-                                    <MapView
-                                        style={styles.map}
-                                        region={{
-                                            latitude: eventDetails.locationLatitude,
-                                            longitude: eventDetails.locationLongitude,
-                                            latitudeDelta: 0.005,
-                                            longitudeDelta: 0.005,
-                                        }}
-                                    >
-                                        {eventDetails.locationLatitude != null && eventDetails.locationLongitude != null && (
+                                    {eventDetails.locationLatitude != null && eventDetails.locationLongitude != null && (
+                                        <MapView
+                                            provider={PROVIDER_GOOGLE}
+                                            style={styles.map}
+                                            region={{
+                                                latitude: eventDetails.locationLatitude,
+                                                longitude: eventDetails.locationLongitude,
+                                                latitudeDelta: 0.005,
+                                                longitudeDelta: 0.005,
+                                            }}
+                                        >
                                             <Marker
                                                 coordinate={{
                                                     latitude: eventDetails.locationLatitude,
@@ -707,8 +745,8 @@ const EventDetailsScreen = ({ navigation, route }) => {
                                                 }}
                                                 title={eventDetails.locationName}
                                             />
-                                        )}
-                                    </MapView>
+                                        </MapView>
+                                    )}
                                 </View>
                             </View>
                         </View>
@@ -735,19 +773,19 @@ const EventDetailsScreen = ({ navigation, route }) => {
                     {
                         eventDetails.capacity === currentParticipantNum ? (
                             <View style={styles.maxCapacityContainer}>
-                                <CircleX color="#FF002F" size={24} />
+                                <Entypo name="circle-with-cross" size={24} color="#FF002F" />
                                 <Text style={styles.maxCapacityText}>Maximum Capacity</Text>
                             </View>
                         ) : eventDetails.isFacultyRestrict && userRegistrationInfo.facultyID.toString() !== eventDetails.organiserID ? (
                             <View style={styles.maxCapacityContainer}>
-                                <CircleX color="#FF002F" size={24} />
+                                <Entypo name="circle-with-cross" size={24} color="#FF002F" />
                                 <Text style={styles.maxCapacityText}>
                                     {`This event is only eligible for ${ORGANISER_MAPPING[eventDetails.organiserID]} student`}
                                 </Text>
                             </View>
                         ) : eventDetails.isYearRestrict && !eventDetails.yearsRestricted?.includes(userRegistrationInfo.yearOfStudy) ? (
                             <View style={styles.maxCapacityContainer}>
-                                <CircleX color="#FF002F" size={24} />
+                                <Entypo name="circle-with-cross" size={24} color="#FF002F" />
                                 <Text style={styles.maxCapacityText}>
                                     This event is only eligible for Year {eventDetails.yearsRestricted?.join(", ")} student
                                 </Text>

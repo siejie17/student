@@ -7,7 +7,7 @@ import {
   Dimensions 
 } from 'react-native';
 
-import { Trophy } from 'lucide-react-native';
+import { FontAwesome } from '@expo/vector-icons';
 
 const QuestCompletedModal = ({ 
   isVisible, 
@@ -36,11 +36,7 @@ const QuestCompletedModal = ({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <Trophy 
-            color="#FFD700" 
-            size={64} 
-            style={styles.trophyIcon} 
-          />
+          <FontAwesome name="trophy" size={64} color="#FFD700" style={styles.trophyIcon} />
           
           <Text style={styles.titleText}>
             Quest Completed

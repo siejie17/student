@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "student",
+    "name": "UniEXP",
     "slug": "student",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -23,10 +23,15 @@
     },
     "android": {
       "package": "com.lingsiejie.uniexp",
-      "googleServicesFile": "./google-services.json",
+      "googleServicesFile": "./android/app/google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/device_logo.png",
         "backgroundColor": "#ffffff"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCh4pevCllhwWP35yeAwWSU87vjJ0q34ok"
+        }
       }
     },
     "web": {
