@@ -23,7 +23,7 @@
     },
     "android": {
       "package": "com.lingsiejie.uniexp",
-      "googleServicesFile": "./android/app/google-services.json",
+      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCh4pevCllhwWP35yeAwWSU87vjJ0q34ok"
@@ -50,11 +50,6 @@
         }
       ]
     ],
-    "owner": "uniexp",
-    "sdkVersion": "52.0.0",
-    "platforms": [
-      "ios",
-      "android"
-    ]
+    "owner": "uniexp"
   }
 }
