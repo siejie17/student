@@ -81,12 +81,10 @@ const SignInScreen = () => {
         const userSignedUpData = JSON.parse(userSignedUpDataJSON);
 
         if (userSignedUpData) {
-          const imageAsset = Asset.fromModule(require('../assets/auth/defaultProfilePic.png'));
-          await imageAsset.downloadAsync();
+          const profilePicQuery = query(collection(db, "config"), where("name", "==", "defaultProfilePic"));
+          const profilePicSnapshot = await getDocs(profilePicQuery);
 
-          const ProfilePicBase64 = await FileSystem.readAsStringAsync(imageAsset.localUri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
+          const ProfilePicBase64 = profilePicSnapshot.docs[0].data().base64;;
 
           await setDoc(userDocRef, {
             firstName: userSignedUpData.firstName,
@@ -121,7 +119,6 @@ const SignInScreen = () => {
           await setItem('facultyID', userSignedUpData.facultyID.value);
           await auth.signOut();
           await signInWithEmailAndPassword(auth, email.value, password.value)
-          await removeItem('@userSignedUpData');
         }
       } else {
         await setItem('studentID', user.uid);
