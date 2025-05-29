@@ -1,10 +1,8 @@
 import { View, Text, StyleSheet, Image, KeyboardAvoidingView, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal } from 'react-native';
-import { useRef, useState, memo, useEffect } from 'react';
+import { useRef, useState, memo } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
-import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 
 import Header from '../components/Authentication/Header';
 import Button from '../components/Authentication/Button';
@@ -12,7 +10,7 @@ import TextInput from '../components/Authentication/TextInput';
 
 import { theme } from '../core/theme';
 import { auth, db } from '../utils/firebaseConfig';
-import { getItem, removeItem, setItem } from '../utils/asyncStorage';
+import { setItem } from '../utils/asyncStorage';
 
 const SignInScreen = () => {
   const [email, setEmail] = useState({ value: '', error: '' });
@@ -26,11 +24,6 @@ const SignInScreen = () => {
   const passwordInputRef = useRef(null);
 
   const navigation = useNavigation();
-
-  useEffect(() => {
-    setLoading(false);
-
-  }, []);
 
   const _onLoginPressed = async () => {
     // Reset errors
@@ -52,6 +45,7 @@ const SignInScreen = () => {
 
       if (!user.uid) {
         setLoading(false);
+        await auth.signOut();
         setPassword({ ...password, error: 'User not found. Please sign up first!' });
         return;
       }
@@ -76,56 +70,10 @@ const SignInScreen = () => {
       const userDocRef = doc(db, "user", user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
-      if (!userDocSnap.exists()) {
-        const userSignedUpDataJSON = await getItem('@userSignedUpData');
-        const userSignedUpData = JSON.parse(userSignedUpDataJSON);
-
-        if (userSignedUpData) {
-          const profilePicQuery = query(collection(db, "config"), where("name", "==", "defaultProfilePic"));
-          const profilePicSnapshot = await getDocs(profilePicQuery);
-
-          const ProfilePicBase64 = profilePicSnapshot.docs[0].data().base64;;
-
-          await setDoc(userDocRef, {
-            firstName: userSignedUpData.firstName,
-            lastName: userSignedUpData.lastName,
-            email: userSignedUpData.email,
-            yearOfStudy: userSignedUpData.yearOfStudy.value,
-            facultyID: userSignedUpData.facultyID.value,
-            diamonds: 0,
-            totalPointsGained: 0,
-            profilePicture: ProfilePicBase64,
-            expoPushToken: userSignedUpData.expoPushToken || null,
-          });
-
-          const badgeProgressDocRef = await addDoc(collection(db, "badgeProgress"), { studentID: user.uid });
-
-          const badgeSnapshot = await getDocs(collection(db, "badge"));
-
-          const batchPromises = badgeSnapshot.docs.map(async (badgeDoc) => {
-            const badgeID = badgeDoc.id;
-            const badgeProgressSubDocRef = doc(db, "badgeProgress", badgeProgressDocRef.id, "userBadgeProgress", badgeID);
-
-            await setDoc(badgeProgressSubDocRef, {
-              dateUpdated: serverTimestamp(),
-              isUnlocked: false,
-              progress: 0,
-            });
-          });
-
-          await Promise.all(batchPromises);
-
-          await setItem('studentID', user.uid);
-          await setItem('facultyID', userSignedUpData.facultyID.value);
-          await auth.signOut();
-          await signInWithEmailAndPassword(auth, email.value, password.value)
-        }
-      } else {
-        await setItem('studentID', user.uid);
-        await setItem('facultyID', userDocSnap.data().facultyID);
-        await auth.signOut();
-        await signInWithEmailAndPassword(auth, email.value, password.value)
-      }
+      await setItem('studentID', user.uid);
+      await setItem('facultyID', userDocSnap.data().facultyID);
+      await auth.signOut();
+      await signInWithEmailAndPassword(auth, email.value, password.value);
     } catch (error) {
       setLoading(false);
 
@@ -168,114 +116,114 @@ const SignInScreen = () => {
   return (
     <TouchableWithoutFeedback onPress={dismissEverything}>
       <View style={styles.background}>
-      <KeyboardAvoidingView style={styles.container} behavior='padding'>
-        <Image source={require('../assets/logo.png')} style={styles.image} />
-        <Header>Welcome Back, Warrior!</Header>
-        <TextInput
-          label="Email"
-          returnKeyType="next"
-          value={email.value}
-          onChangeText={text => setEmail({ value: text, error: '' })}
-          errorText={email.error}
-          autoCapitalize="none"
-          autoCompleteType="email"
-          textContentType="emailAddress"
-          keyboardType="email-address"
-          disabled={loading}
-          onRef={(ref) => (emailInputRef.current = ref)}
-        />
-        <TextInput
-          label="Password"
-          returnKeyType="done"
-          value={password.value}
-          onChangeText={text => setPassword({ value: text, error: '' })}
-          errorText={password.error}
-          secureTextEntry
-          disabled={loading}
-          onRef={(ref) => (passwordInputRef.current = ref)}
-        />
-        <View style={styles.forgotPassword}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('PasswordReset')}
+        <KeyboardAvoidingView style={styles.container} behavior='padding'>
+          <Image source={require('../assets/logo.png')} style={styles.image} />
+          <Header>Welcome Back, Warrior!</Header>
+          <TextInput
+            label="Email"
+            returnKeyType="next"
+            value={email.value}
+            onChangeText={text => setEmail({ value: text, error: '' })}
+            errorText={email.error}
+            autoCapitalize="none"
+            autoCompleteType="email"
+            textContentType="emailAddress"
+            keyboardType="email-address"
+            disabled={loading}
+            onRef={(ref) => (emailInputRef.current = ref)}
+          />
+          <TextInput
+            label="Password"
+            returnKeyType="done"
+            value={password.value}
+            onChangeText={text => setPassword({ value: text, error: '' })}
+            errorText={password.error}
+            secureTextEntry
+            disabled={loading}
+            onRef={(ref) => (passwordInputRef.current = ref)}
+          />
+          <View style={styles.forgotPassword}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('PasswordReset')}
+            >
+              <Text style={styles.label}>Forgot your password?</Text>
+            </TouchableOpacity>
+          </View>
+          <Button
+            mode="contained"
+            onPress={_onLoginPressed}
+            loading={loading}
+            disabled={loading}
           >
-            <Text style={styles.label}>Forgot your password?</Text>
-          </TouchableOpacity>
-        </View>
-        <Button
-          mode="contained"
-          onPress={_onLoginPressed}
-          loading={loading}
-          disabled={loading}
-        >
-          Login
-        </Button>
-        <View style={styles.row}>
-          <Text style={styles.label}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-            <Text style={styles.link}>Sign up</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Verification Modal */}
-        <Modal
-          visible={isVerificationModalVisible}
-          transparent
-          animationType="slide"
-        >
-          <View style={styles.modalBackground}>
-            <View style={styles.verificationModal}>
-              <Image
-                source={require('../assets/auth/email_send.png')}
-                style={styles.verificationImage}
-              />
-
-              <Text style={styles.verificationTitle}>Whoa there, Warrior!</Text>
-              <Text style={styles.verificationText}>
-                Looks like you haven't verified your email yet! Check your inbox for the verification link.
-                Your quest awaits after verification! 🏆✨
-              </Text>
-
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={closeVerificationModal}
-              >
-                <Text style={styles.closeButtonText}>GOT IT!</Text>
-              </TouchableOpacity>
-            </View>
+            Login
+          </Button>
+          <View style={styles.row}>
+            <Text style={styles.label}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
+              <Text style={styles.link}>Sign up</Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
 
-        <Modal
-          visible={isAdminModalVisible}
-          transparent
-          animationType="slide"
-        >
-          <View style={styles.modalBackground}>
-            <View style={styles.verificationModal}>
-              <Image
-                source={require('../assets/auth/access_denied.png')}
-                style={styles.verificationImage}
-              />
+          {/* Verification Modal */}
+          <Modal
+            visible={isVerificationModalVisible}
+            transparent
+            animationType="slide"
+          >
+            <View style={styles.modalBackground}>
+              <View style={styles.verificationModal}>
+                <Image
+                  source={require('../assets/auth/email_send.png')}
+                  style={styles.verificationImage}
+                />
 
-              <Text style={styles.verificationTitle}>Whoa there, Admin!</Text>
-              <Text style={styles.verificationText}>
-                ⚠️ Access Denied: This level is for students only.
-                Admins must return to their designated portal!
-              </Text>
+                <Text style={styles.verificationTitle}>Whoa there, Warrior!</Text>
+                <Text style={styles.verificationText}>
+                  Looks like you haven't verified your email yet! Check your inbox for the verification link.
+                  Your quest awaits after verification! 🏆✨
+                </Text>
 
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => {
-                  setIsAdminModalVisible(false);
-                  setLoading(false);
-                }}
-              >
-                <Text style={styles.closeButtonText}>Oops, My Bad!</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={closeVerificationModal}
+                >
+                  <Text style={styles.closeButtonText}>GOT IT!</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </Modal>
-      </KeyboardAvoidingView>
+          </Modal>
+
+          <Modal
+            visible={isAdminModalVisible}
+            transparent
+            animationType="slide"
+          >
+            <View style={styles.modalBackground}>
+              <View style={styles.verificationModal}>
+                <Image
+                  source={require('../assets/auth/access_denied.png')}
+                  style={styles.verificationImage}
+                />
+
+                <Text style={styles.verificationTitle}>Whoa there, Admin!</Text>
+                <Text style={styles.verificationText}>
+                  ⚠️ Access Denied: This level is for students only.
+                  Admins must return to their designated portal!
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => {
+                    setIsAdminModalVisible(false);
+                    setLoading(false);
+                  }}
+                >
+                  <Text style={styles.closeButtonText}>Oops, My Bad!</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        </KeyboardAvoidingView>
       </View>
     </TouchableWithoutFeedback>
   )

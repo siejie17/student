@@ -426,22 +426,14 @@ const EventListingScreen = ({ route, navigation }) => {
   ), [navigation]);
 
   const ListEmptyComponent = useMemo(() => (
-    <Animated.View
-      style={[
-        styles.emptyContainer,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }]
-        }
-      ]}
-    >
+    <View style={styles.emptyContainer}>
       <Ionicons name="calendar-outline" size={50} color="#CCCCCC" />
       <Text style={styles.emptyText}>No events found</Text>
       <Text style={styles.emptySubText}>
         Try selecting a different category or search term
       </Text>
-    </Animated.View>
-  ), [fadeAnim, slideAnim]);
+    </View>
+  ), []);
 
   return (
     <View style={styles.container}>

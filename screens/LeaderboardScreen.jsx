@@ -538,7 +538,7 @@ const LeaderboardScreen = () => {
             {/* Points Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
-                <MaterialIcons name="stars" size={20} color="#3b82f6" />
+                <MaterialIcons name="stars" size={20} color="#3f6bc4" />
                 <Text style={styles.sectionTitle}>How to Earn Points!</Text>
               </View>
 
@@ -551,7 +551,7 @@ const LeaderboardScreen = () => {
                   { icon: "rate-review", label: "Feedback driven", desc: "Complete event surveys" },
                 ].map((item, index) => (
                   <View key={index} style={styles.pointItem}>
-                    <MaterialIcons name={item.icon} size={20} color="#3b82f6" />
+                    <MaterialIcons name={item.icon} size={20} color="#3f6bc4" />
                     <Text style={styles.pointText}>
                       <Text style={styles.boldText}>{item.label}:</Text> {item.desc}
                     </Text>
@@ -990,7 +990,7 @@ const styles = StyleSheet.create({
   rankText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#3b82f6',
+    color: '#3f6bc4',
   },
   highlightedRankText: {
     color: '#334155',
@@ -1142,7 +1142,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#3f6bc4',
     borderRadius: 10,
     padding: 12,
     marginBottom: 8,

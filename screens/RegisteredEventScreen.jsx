@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions, Imag
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { doc, onSnapshot, collection, query, where, deleteDoc, Timestamp, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, deleteDoc, Timestamp, getDocs, writeBatch } from 'firebase/firestore';
 
 import { db } from '../utils/firebaseConfig';
 import { getItem } from '../utils/asyncStorage';

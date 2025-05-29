@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,7 @@ import {
   StyleSheet,
   Animated,
   Easing,
-  Dimensions,
-  Image
+  Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 

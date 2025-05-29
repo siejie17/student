@@ -7,7 +7,6 @@ import { db } from '../utils/firebaseConfig';
 import { getItem } from '../utils/asyncStorage';
 
 import RedemptionCard from '../components/Merchandise/RedemptionCard';
-import EmptyListComponent from '../components/Merchandise/EmptyListComponent';
 import SearchBar from '../components/EventListing/SearchBar';
 
 const ITEMS_PER_PAGE = 5;

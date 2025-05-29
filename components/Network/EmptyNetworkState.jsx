@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 
-const EmptyNetworkState = ({ onScanQRPress }) => {
+const EmptyNetworkState = () => {
   return (
     <Animatable.View 
       style={styles.container}

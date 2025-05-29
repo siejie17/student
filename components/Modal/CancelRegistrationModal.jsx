@@ -9,7 +9,7 @@ import {
     Animated,
     Dimensions
 } from 'react-native';
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 const COLORS = {
     primary: '#4789d6',

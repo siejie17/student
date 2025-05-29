@@ -12,16 +12,16 @@ import TextInput from '../components/Authentication/TextInput';
 import DropdownList from '../components/Authentication/DropdownList';
 import Button from '../components/Authentication/Button';
 
-import { auth } from '../utils/firebaseConfig';
-import { getItem, setItem } from '../utils/asyncStorage';
+import { auth, db } from '../utils/firebaseConfig';
 import { theme } from '../core/theme';
+import { addDoc, collection, doc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 
 const SignUpScreen = () => {
   const [firstName, setFirstName] = useState({ value: '', error: '' });
   const [lastName, setLastName] = useState({ value: '', error: '' });
   const [email, setEmail] = useState({ value: '', error: '' });
   const [password, setPassword] = useState({ value: '', error: '' });
-  const [faculty, setFaculty] = useState(null);
+  const [faculty, setFaculty] = useState("");
   const [year, setYear] = useState(null);
   const [facultyError, setFacultyError] = useState('');
   const [yearError, setYearError] = useState('');
@@ -37,13 +37,13 @@ const SignUpScreen = () => {
   };
 
   const handleFacultyChange = (item) => {
-    setFaculty(item);
+    setFaculty(item.value);
     setYear(null); // Reset year when faculty changes
     setFacultyError('');
   };
 
   const handleYearChange = (item) => {
-    setYear(item);
+    setYear(item.value);
     setYearError('');
   };
 
@@ -105,7 +105,7 @@ const SignUpScreen = () => {
       newError++;
     }
 
-    if (faculty === null) {
+    if (faculty === "") {
       setFacultyError('Faculty selection is required');
       newError++;
     }
@@ -147,20 +147,46 @@ const SignUpScreen = () => {
           })).data;
         } else {
           console.warn('Push notification permission not granted');
+          setLoading(false);
+          return;
         }
       }
 
-      await setItem('@userSignedUpData', JSON.stringify({
+      const userDocRef = doc(db, "user", user.uid);
+
+      const profilePicQuery = query(collection(db, "config"), where("name", "==", "defaultProfilePic"));
+      const profilePicSnapshot = await getDocs(profilePicQuery);
+
+      const ProfilePicBase64 = profilePicSnapshot.docs[0].data().base64;
+
+      await setDoc(userDocRef, {
         firstName: firstName.value,
         lastName: lastName.value,
         email: email.value,
         yearOfStudy: year,
-        facultyID: faculty,
+        facultyID: String(faculty),
+        diamonds: 0,
+        totalPointsGained: 0,
+        profilePicture: ProfilePicBase64,
         expoPushToken: expoPushToken || null,
-      }));
-      
-      const getUserItem = await getItem('@userSignedUpData');
-      console.log('User data:', JSON.parse(getUserItem));
+      })
+
+      const badgeProgressDocRef = await addDoc(collection(db, "badgeProgress"), { studentID: user.uid });
+
+      const badgeSnapshot = await getDocs(collection(db, "badge"));
+
+      const batchPromises = badgeSnapshot.docs.map(async (badgeDoc) => {
+        const badgeID = badgeDoc.id;
+        const badgeProgressSubDocRef = doc(db, "badgeProgress", badgeProgressDocRef.id, "userBadgeProgress", badgeID);
+
+        await setDoc(badgeProgressSubDocRef, {
+          dateUpdated: serverTimestamp(),
+          isUnlocked: false,
+          progress: 0,
+        });
+      });
+
+      await Promise.all(batchPromises);
 
       await sendEmailVerification(user);
       setIsEmailSentModalVisible(true);
@@ -246,9 +272,9 @@ const SignUpScreen = () => {
             errorText={yearError}
           />
 
-          <Button 
-            mode="contained" 
-            onPress={_onSignUpPressed} 
+          <Button
+            mode="contained"
+            onPress={_onSignUpPressed}
             loading={loading}
             disabled={loading}
             style={styles.button}
