@@ -10,6 +10,7 @@ import {
     Platform,
     Image,
     Animated,
+    ActivityIndicator,
 } from 'react-native';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
@@ -23,6 +24,7 @@ const MessagingScreen = ({ navigation, route }) => {
 
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     const getChatID = () => {
         return [studentID, auth.currentUser.uid].sort().join("_");
@@ -40,8 +42,10 @@ const MessagingScreen = ({ navigation, route }) => {
         const chatRef = doc(db, 'chats', chatID);
 
         const unsubscribe = onSnapshot(chatRef, async (chatDoc) => {
+            setIsLoading(true);
             if (!chatDoc.exists()) {
                 setMessages([]);
+                setIsLoading(false);
                 return;
             }
 
@@ -70,6 +74,7 @@ const MessagingScreen = ({ navigation, route }) => {
                     ...doc.data()
                 }));
                 setMessages(messages);
+                setIsLoading(false);
             });
 
             // Clean up messages listener when chat changes
@@ -269,129 +274,135 @@ const MessagingScreen = ({ navigation, route }) => {
             <KeyboardAvoidingView
                 style={styles.messageContentContainer}
             >
-                <ScrollView
-                    style={styles.messagesContainer}
-                    ref={scrollViewRef}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={Object.keys(groupedMessages).length === 0 ? styles.emptyMessageContainer : null}
-                >
-                    {Object.keys(groupedMessages).length === 0 ? (
-                        // Empty state when no messages exist
-                        <View style={styles.noMessagesContainer}>
-                            <View style={styles.noMessagesIconContainer}>
-                                <MaterialCommunityIcons name="message-reply-text-outline" size={40} color="#3B6FC9" strokeWidth={1.5} />
+                {isLoading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#3B6FC9" />
+                    </View>
+                ) : (
+                    <ScrollView
+                        style={styles.messagesContainer}
+                        ref={scrollViewRef}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={Object.keys(groupedMessages).length === 0 ? styles.emptyMessageContainer : null}
+                    >
+                        {Object.keys(groupedMessages).length === 0 ? (
+                            // Empty state when no messages exist
+                            <View style={styles.noMessagesContainer}>
+                                <View style={styles.noMessagesIconContainer}>
+                                    <MaterialCommunityIcons name="message-reply-text-outline" size={40} color="#3B6FC9" strokeWidth={1.5} />
+                                </View>
+                                <Text style={styles.noMessagesTitle}>No messages yet</Text>
+                                <Text style={styles.noMessagesSubtitle}>
+                                    Start the conversation by sending a message below
+                                </Text>
                             </View>
-                            <Text style={styles.noMessagesTitle}>No messages yet</Text>
-                            <Text style={styles.noMessagesSubtitle}>
-                                Start the conversation by sending a message below
-                            </Text>
-                        </View>
-                    ) : (
-                        Object.entries(groupedMessages).map(([date, msgs]) => (
-                            <View key={date}>
-                                {renderDateHeader(date)}
-                                {msgs.map((msg) => (
-                                    <View
-                                        key={msg.id}
-                                        style={[
-                                            styles.messageContainer,
-                                            msg.senderID === auth.currentUser.uid.toString()
-                                                ? styles.userMessageContainer
-                                                : styles.receiverMessageContainer,
-                                        ]}
-                                    >
-                                        {msg.senderID === studentID && (
-                                            <Image
-                                                source={{ uri: `data:image/png;base64,${profilePic}` }}
-                                                style={styles.messageProfileImage}
-                                            />
-                                        )}
+                        ) : (
+                            Object.entries(groupedMessages).map(([date, msgs]) => (
+                                <View key={date}>
+                                    {renderDateHeader(date)}
+                                    {msgs.map((msg) => (
                                         <View
+                                            key={msg.id}
                                             style={[
-                                                styles.messageBubble,
-                                                msg.senderID === auth.currentUser.uid
-                                                    ? styles.userMessageBubble
-                                                    : styles.receiverMessageBubble,
+                                                styles.messageContainer,
+                                                msg.senderID === auth.currentUser.uid.toString()
+                                                    ? styles.userMessageContainer
+                                                    : styles.receiverMessageContainer,
                                             ]}
                                         >
-                                            <Text
+                                            {msg.senderID === studentID && (
+                                                <Image
+                                                    source={{ uri: `data:image/png;base64,${profilePic}` }}
+                                                    style={styles.messageProfileImage}
+                                                />
+                                            )}
+                                            <View
                                                 style={[
-                                                    styles.messageText,
+                                                    styles.messageBubble,
                                                     msg.senderID === auth.currentUser.uid
-                                                        ? styles.userMessageText
-                                                        : styles.receiverMessageText,
+                                                        ? styles.userMessageBubble
+                                                        : styles.receiverMessageBubble,
                                                 ]}
                                             >
-                                                {msg.text}
-                                            </Text>
-                                            <View style={styles.messageInfoContainer}>
-                                                {msg.timestamp && (
-                                                    <Text
-                                                        style={[
-                                                            styles.timeText,
-                                                            msg.senderID === auth.currentUser.uid
-                                                                ? styles.userTimeText
-                                                                : styles.receiverTimeText,
-                                                        ]}
-                                                    >
-                                                        {format(msg.timestamp.toDate(), 'HH:mm')}
-                                                    </Text>
-                                                )}
-                                                {msg.senderID === auth.currentUser.uid && renderMessageStatus(msg.read)}
+                                                <Text
+                                                    style={[
+                                                        styles.messageText,
+                                                        msg.senderID === auth.currentUser.uid
+                                                            ? styles.userMessageText
+                                                            : styles.receiverMessageText,
+                                                    ]}
+                                                >
+                                                    {msg.text}
+                                                </Text>
+                                                <View style={styles.messageInfoContainer}>
+                                                    {msg.timestamp && (
+                                                        <Text
+                                                            style={[
+                                                                styles.timeText,
+                                                                msg.senderID === auth.currentUser.uid
+                                                                    ? styles.userTimeText
+                                                                    : styles.receiverTimeText,
+                                                            ]}
+                                                        >
+                                                            {format(msg.timestamp.toDate(), 'HH:mm')}
+                                                        </Text>
+                                                    )}
+                                                    {msg.senderID === auth.currentUser.uid && renderMessageStatus(msg.read)}
+                                                </View>
                                             </View>
                                         </View>
-                                    </View>
-                                ))}
-                            </View>
-                        ))
-                    )}
+                                    ))}
+                                </View>
+                            ))
+                        )}
 
-                    {isTyping && (
-                        <View style={styles.typingContainer}>
-                            <Image
-                                source={{ uri: `data:image/png;base64,${profilePic}` }}
-                                style={styles.messageProfileImage}
-                            />
-                            <View style={styles.typingBubble}>
-                                <Animated.View
-                                    style={[
-                                        styles.typingDot,
-                                        {
-                                            opacity: typingAnimation.interpolate({
-                                                inputRange: [0, 0.5, 1],
-                                                outputRange: [0.3, 1, 0.3],
-                                            }),
-                                        },
-                                    ]}
+                        {isTyping && (
+                            <View style={styles.typingContainer}>
+                                <Image
+                                    source={{ uri: `data:image/png;base64,${profilePic}` }}
+                                    style={styles.messageProfileImage}
                                 />
-                                <Animated.View
-                                    style={[
-                                        styles.typingDot,
-                                        {
-                                            opacity: typingAnimation.interpolate({
-                                                inputRange: [0, 0.5, 1],
-                                                outputRange: [0.5, 1, 0.5],
-                                            }),
-                                            marginHorizontal: 4,
-                                        },
-                                    ]}
-                                />
-                                <Animated.View
-                                    style={[
-                                        styles.typingDot,
-                                        {
-                                            opacity: typingAnimation.interpolate({
-                                                inputRange: [0, 0.5, 1],
-                                                outputRange: [0.7, 1, 0.7],
-                                            }),
-                                        },
-                                    ]}
-                                />
+                                <View style={styles.typingBubble}>
+                                    <Animated.View
+                                        style={[
+                                            styles.typingDot,
+                                            {
+                                                opacity: typingAnimation.interpolate({
+                                                    inputRange: [0, 0.5, 1],
+                                                    outputRange: [0.3, 1, 0.3],
+                                                }),
+                                            },
+                                        ]}
+                                    />
+                                    <Animated.View
+                                        style={[
+                                            styles.typingDot,
+                                            {
+                                                opacity: typingAnimation.interpolate({
+                                                    inputRange: [0, 0.5, 1],
+                                                    outputRange: [0.5, 1, 0.5],
+                                                }),
+                                                marginHorizontal: 4,
+                                            },
+                                        ]}
+                                    />
+                                    <Animated.View
+                                        style={[
+                                            styles.typingDot,
+                                            {
+                                                opacity: typingAnimation.interpolate({
+                                                    inputRange: [0, 0.5, 1],
+                                                    outputRange: [0.7, 1, 0.7],
+                                                }),
+                                            },
+                                        ]}
+                                    />
+                                </View>
                             </View>
-                        </View>
-                    )}
-                    <View style={{ height: 20 }} />
-                </ScrollView>
+                        )}
+                        <View style={{ height: 20 }} />
+                    </ScrollView>
+                )}
 
                 {/* <BlurView intensity={80} tint="light" style={styles.inputContainerBlur}> */}
                 <View style={styles.inputContainer}>
@@ -423,6 +434,11 @@ const MessagingScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     container: {
         flex: 1,
         backgroundColor: '#F5F5F5',

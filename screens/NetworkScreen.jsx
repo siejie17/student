@@ -1,7 +1,7 @@
 import { View, Text, ActivityIndicator, StyleSheet, Animated, TouchableOpacity, FlatList } from 'react-native';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Entypo } from '@expo/vector-icons';
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, onSnapshot } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 
 import { db } from '../utils/firebaseConfig';
@@ -20,6 +20,8 @@ const NetworkScreen = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
+
+    const listenersRef = useRef([]);
 
     const animatedValues = networks.map(() => new Animated.Value(0.95));
 
@@ -59,6 +61,10 @@ const NetworkScreen = () => {
                     ...doc.data()
                 }));
 
+                // Cancel any existing listeners before setting new ones
+                listenersRef.current.forEach(unsub => unsub());
+                listenersRef.current = [];
+
                 const networkListDetailsPromises = networkListDocs.map(async (network) => {
                     const userRef = doc(db, "user", network.networkID);
                     const userSnap = await getDoc(userRef);
@@ -66,22 +72,68 @@ const NetworkScreen = () => {
                     const eventRef = doc(db, "event", network.eventID);
                     const eventSnap = await getDoc(eventRef);
 
-                    return (userSnap.exists() && eventSnap.exists())
-                        ? {
-                            id: network.id,
-                            studentID: userSnap.id,
-                            networkName: userSnap.data().firstName + " " + userSnap.data().lastName,
-                            yearOfStudy: userSnap.data().yearOfStudy,
-                            facultyID: userSnap.data().facultyID,
-                            profilePic: userSnap.data().profilePicture,
-                            eventName: eventSnap.data().eventName,
-                            scannedTime: network.scannedTime,
+                    if (!userSnap.exists() || !eventSnap.exists()) return null;
+
+                    // Create chat document ID by sorting and joining IDs
+                    const sortedIds = [studentID, network.networkID].sort();
+                    const chatDocId = sortedIds.join('_');
+                    const chatRef = doc(db, "chats", chatDocId);
+                    const messagesRef = collection(chatRef, "messages");
+
+                    // Initial unread check
+                    const messagesQuery = query(
+                        messagesRef,
+                        where("senderID", "==", network.networkID),
+                        where("read", "==", false)
+                    );
+                    const messagesSnap = await getDocs(messagesQuery);
+                    const hasUnread = !messagesSnap.empty;
+
+                    const newNetwork = {
+                        id: network.id,
+                        studentID: userSnap.id,
+                        networkName: `${userSnap.data().firstName} ${userSnap.data().lastName}`,
+                        yearOfStudy: userSnap.data().yearOfStudy,
+                        facultyID: userSnap.data().facultyID,
+                        profilePic: userSnap.data().profilePicture,
+                        eventName: eventSnap.data().eventName,
+                        scannedTime: network.scannedTime,
+                        hasUnread: hasUnread
+                    };
+
+                    // Set up real-time listener
+                    const unsub = onSnapshot(
+                        query(messagesRef, where("senderID", "==", network.networkID), where("read", "==", false)),
+                        (snapshot) => {
+                            const newHasUnread = !snapshot.empty;
+                            setNetworks(prev =>
+                                prev
+                                    .map(n => n.id === newNetwork.id
+                                        ? { ...n, hasUnread: newHasUnread }
+                                        : n
+                                    )
+                                    .sort((a, b) => {
+                                        if (a.hasUnread && !b.hasUnread) return -1;
+                                        if (!a.hasUnread && b.hasUnread) return 1;
+                                        return 0;
+                                    })
+                            );
                         }
-                        : null;
+                    );
+
+                    listenersRef.current.push(unsub);
+
+                    return newNetwork;
                 });
 
                 const resolvedNetworkList = (await Promise.all(networkListDetailsPromises)).filter(Boolean);
-                
+
+                resolvedNetworkList.sort((a, b) => {
+                    if (a.hasUnread && !b.hasUnread) return -1;
+                    if (!a.hasUnread && b.hasUnread) return 1;
+                    return 0;
+                });
+
                 setTotalItems(resolvedNetworkList.length);
                 setTotalPages(Math.ceil(resolvedNetworkList.length / ITEMS_PER_PAGE));
                 setNetworks(resolvedNetworkList);
@@ -94,6 +146,12 @@ const NetworkScreen = () => {
         }
 
         fetchUserNetworks();
+
+        // Cleanup function to remove all listeners
+        return () => {
+            listenersRef.current.forEach(unsub => unsub());
+            listenersRef.current = [];
+        };
     }, []);
 
     useEffect(() => {
@@ -106,7 +164,7 @@ const NetworkScreen = () => {
                 delay: index * 100,
             });
         });
-        
+
         Animated.stagger(100, animations).start();
     }, [networks]);
 
@@ -129,7 +187,7 @@ const NetworkScreen = () => {
 
     const handleNetworkCardPress = (item, index) => {
         handleCardPress(index);
-        navigation.navigate("Messaging", { studentID: item.studentID,fullName: item.networkName, profilePic: item.profilePic });
+        navigation.navigate("Messaging", { studentID: item.studentID, fullName: item.networkName, profilePic: item.profilePic });
     }
 
     const handleSearch = (query) => {
@@ -158,15 +216,15 @@ const NetworkScreen = () => {
 
         return (
             <View style={styles.paginationContainer}>
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
                     onPress={() => handlePageChange(1)}
                     disabled={currentPage === 1}
                 >
                     <Text style={styles.pageButtonText}>{"<<"}</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                     style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
                     onPress={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage === 1}
@@ -200,7 +258,7 @@ const NetworkScreen = () => {
                     <Text style={styles.pageEllipsis}>...</Text>
                 )}
 
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
                     onPress={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
@@ -208,7 +266,7 @@ const NetworkScreen = () => {
                     <Text style={styles.pageButtonText}>{">"}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
                     onPress={() => handlePageChange(totalPages)}
                     disabled={currentPage === totalPages}
@@ -231,7 +289,7 @@ const NetworkScreen = () => {
 
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
         const endIndex = startIndex + ITEMS_PER_PAGE;
-        
+
         return filtered.slice(startIndex, endIndex);
     }, [networks, searchQuery, currentPage]);
 
@@ -262,43 +320,43 @@ const NetworkScreen = () => {
     }
 
     return (
-            <View style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => navigation.goBack()}
-                    >
-                        <Entypo name="chevron-left" size={24} color="#000" />
-                    </TouchableOpacity>
-                    <View style={styles.headerTitleContainer}>
-                        <Text style={styles.headerTitle}>Networks</Text>
-                    </View>
+        <View style={styles.container}>
+            <View style={styles.header}>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Entypo name="chevron-left" size={24} color="#000" />
+                </TouchableOpacity>
+                <View style={styles.headerTitleContainer}>
+                    <Text style={styles.headerTitle}>Networks</Text>
                 </View>
-
-                <SearchBar
-                    onSearch={handleSearch}
-                    placeholder="Search networks..."
-                    style={styles.searchBar}
-                />
-
-                <View style={styles.promptContainer}>
-                    <Text style={styles.promptText}>Explore all the connections you've made by scanning QR codes at various events around campus.</Text>
-                </View>
-
-                <FlatList
-                    data={filteredAndPaginatedNetworks}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={[
-                        styles.cardList, 
-                        filteredAndPaginatedNetworks.length === 0 && styles.emptyListContainer
-                    ]}
-                    renderItem={({ item, index }) => renderNetworkCard(item, index)}
-                    ListEmptyComponent={
-                        <EmptyNetworkState />
-                    }
-                />
-                {filteredAndPaginatedNetworks.length > 0 && totalPages > 1 && <PageSelector />}
             </View>
+
+            <SearchBar
+                onSearch={handleSearch}
+                placeholder="Search networks..."
+                style={styles.searchBar}
+            />
+
+            <View style={styles.promptContainer}>
+                <Text style={styles.promptText}>Explore all the connections you've made by scanning QR codes at various events around campus.</Text>
+            </View>
+
+            <FlatList
+                data={filteredAndPaginatedNetworks}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={[
+                    styles.cardList,
+                    filteredAndPaginatedNetworks.length === 0 && styles.emptyListContainer
+                ]}
+                renderItem={({ item, index }) => renderNetworkCard(item, index)}
+                ListEmptyComponent={
+                    <EmptyNetworkState />
+                }
+            />
+            {filteredAndPaginatedNetworks.length > 0 && totalPages > 1 && <PageSelector />}
+        </View>
     )
 }
 

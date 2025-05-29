@@ -48,9 +48,9 @@ const NetworkCard = ({ item, index, animatedValues }) => {
         >
             <View style={styles.cardContent}>
                 <View style={[styles.profilePicContainer, { borderColor: "#3B6FC9" }]}>
-                    <Image 
-                        source={{ uri: `data:image/png;base64,${item.profilePic}` }} 
-                        style={styles.profilePic} 
+                    <Image
+                        source={{ uri: `data:image/png;base64,${item.profilePic}` }}
+                        style={styles.profilePic}
                     />
                 </View>
 
@@ -74,9 +74,14 @@ const NetworkCard = ({ item, index, animatedValues }) => {
             </View>
 
             <View style={styles.chatPromptContainer}>
-                    <MaterialCommunityIcons name="message" size={14} color="#3B6FC9" />
-                    <Text style={styles.chatPromptText}>Press to chat...</Text>
-                </View>
+                {item.hasUnread && (
+                    <View style={styles.unreadIndicator}>
+                        <Text style={{ color: '#fff', fontSize: 8, textAlign: 'center' }}>New message(s).</Text>    
+                    </View>
+                )}
+                <MaterialCommunityIcons name="message" size={14} color="#3B6FC9" />
+                <Text style={styles.chatPromptText}>Press to chat...</Text>
+            </View>
         </Animated.View>
     );
 };
@@ -180,6 +185,15 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         paddingHorizontal: 12,
         backgroundColor: '#f8fafd',
+        position: 'relative',
+    },
+    unreadIndicator: {
+        position: 'absolute',
+        left: 12,
+        paddingVertical: 3,
+        paddingHorizontal: 6,
+        borderRadius: 8,
+        backgroundColor: '#3B6FC9',
     },
     chatPromptText: {
         fontSize: 11,
