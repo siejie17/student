@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, Image, Dimensions, ActivityIndicator, FlatList, RefreshControl, Animated, Modal, Pressable } from 'react-native'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { collection, doc, getDoc, query, where, onSnapshot, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, query, where, onSnapshot, getDocs, Timestamp, deleteDoc } from 'firebase/firestore';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -124,7 +124,7 @@ const LeaderboardScreen = () => {
             remainingUsers: entriesWithUserInfo.slice(3),
           });
 
-          
+
         });
       });
     } catch (error) {
@@ -156,12 +156,20 @@ const LeaderboardScreen = () => {
           where("studentID", "==", studentID)
         );
 
-        unsubscribeLastMonth = onSnapshot(lastMonthQuery, (snapshot) => {
+        unsubscribeLastMonth = onSnapshot(lastMonthQuery, async (snapshot) => {
           if (!snapshot.empty) {
             const data = snapshot.docs[0].data();
             setPreviousMonthRanking(data.rank);
             setDiamondsRewards(data.diamonds);
             setRewardsModalVisible(true);
+
+            const docRef = snapshot.docs[0].ref;
+            try {
+              await deleteDoc(docRef);
+              console.log("Deleted lastMonth entry for student:", studentID);
+            } catch (err) {
+              console.error("Failed to delete lastMonth entry:", err);
+            }
           }
         });
       } catch (error) {
@@ -631,7 +639,7 @@ const LeaderboardScreen = () => {
           <Text style={styles.headerTitle}>Leaderboard</Text>
         </View>
       </View>
-      
+
       <View style={styles.divider} />
 
       {/* Podium section */}
