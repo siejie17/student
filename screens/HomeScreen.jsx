@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, Animated, SafeAreaView, Image } from 'react-native';
 import { useState, useCallback, useMemo, useRef } from 'react';
+import { Ionicons }from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
 
@@ -156,15 +157,9 @@ const HomeScreen = () => {
 
         <TouchableOpacity
           style={styles.logoContainer}
-          onPress={scrollToTop}
+          onPress={() => navigation.navigate("NotificationList")}
         >
-          <Image
-            source={require('../assets/logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-            // Fallback for the demo - in reality this would be your actual logo image
-            defaultSource={require('../assets/logo.png')}
-          />
+          <Ionicons name="notifications" size={32} color="#71797E" />
         </TouchableOpacity>
       </View>
 
@@ -235,7 +230,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 10,
     paddingHorizontal: 20,
-    marginBottom: 5,
+    marginBottom: 10,
     zIndex: 6,
   },
   searchBarContainer: {
@@ -260,8 +255,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   logoContainer: {
-    width: 60,
-    height: 60,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
@@ -270,7 +265,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 1,
   },
   logo: {
     width: 50,

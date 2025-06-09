@@ -30,17 +30,18 @@ import BadgeScreen from './screens/BadgeScreen.jsx';
 import NetworkScreen from './screens/NetworkScreen.jsx';
 import FeedbackFormScreen from './screens/FeedbackFormScreen.jsx';
 import MessagingScreen from './screens/MessagingScreen.jsx';
-
+import NotificationListScreen from './screens/NotificationListScreen.jsx';
 import LoadingIndicator from './components/General/LoadingIndicator.jsx';
 
 import { getItem } from './utils/asyncStorage.js';
 import { auth, db } from './utils/firebaseConfig';
+import { navigationRef, navigate } from './utils/navigationRef';
 
 // Show notifications when app is foregrounded
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true, // show banner on screen
-    shouldPlaySound: false,
+    shouldPlaySound: true,
     shouldSetBadge: false,
   }),
 });
@@ -133,6 +134,7 @@ export default function App() {
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       console.log("👆 User tapped the notification:", response);
       // Optional: navigate somewhere based on notification data
+      navigationRef.current?.navigate('NotificationList');
     });
 
     return () => {
@@ -155,7 +157,7 @@ export default function App() {
         translucent={false}
         hidden={false}
       />
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         {studentID ? <AppStack /> : <AuthStackScreen showOnboarding={showOnboarding} />}
       </NavigationContainer>
     </SafeAreaView>
@@ -173,6 +175,7 @@ const AppStack = () => (
     <MainStack.Screen name="NetworkList" component={NetworkScreen} options={{ headerShown: false }} />
     <MainStack.Screen name="MerchandiseDetails" component={MerchandiseDetailsScreen} options={{ headerShown: false }} />
     <MainStack.Screen name="Messaging" component={MessagingScreen} options={{ headerShown: false }} />
+    <MainStack.Screen name="NotificationList" component={NotificationListScreen} options={{ headerShown: false }} />
   </MainStack.Navigator>
 )
 
