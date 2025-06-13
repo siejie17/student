@@ -132,9 +132,9 @@ export default function App() {
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log("👆 User tapped the notification:", response);
-      // Only navigate if there's actual notification data
-      if (response.notification.request.content.data) {
+      const data = response?.notification?.request?.content?.data;
+
+      if (data && Object.keys(data).length > 0) {
         navigationRef.current?.navigate('NotificationList');
       }
     });
