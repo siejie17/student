@@ -124,6 +124,7 @@ const RegisteredEventScreen = ({ route }) => {
                         description: eventData.eventDescription,
                         startTime: eventData.eventStartDateTime,
                         endTime: eventData.eventEndDateTime,
+                        status: eventData.status,
                         images,
                     };
 
@@ -486,7 +487,8 @@ const RegisteredEventScreen = ({ route }) => {
 
             {/* Footer for Cancel Registration */}
             {(eventDetails?.startTime &&
-                eventDetails.startTime.seconds - Timestamp.now().seconds > 3600) && (
+                eventDetails.startTime.seconds - Timestamp.now().seconds > 3600) &&
+                    eventDetails.status !== "Cancelled" && (
                     <View style={styles.footer}>
                         <TouchableOpacity
                             style={styles.cancelRegistrationButton}

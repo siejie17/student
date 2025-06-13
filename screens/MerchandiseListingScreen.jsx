@@ -34,15 +34,18 @@ const MerchandiseListingScreen = ({ navigation }) => {
 
   const CATEGORIES = ["All", "Clothing", "Non-Clothing"];
 
+  const [merchandiseListener, setMerchandiseListener] = useState(null);
+
   useEffect(() => {
     let unsubscribeUser = null;
+    let unsubscribeMerchandise = null;
 
     const loadData = async () => {
       setIsLoading(true);
       try {
         unsubscribeUser = await fetchUserDiamonds();
         await getTotalItems();
-        await fetchInitialMerchandises();
+        unsubscribeMerchandise = await fetchInitialMerchandises();
       } catch (error) {
         console.error("Error loading data:", error);
       } finally {
@@ -55,6 +58,9 @@ const MerchandiseListingScreen = ({ navigation }) => {
     return () => {
       if (unsubscribeUser) {
         unsubscribeUser();
+      }
+      if (unsubscribeMerchandise) {
+        unsubscribeMerchandise();
       }
     };
   }, [selectedCategory]); // Reload when category changes
@@ -138,24 +144,30 @@ const MerchandiseListingScreen = ({ navigation }) => {
       setHasMoreItems(true);
 
       const queryRef = createMerchandiseQuery();
-      const documentSnapshots = await getDocs(queryRef);
+      
+      // Set up real-time listener
+      const unsubscribe = onSnapshot(queryRef, (documentSnapshots) => {
+        if (documentSnapshots.empty) {
+          setHasMoreItems(false);
+          return;
+        }
 
-      if (documentSnapshots.empty) {
-        setHasMoreItems(false);
-        return;
-      }
-
-      const merchandiseList = [];
-      documentSnapshots.forEach((doc) => {
-        merchandiseList.push({
-          id: doc.id,
-          ...doc.data()
+        const merchandiseList = [];
+        documentSnapshots.forEach((doc) => {
+          merchandiseList.push({
+            id: doc.id,
+            ...doc.data()
+          });
         });
+
+        setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
+        setMerchandises(merchandiseList);
+        setHasMoreItems(documentSnapshots.docs.length === ITEMS_PER_PAGE);
+      }, (error) => {
+        console.error("Error in merchandise listener:", error);
       });
 
-      setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
-      setMerchandises(merchandiseList);
-      setHasMoreItems(documentSnapshots.docs.length === ITEMS_PER_PAGE);
+      return unsubscribe;
     } catch (error) {
       console.error("Error fetching initial merchandises:", error);
     }

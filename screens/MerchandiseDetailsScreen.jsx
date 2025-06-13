@@ -1,15 +1,34 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions } from 'react-native'
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Entypo, MaterialIcons } from '@expo/vector-icons';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../utils/firebaseConfig';
 
 import MerchandiseFooter from '../components/Merchandise/MerchandiseFooter';
 
 const { width } = Dimensions.get('window');
 
 const MerchandiseDetailsScreen = ({ route, navigation }) => {
-  const { merch, balanceDiamonds } = route?.params;
-
+  const { merch: initialMerch, balanceDiamonds } = route?.params;
+  const [merch, setMerch] = useState(initialMerch);
   const scrollViewRef = useRef(null);
+
+  useEffect(() => {
+    // Set up real-time listener for merchandise availability
+    const unsubscribe = onSnapshot(doc(db, "merchandise", merch.id), (doc) => {
+      if (doc.exists()) {
+        setMerch(prevMerch => ({
+          ...prevMerch,
+          ...doc.data()
+        }));
+      }
+    }, (error) => {
+      console.error("Error listening to merchandise updates:", error);
+    });
+
+    // Cleanup listener on unmount
+    return () => unsubscribe();
+  }, [merch.id]);
 
   const ADMIN_MAPPING = {
     1: "Faculty of Applied & Creative Arts",
@@ -113,10 +132,18 @@ const MerchandiseDetailsScreen = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
-      <MerchandiseFooter
-        merch={merch}
-        balanceDiamonds={balanceDiamonds}
-      />
+      {merch.available ? (
+        <MerchandiseFooter
+          merch={merch}
+          balanceDiamonds={balanceDiamonds}
+        />
+      ) : (
+        <View style={styles.unavailableFooter}>
+          <View style={styles.unavailableContainer}>
+            <Text style={styles.unavailableText}>This merchandise is currently unavailable</Text>
+          </View>
+        </View>
+      )}
     </View>
   )
 }
@@ -294,5 +321,24 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
+  },
+  unavailableFooter: {
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 10,
+    backgroundColor: '#fff',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  unavailableContainer: {
+    backgroundColor: '#ff4d4f',
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  unavailableText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
   },
 });

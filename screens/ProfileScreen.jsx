@@ -9,7 +9,8 @@ import {
   ScrollView,
   Platform,
   Alert,
-  Modal
+  Modal,
+  Animated
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { getItem, removeItem } from '../utils/asyncStorage';
@@ -54,6 +55,7 @@ const ProfileScreen = () => {
   const [badgeProgressList, setBadgeProgressList] = useState([]);
   const [attendedEventsLength, setAttendedEventsLength] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBadgesLoading, setIsBadgesLoading] = useState(true);
 
   const [isProfilePicSheetVisible, setIsProfilePicSheetVisible] = useState(false);
   const snapPoints = useMemo(() => ['10%'], []);
@@ -62,6 +64,8 @@ const ProfileScreen = () => {
   const [isSignOutModalVisible, setIsSignOutModalVisible] = useState(false);
 
   const navigation = useNavigation();
+
+  const breathingAnim = useRef(new Animated.Value(1)).current;
 
   useFocusEffect(
     useCallback(() => {
@@ -133,8 +137,31 @@ const ProfileScreen = () => {
     };
   }, []);
 
+  useEffect(() => {
+    // Start breathing animation
+    const startBreathingAnimation = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(breathingAnim, {
+            toValue: 0.7,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(breathingAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    startBreathingAnimation();
+  }, []);
+
   const fetchUserBadgeProgress = async (studentID, setBadgeProgressList) => {
     try {
+      setIsBadgesLoading(true);
       const badgeProgressQuery = query(
         collection(db, "badgeProgress"),
         where("studentID", "==", studentID)
@@ -143,6 +170,7 @@ const ProfileScreen = () => {
       const badgeProgressSnapshot = await getDocs(badgeProgressQuery);
       if (badgeProgressSnapshot.empty) {
         setBadgeProgressList([]);
+        setIsBadgesLoading(false);
         return () => { }; // return dummy unsubscribe
       }
 
@@ -152,6 +180,7 @@ const ProfileScreen = () => {
       const unsubscribe = onSnapshot(userBadgeProgressRef, async (userBadgeProgressSnapshot) => {
         if (userBadgeProgressSnapshot.empty) {
           setBadgeProgressList([]);
+          setIsBadgesLoading(false);
           return;
         }
 
@@ -177,12 +206,14 @@ const ProfileScreen = () => {
 
         const badgeDetails = await Promise.all(badgeDetailPromises);
         setBadgeProgressList(badgeDetails.filter(Boolean));
+        setIsBadgesLoading(false);
       });
 
       return unsubscribe;
     } catch (error) {
       console.error("Error fetching badge progress:", error);
       setBadgeProgressList([]);
+      setIsBadgesLoading(false);
       return () => { }; // return dummy unsubscribe on error
     }
   };
@@ -291,6 +322,26 @@ const ProfileScreen = () => {
       </TouchableOpacity>
     )
   }
+
+  const renderLoadingBadge = (index) => {
+    return (
+      <Animated.View
+        key={`loading-badge-${index}`}
+        style={[
+          styles.badgeContainer,
+          {
+            opacity: breathingAnim,
+            transform: [{ scale: breathingAnim }]
+          }
+        ]}
+      >
+        <View style={[styles.badge, styles.loadingBadge]}>
+          <View style={styles.loadingBadgePlaceholder} />
+        </View>
+        <View style={styles.loadingBadgeNamePlaceholder} />
+      </Animated.View>
+    );
+  };
 
   const handleSignOut = async () => {
     try {
@@ -427,7 +478,12 @@ const ProfileScreen = () => {
 
           <View style={styles.achievementsFrame}>
             <View style={styles.achievementsContainer}>
-              {badgeProgressList.map(badge => renderBadge(badge))}
+              {isBadgesLoading ? (
+                // Render 9 loading badges
+                Array(9).fill(0).map((_, index) => renderLoadingBadge(index))
+              ) : (
+                badgeProgressList.map(badge => renderBadge(badge))
+              )}
             </View>
           </View>
         </View>
@@ -1061,5 +1117,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingBadge: {
+    backgroundColor: '#F0F0F0',
+    borderWidth: 0,
+  },
+  loadingBadgePlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E0E0E0',
+  },
+  loadingBadgeNamePlaceholder: {
+    width: 60,
+    height: 12,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 6,
+    marginTop: 8,
   },
 });

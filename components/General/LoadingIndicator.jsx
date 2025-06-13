@@ -1,9 +1,9 @@
-import { Text, StyleSheet, ActivityIndicator, Animated } from 'react-native';
-import { useState, useEffect } from 'react';
+import { Text, StyleSheet, ActivityIndicator, Animated, Image, View } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
 
 const LoadingIndicator = () => {
   const [fadeAnim] = useState(new Animated.Value(0));
-  const [dotCount, setDotCount] = useState(0);
+  const breathingAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     // Fade in animation
@@ -13,26 +13,42 @@ const LoadingIndicator = () => {
       useNativeDriver: true
     }).start();
 
-    // Animated dots effect
-    const dotInterval = setInterval(() => {
-      setDotCount((prev) => (prev + 1) % 4);
-    }, 500);
-
-    return () => clearInterval(dotInterval);
+    // Breathing animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(breathingAnim, {
+          toValue: 0.8,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(breathingAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, []);
-
-  // Generate dots for loading effect
-  const renderDots = () => {
-    return Array.from({ length: dotCount }, (_, index) => (
-      <Text key={index} style={styles.dot}>.</Text>
-    ));
-  };
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      <ActivityIndicator size="large" color="#6284bf" />
+      <Animated.View
+        style={[
+          styles.logoContainer,
+          {
+            transform: [{ scale: breathingAnim }],
+            opacity: breathingAnim
+          }
+        ]}
+      >
+        <Image
+          source={require('../../assets/logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </Animated.View>
       <Text style={styles.loadingText}>
-        Hang tight! Your UniEXP adventure is just starting{renderDots()}
+        Hang tight! Your UniEXP adventure is just starting
       </Text>
     </Animated.View>
   )
@@ -45,16 +61,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
   },
+  logoContainer: {
+    width: 150,
+    height: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
+  },
   loadingText: {
     marginTop: 20,
     textAlign: 'center',
     color: '#2c3e50',
     fontSize: 16,
     fontWeight: '600',
-  },
-  dot: {
-    color: '#3498db',
-    fontSize: 20,
   }
 })
 
