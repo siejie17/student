@@ -19,6 +19,11 @@ exports.monthlyLeaderboardRefresh = onSchedule(
       const { refreshDateTime } = doc.data();
       const currentTime = admin.firestore.Timestamp.now();
 
+      const nextDate = refreshDateTime.toDate();
+      nextDate.setMonth(nextDate.getMonth() + 1);
+      const newTimestamp = admin.firestore.Timestamp.fromDate(nextDate);
+      await leaderboardDocRef.update({ refreshDateTime: newTimestamp });
+
       if (!refreshDateTime || refreshDateTime.toMillis() > currentTime.toMillis()) continue;
 
       const entriesRef = leaderboardDocRef.collection("leaderboardEntries");
@@ -69,11 +74,6 @@ exports.monthlyLeaderboardRefresh = onSchedule(
       const deleteEntriesBatch = db.batch();
       entriesSnap.docs.forEach((doc) => deleteEntriesBatch.delete(doc.ref));
       await deleteEntriesBatch.commit();
-
-      const nextDate = refreshDateTime.toDate();
-      nextDate.setMonth(nextDate.getMonth() + 1);
-      const newTimestamp = admin.firestore.Timestamp.fromDate(nextDate);
-      await leaderboardDocRef.update({ refreshDateTime: newTimestamp });
     }
 
     logger.log("Monthly leaderboard refresh complete.");
