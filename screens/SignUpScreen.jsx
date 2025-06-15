@@ -1,6 +1,7 @@
 import { View, Text, TouchableWithoutFeedback, KeyboardAvoidingView, StyleSheet, Modal, Image, TouchableOpacity, Keyboard } from 'react-native';
 import { useState, memo } from 'react';
 import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from 'firebase/auth';
+import { TextInput as PaperTextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -26,13 +27,14 @@ const SignUpScreen = () => {
   const [facultyError, setFacultyError] = useState('');
   const [yearError, setYearError] = useState('');
   const [isEmailSentModalVisible, setIsEmailSentModalVisible] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
   const navigation = useNavigation();
 
   const validateEmail = (email) => {
-    const emailRegex = /^[0-9._-]+@siswa\.unimas\.my$/;
+    const emailRegex = /^[1-9]\d*@siswa\.unimas\.my$/;
     return emailRegex.test(email);
   };
 
@@ -79,29 +81,28 @@ const SignUpScreen = () => {
     let newError = 0;
 
     if (!firstName.value.trim()) {
-      firstName.error = 'First name is required';
+      setFirstName({ ...firstName, error: 'First name is required' });
       newError++;
     }
 
     if (!lastName.value.trim()) {
-      lastName.error = 'Last name is required';
+      setLastName({ ...lastName, error: 'Last name is required' });
       newError++;
     }
 
     if (!email.value.trim()) {
-      email.error = 'Email is required';
+      setEmail({ ...email, error: 'Email address is required' });
       newError++;
-    }
-    else if (!validateEmail(email.value)) {
-      email.error = 'Email must be in format: {matric_number}@siswa.unimas.my';
+    } else if (!validateEmail(email.value)) {
+      setEmail({ ...email, error: 'Email must be in format: {matric_number}@siswa.unimas.my' });
       newError++;
     }
 
     if (!password.value) {
-      password.error = 'Password is required';
+      setPassword({ ...password, error: 'Password is required' });
       newError++;
     } else if (password.value.length < 6) {
-      password.error = 'Password must be at least 6 characters';
+      setPassword({ ...password, error: 'Password must be at least 6 characters' });
       newError++;
     }
 
@@ -120,6 +121,14 @@ const SignUpScreen = () => {
 
   const _onSignUpPressed = async () => {
     setLoading(true);
+
+    // Clear all previous errors
+    setFirstName({ ...firstName, error: '' });
+    setLastName({ ...lastName, error: '' });
+    setEmail({ ...email, error: '' });
+    setPassword({ ...password, error: '' });
+    setFacultyError('');
+    setYearError('');
 
     if (!validateForm()) {
       setLoading(false);
@@ -214,6 +223,7 @@ const SignUpScreen = () => {
             onChangeText={text => setFirstName({ value: text, error: '' })}
             error={!!firstName.error}
             errorText={firstName.error}
+            required
           />
 
           <TextInput
@@ -223,6 +233,7 @@ const SignUpScreen = () => {
             onChangeText={text => setLastName({ value: text, error: '' })}
             error={!!lastName.error}
             errorText={lastName.error}
+            required
           />
 
           <TextInput
@@ -241,7 +252,8 @@ const SignUpScreen = () => {
             textContentType="emailAddress"
             keyboardType="email-address"
             disabled={loading}
-            description="Only accept student emails (XXXXXX@siswa.unimas.my)"
+            description="Format: {matric_number}@siswa.unimas.my"
+            required
           />
 
           <TextInput
@@ -250,9 +262,16 @@ const SignUpScreen = () => {
             value={password.value}
             onChangeText={text => setPassword({ value: text, error: '' })}
             errorText={password.error}
-            secureTextEntry
+            secureTextEntry={!showPassword}
+            right={
+              <PaperTextInput.Icon
+                icon={showPassword ? "eye-off" : "eye"}
+                onPress={() => setShowPassword(!showPassword)}
+              />
+            }
             disabled={loading}
             description="Password must be at least 6 characters"
+            required
           />
 
           <DropdownList
@@ -261,6 +280,7 @@ const SignUpScreen = () => {
             onChange={handleFacultyChange}
             placeholder="Select Faculty"
             errorText={facultyError}
+            required
           />
 
           <DropdownList
@@ -270,6 +290,7 @@ const SignUpScreen = () => {
             placeholder="Select Year of Study"
             disabled={!faculty}
             errorText={yearError}
+            required
           />
 
           <Button

@@ -3,6 +3,7 @@ import { useRef, useState, memo } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { TextInput as PaperTextInput } from 'react-native-paper';
 
 import Header from '../components/Authentication/Header';
 import Button from '../components/Authentication/Button';
@@ -18,6 +19,7 @@ const SignInScreen = () => {
   const [loading, setLoading] = useState(false);
   const [isVerificationModalVisible, setIsVerificationModalVisible] = useState(false);
   const [isAdminModalVisible, setIsAdminModalVisible] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Refs for the input fields
   const emailInputRef = useRef(null);
@@ -120,7 +122,7 @@ const SignInScreen = () => {
           <Image source={require('../assets/logo.png')} style={styles.image} />
           <Header>Welcome Back, Warrior!</Header>
           <TextInput
-            label="Email"
+            label="Email Address"
             returnKeyType="next"
             value={email.value}
             onChangeText={text => setEmail({ value: text, error: '' })}
@@ -131,6 +133,7 @@ const SignInScreen = () => {
             keyboardType="email-address"
             disabled={loading}
             onRef={(ref) => (emailInputRef.current = ref)}
+            required={true}
           />
           <TextInput
             label="Password"
@@ -138,9 +141,16 @@ const SignInScreen = () => {
             value={password.value}
             onChangeText={text => setPassword({ value: text, error: '' })}
             errorText={password.error}
-            secureTextEntry
+            secureTextEntry={!showPassword}
             disabled={loading}
             onRef={(ref) => (passwordInputRef.current = ref)}
+            right={
+              <PaperTextInput.Icon
+                icon={showPassword ? "eye-off" : "eye"}
+                onPress={() => setShowPassword(!showPassword)}
+              />
+            }
+            required={true}
           />
           <View style={styles.forgotPassword}>
             <TouchableOpacity
@@ -317,5 +327,9 @@ const styles = StyleSheet.create({
     color: theme.colors.secondary,
     fontSize: 16,
     fontWeight: '600',
+  },
+  eyeIcon: {
+    padding: 8,
+    marginRight: 4,
   },
 });

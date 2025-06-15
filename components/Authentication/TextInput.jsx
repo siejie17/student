@@ -1,31 +1,44 @@
 import { View, StyleSheet, Text } from 'react-native';
 import { TextInput as Input } from 'react-native-paper';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 
 import { theme } from '../../core/theme';
 
-const TextInput = ({ errorText, description, ...props }) => (
-    <View style={styles.container}>
-        <Input
-            style={styles.input}
-            selectionColor={theme.colors.primary}
-            underlineColor="transparent"
-            mode="outlined"
-            theme={{
-                roundness: 12,
-                colors: {
-                    primary: theme.colors.primary,
-                    background: styles.input.backgroundColor,
-                },
-            }}
-            outlineStyle={styles.outline}
-            contentStyle={styles.contentStyle}
-            {...props}
-        />
-        {description ? <Text style={styles.description}>{description}</Text> : null}
-        {errorText ? <Text style={styles.error}>{errorText}</Text> : null}
-    </View>
-);
+const TextInput = ({ errorText, description, right, required, label, ...props }) => {
+    const [isFocused, setIsFocused] = useState(false);
+
+    return (
+        <View style={styles.container}>
+            <Input
+                style={styles.input}
+                selectionColor={theme.colors.primary}
+                underlineColor="transparent"
+                mode="outlined"
+                theme={{
+                    roundness: 12,
+                    colors: {
+                        primary: theme.colors.primary,
+                        background: styles.input.backgroundColor,
+                    },
+                }}
+                outlineStyle={styles.outline}
+                contentStyle={styles.contentStyle}
+                right={right}
+                label={required ? (
+                    <Text>
+                        {label}
+                        {isFocused && <Text style={styles.asterisk}> *</Text>}
+                    </Text>
+                ) : label}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                {...props}
+            />
+            {description ? <Text style={styles.description}>{description}</Text> : null}
+            {errorText ? <Text style={styles.error}>{errorText}</Text> : null}
+        </View>
+    );
+};
 
 export default memo(TextInput);
 
@@ -59,5 +72,8 @@ const styles = StyleSheet.create({
         color: theme.colors.error,
         paddingHorizontal: 12,
         paddingTop: 6,
+    },
+    asterisk: {
+        color: '#800000', // Maroon red color
     },
 });
