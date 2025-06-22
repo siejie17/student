@@ -31,7 +31,7 @@ A mobile app for students, built with React Native and Expo, featuring event lis
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/siejie17/student
+git clone https://github.com/siejie17/student.git
 cd student
 ```
 
