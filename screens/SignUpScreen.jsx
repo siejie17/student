@@ -27,6 +27,10 @@ const SignUpScreen = () => {
   const [facultyError, setFacultyError] = useState('');
   const [yearError, setYearError] = useState('');
   const [isEmailSentModalVisible, setIsEmailSentModalVisible] = useState(false);
+  const [isUserExistsModalVisible, setIsUserExistsModalVisible] = useState(false);
+  const [isNetworkErrorModalVisible, setIsNetworkErrorModalVisible] = useState(false);
+  const [isRateLimitModalVisible, setIsRateLimitModalVisible] = useState(false);
+  const [isGenericErrorModalVisible, setIsGenericErrorModalVisible] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -200,13 +204,52 @@ const SignUpScreen = () => {
       await sendEmailVerification(user);
       setIsEmailSentModalVisible(true);
     } catch (error) {
-      console.error('Error', error.message);
+      setLoading(false);
+      
+      // Handle specific Firebase auth errors
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          setIsUserExistsModalVisible(true);
+          break;
+        case 'auth/operation-not-allowed':
+          setIsGenericErrorModalVisible(true);
+          break;
+        case 'auth/network-request-failed':
+          setIsNetworkErrorModalVisible(true);
+          break;
+        case 'auth/too-many-requests':
+          setIsRateLimitModalVisible(true);
+          break;
+        case 'auth/user-disabled':
+          setIsGenericErrorModalVisible(true);
+          break;
+        default:
+          setIsGenericErrorModalVisible(true);
+          break;
+      }
     }
   }
 
   const closeEmailSentModal = () => {
     setIsEmailSentModalVisible(false);
     navigation.navigate("SignIn");
+  }
+
+  const closeUserExistsModal = () => {
+    setIsUserExistsModalVisible(false);
+    navigation.navigate("SignIn");
+  }
+
+  const closeNetworkErrorModal = () => {
+    setIsNetworkErrorModalVisible(false);
+  }
+
+  const closeRateLimitModal = () => {
+    setIsRateLimitModalVisible(false);
+  }
+
+  const closeGenericErrorModal = () => {
+    setIsGenericErrorModalVisible(false);
   }
 
   return (
@@ -327,6 +370,118 @@ const SignUpScreen = () => {
                   onPress={closeEmailSentModal}
                 >
                   <Text style={styles.closeButtonText}>I'm on it!</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            visible={isUserExistsModalVisible}
+            transparent
+            animationType='slide'
+          >
+            <View style={styles.modalBackground}>
+              <View style={styles.emailSentModal}>
+                <Image
+                  source={require('../assets/auth/access_denied.png')}
+                  style={styles.emailSentImage}
+                />
+
+                <Text style={styles.emailSentTitle}>Account Already Exists!</Text>
+                <Text style={styles.emailSentText}>
+                  It looks like an account with this email address already exists.
+                  Please try signing in instead, or use a different email address.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={closeUserExistsModal}
+                >
+                  <Text style={styles.closeButtonText}>Go to Sign In</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            visible={isNetworkErrorModalVisible}
+            transparent
+            animationType='slide'
+          >
+            <View style={styles.modalBackground}>
+              <View style={styles.emailSentModal}>
+                <Image
+                  source={require('../assets/icons/exclamation_mark.png')}
+                  style={styles.emailSentImage}
+                />
+
+                <Text style={styles.emailSentTitle}>Network Error</Text>
+                <Text style={styles.emailSentText}>
+                  It looks like there's a network connection issue.
+                  Please check your internet connection and try again.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={closeNetworkErrorModal}
+                >
+                  <Text style={styles.closeButtonText}>Try Again</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            visible={isRateLimitModalVisible}
+            transparent
+            animationType='slide'
+          >
+            <View style={styles.modalBackground}>
+              <View style={styles.emailSentModal}>
+                <Image
+                  source={require('../assets/icons/lock.png')}
+                  style={styles.emailSentImage}
+                />
+
+                <Text style={styles.emailSentTitle}>Too Many Attempts</Text>
+                <Text style={styles.emailSentText}>
+                  You've made too many registration attempts.
+                  Please wait a few minutes before trying again.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={closeRateLimitModal}
+                >
+                  <Text style={styles.closeButtonText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            visible={isGenericErrorModalVisible}
+            transparent
+            animationType='slide'
+          >
+            <View style={styles.modalBackground}>
+              <View style={styles.emailSentModal}>
+                <Image
+                  source={require('../assets/icons/exclamation_mark.png')}
+                  style={styles.emailSentImage}
+                />
+
+                <Text style={styles.emailSentTitle}>Registration Error</Text>
+                <Text style={styles.emailSentText}>
+                  Something went wrong during registration.
+                  Please try again or contact support if the problem persists.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={closeGenericErrorModal}
+                >
+                  <Text style={styles.closeButtonText}>OK</Text>
                 </TouchableOpacity>
               </View>
             </View>
