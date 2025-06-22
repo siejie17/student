@@ -60,7 +60,7 @@ npm start
 ```
 or
 ```bash
-expo start
+npx expo start
 ```
 
 - Use the Expo Go app on your phone to scan the QR code, or run on an emulator with:
