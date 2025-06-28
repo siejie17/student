@@ -19,16 +19,16 @@ const FACULTY_SHORT_MAPPING = {
 // Helper function to get faculty accent color
 const getFacultyColor = (id) => {
     const colors = {
-        1: "rgba(255, 82, 82, 0.3)", // Arts - Red
-        2: "rgba(139, 195, 74, 0.3)", // Built Environment - Green
-        3: "rgba(171, 71, 188, 0.3)", // Cognitive Sciences - Purple
-        4: "rgba(33, 150, 243, 0.3)", // Computer Science - Blue
-        5: "rgba(255, 193, 7, 0.3)", // Economics - Amber
-        6: "rgba(127, 0, 255, 0.3)", // Education - Violet
-        7: "rgba(102, 153, 204, 0.3)", // Engineering - Blue Grey
-        8: "rgba(222, 205, 53, 0.3)", // Medicine - Yellow
-        9: "rgba(240, 46, 198, 0.3)", // Resource Science - Pink
-        10: "rgba(150, 75, 0, 0.3)", // Social Sciences - Brown
+        1: "#fff", // Arts - Red
+        2: "#fff", // Built Environment - Green
+        3: "#fff", // Cognitive Sciences - Purple
+        4: "#fff", // Computer Science - Blue
+        5: "#fff", // Economics - Amber
+        6: "#fff", // Education - Violet
+        7: "#fff", // Engineering - Blue Grey
+        8: "#fff", // Medicine - Yellow
+        9: "#fff", // Resource Science - Pink
+        10: "#fff", // Social Sciences - Brown
     };
     return colors[id] || "#757575"; // Default grey if not found
 };

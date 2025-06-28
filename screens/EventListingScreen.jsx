@@ -52,7 +52,8 @@ const CATEGORIES_MAPPING = {
 };
 
 const EventListingScreen = ({ route, navigation }) => {
-  const [events, setEvents] = useState([]);
+  const [allEvents, setAllEvents] = useState([]); // Store all events
+  const [events, setEvents] = useState([]); // Current page events
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -111,7 +112,7 @@ const EventListingScreen = ({ route, navigation }) => {
         const registeredEventIDs = registrationSnap.docs.map(doc => doc.data().eventID);
 
         // Set up real-time listener for events
-        unsubscribeEventRef.current = onSnapshot(baseQuery, (eventSnap) => {
+        unsubscribeEventRef.current = onSnapshot(baseQuery, async (eventSnap) => {
           const filtered = eventSnap.docs.filter(doc => {
             const event = doc.data();
             const alreadyRegistered = registeredEventIDs.includes(doc.id);
@@ -130,8 +131,32 @@ const EventListingScreen = ({ route, navigation }) => {
             return true;
           });
 
-          setTotalItems(filtered.length);
-          setTotalPages(Math.ceil(filtered.length / ITEMS_PER_PAGE));
+          // Fetch thumbnails for all filtered events
+          const eventIDs = filtered.map(doc => doc.id);
+          let eventsWithThumbnails = filtered.map(doc => ({ id: doc.id, ...doc.data() }));
+
+          if (eventIDs.length > 0) {
+            const imagesQuery = query(
+              collection(db, "eventImages"),
+              where("eventID", "in", eventIDs)
+            );
+            const imageDocs = await getDocs(imagesQuery);
+
+            const imageMap = new Map();
+            imageDocs.forEach(doc => {
+              const { eventID, images } = doc.data();
+              if (images && images.length > 0) imageMap.set(eventID, images[0]);
+            });
+
+            eventsWithThumbnails = eventsWithThumbnails.map(event => ({
+              ...event,
+              thumbnail: imageMap.get(event.id) || null
+            }));
+          }
+
+          setAllEvents(eventsWithThumbnails);
+          setTotalItems(eventsWithThumbnails.length);
+          setTotalPages(Math.ceil(eventsWithThumbnails.length / ITEMS_PER_PAGE));
         });
       });
     } catch (error) {
@@ -142,101 +167,14 @@ const EventListingScreen = ({ route, navigation }) => {
   const fetchPage = async (pageNumber) => {
     try {
       setIsLoading(true);
-      const studentID = await getItem("studentID");
-      if (!studentID) {
-        setIsLoading(false);
-        return;
-      }
+      
+      // Get only the current page's events from allEvents
+      const startIndex = (pageNumber - 1) * ITEMS_PER_PAGE;
+      const paginatedEvents = allEvents.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-      const user = await getUserProfile(studentID);
-      if (!user) {
-        setIsLoading(false);
-        return;
-      }
-      const { yearOfStudy, facultyID } = user;
-
-      // Get registered events
-      const registrationQuery = query(
-        collection(db, "registration"),
-        where("studentID", "==", studentID)
-      );
-      const registrationSnap = await getDocs(registrationQuery);
-      const registeredEventIDs = registrationSnap.docs.map(doc => doc.data().eventID);
-
-      // Query events
-      let eventsQuery = query(
-        collection(db, "event"),
-        where("registrationClosingDate", ">", Timestamp.now()),
-        where("status", "not-in", ["Completed", "Cancelled"]),
-        orderBy("registrationClosingDate", "asc"),
-        limit(pageNumber * ITEMS_PER_PAGE)
-      );
-
-      if (selectedCategory !== 'All') {
-        const categoryID = CATEGORIES_MAPPING[selectedCategory];
-        eventsQuery = query(
-          collection(db, "event"),
-          where("registrationClosingDate", ">", Timestamp.now()),
-          where("status", "not-in", ["Completed", "Cancelled"]),
-          where("category", "==", categoryID),
-          orderBy("registrationClosingDate", "asc"),
-          limit(pageNumber * ITEMS_PER_PAGE)
-        );
-      }
-
-      unsubscribeEventRef.current = onSnapshot(eventsQuery, async (eventSnap) => {
-        let allEvents = eventSnap.docs
-          .filter(doc => {
-            const event = doc.data();
-
-            // Skip if already registered
-            if (registeredEventIDs.includes(doc.id)) return false;
-
-            // Year restriction
-            if (event.isYearRestrict && Array.isArray(event.yearsRestricted)) {
-              if (!event.yearsRestricted.includes(yearOfStudy)) return false;
-            }
-
-            // Faculty restriction
-            if (event.isFacultyRestrict && event.organiserID !== Number(facultyID)) {
-              return false;
-            }
-
-            return true;
-          })
-          .map(doc => ({ id: doc.id, ...doc.data() }));
-
-        // Get only the current page's events
-        const startIndex = (pageNumber - 1) * ITEMS_PER_PAGE;
-        let paginatedEvents = allEvents.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
-        // Fetch thumbnails for the current page
-        if (paginatedEvents.length > 0) {
-          const eventIDs = paginatedEvents.map(e => e.id);
-          const imagesQuery = query(
-            collection(db, "eventImages"),
-            where("eventID", "in", eventIDs)
-          );
-          const imageDocs = await getDocs(imagesQuery);
-
-          const imageMap = new Map();
-          imageDocs.forEach(doc => {
-            const { eventID, images } = doc.data();
-            if (images && images.length > 0) imageMap.set(eventID, images[0]);
-          });
-
-          paginatedEvents = paginatedEvents.map(event => ({
-            ...event,
-            thumbnail: imageMap.get(event.id) || null
-          }));
-        }
-
-        // Update state
-        setEvents(paginatedEvents);
-        setTotalItems(allEvents.length);
-        setTotalPages(Math.ceil(allEvents.length / ITEMS_PER_PAGE));
-        setCurrentPage(pageNumber);
-      });
+      // Update state
+      setEvents(paginatedEvents);
+      setCurrentPage(pageNumber);
     } catch (error) {
       console.error("Error fetching events:", error);
     } finally {
@@ -331,7 +269,7 @@ const EventListingScreen = ({ route, navigation }) => {
     useCallback(() => {
       const loadData = async () => {
         await getTotalItems();
-        await fetchPage(1);
+        // fetchPage will be called after getTotalItems completes and allEvents is set
       };
       loadData();
       return () => {
@@ -341,16 +279,20 @@ const EventListingScreen = ({ route, navigation }) => {
     }, [selectedCategory])
   );
 
+  // Effect to fetch first page when allEvents changes
+  React.useEffect(() => {
+    if (allEvents.length > 0) {
+      fetchPage(1);
+    }
+  }, [allEvents]);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([
-      getTotalItems(),
-      fetchPage(1)
-    ]).finally(() => setRefreshing(false));
+    getTotalItems().finally(() => setRefreshing(false));
   }, [selectedCategory]);
 
   const filteredEvents = useMemo(() => {
-    let filtered = events;
+    let filtered = allEvents;
 
     if (filtered.length > 0) {
 
@@ -369,7 +311,7 @@ const EventListingScreen = ({ route, navigation }) => {
     } else {
       return []
     }
-  }, [events, selectedCategory, searchQuery]);
+  }, [allEvents, selectedCategory, searchQuery]);
 
   const handleCategoryPress = useCallback((category) => {
     setSelectedCategory(category);
@@ -435,6 +377,16 @@ const EventListingScreen = ({ route, navigation }) => {
     </View>
   ), []);
 
+  const CategoryEmptyComponent = useMemo(() => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="calendar-outline" size={50} color="#CCCCCC" />
+      <Text style={styles.emptyText}>No {selectedCategory} events found</Text>
+      <Text style={styles.emptySubText}>
+        Try selecting a different category or check back later
+      </Text>
+    </View>
+  ), [selectedCategory]);
+
   return (
     <View style={styles.container}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -467,24 +419,32 @@ const EventListingScreen = ({ route, navigation }) => {
             <ActivityIndicator size="large" color="#6284bf" />
             <Text style={styles.loadingText}>Loading available events...</Text>
           </View>
-        ) : events.length === 0 && selectedCategory === "All" ? (
+        ) : allEvents.length === 0 ? (
           <View style={[styles.emptyContainer, { flexGrow: 1 }]}>
             <Ionicons name="calendar-outline" size={50} color="#CCCCCC" />
-            <Text style={styles.emptyText}>No events have been posted yet</Text>
+            <Text style={styles.emptyText}>
+              {selectedCategory === "All" 
+                ? "No events have been posted yet" 
+                : `No ${selectedCategory} events found`
+              }
+            </Text>
             <Text style={styles.emptySubText}>
-              Please check back soon for new event postings!
+              {selectedCategory === "All" 
+                ? "Please check back soon for new event postings!"
+                : "Try selecting a different category or check back later."
+              }
             </Text>
           </View>
         ) : (
           <>
             <FlatList
               ref={flatListRef}
-              data={filteredEvents}
+              data={searchQuery.trim() !== '' ? filteredEvents : events}
               renderItem={renderCard}
               keyExtractor={item => item.id}
               contentContainerStyle={[
                 styles.listContainer,
-                filteredEvents.length === 0 && styles.emptyListContainer
+                (searchQuery.trim() !== '' ? filteredEvents : events).length === 0 && styles.emptyListContainer
               ]}
               showsVerticalScrollIndicator={false}
               refreshControl={
@@ -495,15 +455,20 @@ const EventListingScreen = ({ route, navigation }) => {
                 />
               }
               ListEmptyComponent={
-                selectedCategory !== 'All' || searchQuery.trim() !== '' ? (
-                  ListEmptyComponent
+                (searchQuery.trim() !== '' && filteredEvents.length === 0) || 
+                (selectedCategory !== 'All' && events.length === 0) ? (
+                  selectedCategory !== 'All' ? CategoryEmptyComponent : ListEmptyComponent
                 ) : null
               }
             />
           </>
         )}
-        {events.length > 0 && totalPages > 1 && !searchQuery && <PageSelector />}
       </View>
+      {allEvents.length > 0 && totalPages > 1 && !searchQuery && (
+        <View style={styles.floatingPaginationContainer}>
+          <PageSelector />
+        </View>
+      )}
     </View>
   );
 };
@@ -602,18 +567,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderRadius: 25,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   pageButton: {
-    minWidth: 35,
-    height: 35,
-    borderRadius: 8,
+    minWidth: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 4,
+    marginHorizontal: 2,
     backgroundColor: '#f5f5f5',
   },
   pageButtonActive: {
@@ -637,5 +609,11 @@ const styles = StyleSheet.create({
   },
   emptyListContainer: {
     justifyContent: 'center',
+  },
+  floatingPaginationContainer: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    zIndex: 1000,
   },
 });

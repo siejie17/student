@@ -15,11 +15,9 @@ const ITEMS_PER_PAGE = 5; // Number of items to load per page
 
 const MerchandiseListingScreen = ({ navigation }) => {
   const [currentDiamonds, setCurrentDiamonds] = useState(0);
-  const [merchandises, setMerchandises] = useState([]);
+  const [allMerchandises, setAllMerchandises] = useState([]); // Store all merchandise
+  const [merchandises, setMerchandises] = useState([]); // Current page merchandise
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMoreItems, setHasMoreItems] = useState(true);
-  const [lastVisible, setLastVisible] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -34,8 +32,6 @@ const MerchandiseListingScreen = ({ navigation }) => {
 
   const CATEGORIES = ["All", "Clothing", "Non-Clothing"];
 
-  const [merchandiseListener, setMerchandiseListener] = useState(null);
-
   useEffect(() => {
     let unsubscribeUser = null;
     let unsubscribeMerchandise = null;
@@ -44,8 +40,7 @@ const MerchandiseListingScreen = ({ navigation }) => {
       setIsLoading(true);
       try {
         unsubscribeUser = await fetchUserDiamonds();
-        await getTotalItems();
-        unsubscribeMerchandise = await fetchInitialMerchandises();
+        unsubscribeMerchandise = await getTotalItems();
       } catch (error) {
         console.error("Error loading data:", error);
       } finally {
@@ -63,7 +58,14 @@ const MerchandiseListingScreen = ({ navigation }) => {
         unsubscribeMerchandise();
       }
     };
-  }, [selectedCategory]); // Reload when category changes
+  }, [selectedCategory, searchQuery]); // Reload when category or search changes
+
+  // Effect to fetch first page when allMerchandises changes
+  useEffect(() => {
+    if (allMerchandises.length > 0) {
+      fetchPage(1);
+    }
+  }, [allMerchandises]);
 
   const fetchUserDiamonds = async () => {
     try {
@@ -87,30 +89,45 @@ const MerchandiseListingScreen = ({ navigation }) => {
     try {
       let baseQuery = query(
         collection(db, "merchandise"),
-        where("available", "==", true)
+        where("available", "==", true),
+        orderBy("createdAt", "desc")
       );
 
       if (selectedCategory !== 'All') {
         baseQuery = query(
           collection(db, "merchandise"),
           where("available", "==", true),
-          where("category", "==", selectedCategory)
+          where("category", "==", selectedCategory),
+          orderBy("createdAt", "desc")
         );
       }
 
-      const snapshot = await getDocs(baseQuery);
-      let total = snapshot.size;
+      // Set up real-time listener for all merchandise
+      const unsubscribe = onSnapshot(baseQuery, (snapshot) => {
+        let allMerchandiseList = [];
+        
+        snapshot.forEach((doc) => {
+          allMerchandiseList.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
 
-      if (searchQuery.trim()) {
-        const allDocs = snapshot.docs;
-        total = allDocs.filter(doc => {
-          const data = doc.data();
-          return data.name.toLowerCase().includes(searchQuery.toLowerCase());
-        }).length;
-      }
+        // Apply search filter if there's a search query
+        if (searchQuery.trim()) {
+          allMerchandiseList = allMerchandiseList.filter(item =>
+            item.name.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+        }
 
-      setTotalItems(total);
-      setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
+        setAllMerchandises(allMerchandiseList);
+        setTotalItems(allMerchandiseList.length);
+        setTotalPages(Math.ceil(allMerchandiseList.length / ITEMS_PER_PAGE));
+      }, (error) => {
+        console.error("Error in merchandise listener:", error);
+      });
+
+      return unsubscribe;
     } catch (error) {
       console.error("Error getting total items:", error);
     }
@@ -137,75 +154,16 @@ const MerchandiseListingScreen = ({ navigation }) => {
     return baseQuery;
   };
 
-  const fetchInitialMerchandises = async () => {
-    try {
-      setMerchandises([]); // Clear existing items
-      setLastVisible(null); // Reset pagination
-      setHasMoreItems(true);
-
-      const queryRef = createMerchandiseQuery();
-      
-      // Set up real-time listener
-      const unsubscribe = onSnapshot(queryRef, (documentSnapshots) => {
-        if (documentSnapshots.empty) {
-          setHasMoreItems(false);
-          return;
-        }
-
-        const merchandiseList = [];
-        documentSnapshots.forEach((doc) => {
-          merchandiseList.push({
-            id: doc.id,
-            ...doc.data()
-          });
-        });
-
-        setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
-        setMerchandises(merchandiseList);
-        setHasMoreItems(documentSnapshots.docs.length === ITEMS_PER_PAGE);
-      }, (error) => {
-        console.error("Error in merchandise listener:", error);
-      });
-
-      return unsubscribe;
-    } catch (error) {
-      console.error("Error fetching initial merchandises:", error);
-    }
-  };
-
   const fetchPage = async (pageNumber) => {
-    setIsLoading(true);
     try {
-      let queryRef = createMerchandiseQuery();
-      let documentSnapshots;
+      setIsLoading(true);
+      
+      // Get only the current page's merchandise from allMerchandises
+      const startIndex = (pageNumber - 1) * ITEMS_PER_PAGE;
+      const paginatedMerchandise = allMerchandises.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-      if (pageNumber === 1) {
-        documentSnapshots = await getDocs(queryRef);
-      } else {
-        // Skip documents from previous pages
-        const skipDocs = (pageNumber - 1) * ITEMS_PER_PAGE;
-        queryRef = query(queryRef, limit(skipDocs + ITEMS_PER_PAGE));
-        documentSnapshots = await getDocs(queryRef);
-        
-        // Get only the last page's worth of documents
-        const docs = documentSnapshots.docs;
-        documentSnapshots = {
-          docs: docs.slice(-ITEMS_PER_PAGE),
-          empty: docs.length === 0
-        };
-      }
-
-      if (documentSnapshots.empty) {
-        setMerchandises([]);
-        return;
-      }
-
-      const merchandiseList = documentSnapshots.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      setMerchandises(merchandiseList);
+      // Update state
+      setMerchandises(paginatedMerchandise);
       setCurrentPage(pageNumber);
     } catch (error) {
       console.error("Error fetching page:", error);
@@ -299,22 +257,8 @@ const MerchandiseListingScreen = ({ navigation }) => {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([
-      getTotalItems(),
-      fetchPage(1)
-    ]).finally(() => setRefreshing(false));
-  }, [selectedCategory]);
-
-  const renderFooter = () => {
-    if (!isLoadingMore) return null;
-
-    return (
-      <View style={styles.loadingFooter}>
-        <ActivityIndicator size="small" color="#6284bf" />
-        <Text style={styles.loadingFooterText}>Loading more items...</Text>
-      </View>
-    );
-  };
+    getTotalItems().finally(() => setRefreshing(false));
+  }, [selectedCategory, searchQuery]);
 
   const renderCategoryItem = useCallback(({ item }) => {
     const isSelected = selectedCategory === item;
@@ -355,20 +299,13 @@ const MerchandiseListingScreen = ({ navigation }) => {
   }, [fadeAnim, slideAnim]);
 
   const filteredMerchandise = useMemo(() => {
-    let filtered = merchandises;
-
-    if (searchQuery.trim()) {
-      filtered = filtered.filter(item =>
-        item.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    // When searching, show all filtered merchandise
+    if (searchQuery.trim() !== '') {
+      return allMerchandises;
     }
-
-    if (selectedCategory !== 'All') {
-      filtered = filtered.filter(item => item.category === selectedCategory);
-    }
-
-    return filtered;
-  }, [merchandises, selectedCategory, searchQuery]);
+    // When not searching, show current page merchandise
+    return merchandises;
+  }, [allMerchandises, merchandises, searchQuery]);
 
   const handleSearch = (query) => {
     setSearchQuery(query);
@@ -399,6 +336,24 @@ const MerchandiseListingScreen = ({ navigation }) => {
       </Text>
     </Animated.View>
   ), [fadeAnim, slideAnim, searchQuery]);
+
+  const CategoryEmptyComponent = useMemo(() => (
+    <View style={[styles.emptyContainer, { flexGrow: 1 }]}>
+      <Ionicons name="cart-outline" size={50} color="#CCCCCC" />
+      <Text style={styles.emptyText}>
+        {selectedCategory === "All" 
+          ? "No merchandise available" 
+          : `No ${selectedCategory} merchandise found`
+        }
+      </Text>
+      <Text style={styles.emptySubText}>
+        {selectedCategory === "All" 
+          ? "Please check back soon for new merchandise!"
+          : "Try selecting a different category or check back later."
+        }
+      </Text>
+    </View>
+  ), [selectedCategory]);
 
   return (
     <View style={styles.mainContainer}>
@@ -431,6 +386,22 @@ const MerchandiseListingScreen = ({ navigation }) => {
               <ActivityIndicator size="large" color="#6284bf" />
               <Text style={styles.loadingText}>Loading merchandises list...</Text>
             </View>
+          ) : allMerchandises.length === 0 ? (
+            <View style={[styles.emptyContainer, { flexGrow: 1 }]}>
+              <Ionicons name="cart-outline" size={50} color="#CCCCCC" />
+              <Text style={styles.emptyText}>
+                {selectedCategory === "All" 
+                  ? "No merchandise available" 
+                  : `No ${selectedCategory} merchandise found`
+                }
+              </Text>
+              <Text style={styles.emptySubText}>
+                {selectedCategory === "All" 
+                  ? "Please check back soon for new merchandise!"
+                  : "Try selecting a different category or check back later."
+                }
+              </Text>
+            </View>
           ) : (
             <>
               <FlatList
@@ -457,13 +428,22 @@ const MerchandiseListingScreen = ({ navigation }) => {
                     tintColor="#6C63FF"
                   />
                 }
-                ListEmptyComponent={!isLoading && ListEmptyComponent}
+                ListEmptyComponent={
+                  (searchQuery.trim() !== '' && allMerchandises.length === 0) || 
+                  (selectedCategory !== 'All' && merchandises.length === 0) ? (
+                    selectedCategory !== 'All' ? CategoryEmptyComponent : ListEmptyComponent
+                  ) : null
+                }
                 numColumns={1}
               />
             </>
           )}
-          {filteredMerchandise.length > 0 && totalPages > 1 && <PageSelector />}
         </View>
+        {allMerchandises.length > 0 && totalPages > 1 && !searchQuery && (
+          <View style={styles.floatingPaginationContainer}>
+            <PageSelector />
+          </View>
+        )}
       </LinearGradient>
     </View>
   );
@@ -556,33 +536,29 @@ const styles = StyleSheet.create({
   emptyList: {
     paddingBottom: 40,
   },
-  loadingFooter: {
-    paddingVertical: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  loadingFooterText: {
-    marginLeft: 10,
-    fontSize: 14,
-    color: '#666',
-  },
   paginationContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderRadius: 25,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   pageButton: {
-    minWidth: 35,
-    height: 35,
-    borderRadius: 8,
+    minWidth: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 4,
+    marginHorizontal: 2,
     backgroundColor: '#f5f5f5',
   },
   pageButtonActive: {
@@ -603,5 +579,11 @@ const styles = StyleSheet.create({
   pageEllipsis: {
     marginHorizontal: 8,
     color: '#666',
+  },
+  floatingPaginationContainer: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    zIndex: 1000,
   },
 });

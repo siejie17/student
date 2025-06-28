@@ -17,7 +17,8 @@ const TABS = [
 ];
 
 const RedemptionListingScreen = () => {
-  const [redemptions, setRedemptions] = useState([]);
+  const [allRedemptions, setAllRedemptions] = useState([]); // Store all redemptions
+  const [redemptions, setRedemptions] = useState([]); // Current page redemptions
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('uncollected');
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,14 +32,13 @@ const RedemptionListingScreen = () => {
   const flatListRef = useRef(null);
 
   const filteredRedemptions = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return redemptions;
+    // When searching, show all filtered redemptions
+    if (searchQuery.trim() !== '') {
+      return allRedemptions;
     }
-
-    return redemptions.filter(redemption => 
-      redemption.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [redemptions, searchQuery]);
+    // When not searching, show current page redemptions
+    return redemptions;
+  }, [allRedemptions, redemptions, searchQuery]);
 
   const handleSearch = (query) => {
     setSearchQuery(query);
@@ -52,78 +52,19 @@ const RedemptionListingScreen = () => {
       const redemptionQuery = query(
         redemptionRef,
         where("studentID", "==", studentID),
-        where("collected", "==", isCollected)
-      );
-
-      const snapshot = await getDocs(redemptionQuery);
-      let total = snapshot.size;
-
-      if (searchQuery.trim()) {
-        // If there's a search query, we need to filter the results
-        const allDocs = snapshot.docs;
-        const merchandiseIDs = [...new Set(allDocs.map(doc => doc.data().merchandiseID))];
-        const merchandiseData = {};
-
-        // Fetch merchandise details
-        await Promise.all(merchandiseIDs.map(async (id) => {
-          const merchandiseDocRef = doc(db, "merchandise", id);
-          const merchandiseDoc = await getDoc(merchandiseDocRef);
-          if (merchandiseDoc.exists()) {
-            merchandiseData[id] = merchandiseDoc.data().name;
-          }
-        }));
-
-        // Filter based on search query
-        total = allDocs.filter(doc => {
-          const merchandiseName = merchandiseData[doc.data().merchandiseID] || '';
-          return merchandiseName.toLowerCase().includes(searchQuery.toLowerCase());
-        }).length;
-      }
-      
-      setTotalItems(total);
-      setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
-    } catch (error) {
-      console.error("Error getting total items:", error);
-      setTotalItems(0);
-      setTotalPages(1);
-    }
-  };
-
-  const fetchPage = async (pageNumber, tab) => {
-    let unsubscribe;
-    setIsLoading(true);
-
-    try {
-      const studentID = await getItem("studentID");
-      if (!studentID) {
-        setIsLoading(false);
-        return;
-      }
-
-      const isCollected = tab === 'collected';
-      await getTotalItems(studentID, isCollected);
-
-      const redemptionRef = collection(db, "redemption");
-      const redemptionQuery = query(
-        redemptionRef,
-        where("studentID", "==", studentID),
         where("collected", "==", isCollected),
-        orderBy("redeemedTime", "desc"),
-        limit(pageNumber * ITEMS_PER_PAGE)
+        orderBy("redeemedTime", "desc")
       );
 
-      unsubscribe = onSnapshot(redemptionQuery, async (snapshot) => {
-        let redemptionData = snapshot.docs.map(doc => ({
+      // Set up real-time listener for all redemptions
+      const unsubscribe = onSnapshot(redemptionQuery, async (snapshot) => {
+        let allRedemptionData = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
 
-        // Get only the current page's items
-        const startIndex = (pageNumber - 1) * ITEMS_PER_PAGE;
-        redemptionData = redemptionData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
         // Extract unique merchandiseIDs
-        const merchandiseIDs = [...new Set(redemptionData.map(item => item.merchandiseID))];
+        const merchandiseIDs = [...new Set(allRedemptionData.map(item => item.merchandiseID))];
 
         // Fetch merchandise details
         const merchandiseData = {};
@@ -140,25 +81,54 @@ const RedemptionListingScreen = () => {
         }));
 
         // Merge merchandise details into redemption data
-        const mergedData = redemptionData.map(item => ({
+        const mergedData = allRedemptionData.map(item => ({
           ...item,
           name: merchandiseData[item.merchandiseID]?.name || "Unknown",
           collectionLocationName: merchandiseData[item.merchandiseID]?.collectionLocationName || "Unknown",
           category: merchandiseData[item.merchandiseID]?.category || "Unknown",
         }));
 
-        setRedemptions(mergedData);
-        setCurrentPage(pageNumber);
-        setIsLoading(false);
+        // Apply search filter if there's a search query
+        if (searchQuery.trim()) {
+          const filteredData = mergedData.filter(redemption => 
+            redemption.name.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+          setAllRedemptions(filteredData);
+          setTotalItems(filteredData.length);
+          setTotalPages(Math.ceil(filteredData.length / ITEMS_PER_PAGE));
+        } else {
+          setAllRedemptions(mergedData);
+          setTotalItems(mergedData.length);
+          setTotalPages(Math.ceil(mergedData.length / ITEMS_PER_PAGE));
+        }
+      }, (error) => {
+        console.error("Error in redemption listener:", error);
       });
 
+      return unsubscribe;
     } catch (error) {
-      console.error("Error fetching data:", error);
-      setRedemptions([]);
+      console.error("Error getting total items:", error);
+      setTotalItems(0);
+      setTotalPages(1);
+    }
+  };
+
+  const fetchPage = async (pageNumber, tab) => {
+    try {
+      setIsLoading(true);
+      
+      // Get only the current page's redemptions from allRedemptions
+      const startIndex = (pageNumber - 1) * ITEMS_PER_PAGE;
+      const paginatedRedemptions = allRedemptions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+      // Update state
+      setRedemptions(paginatedRedemptions);
+      setCurrentPage(pageNumber);
+    } catch (error) {
+      console.error("Error fetching page:", error);
+    } finally {
       setIsLoading(false);
     }
-
-    return unsubscribe;
   };
 
   const handlePageChange = (pageNumber) => {
@@ -189,14 +159,29 @@ const RedemptionListingScreen = () => {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchPage(1, activeTab).finally(() => setRefreshing(false));
-  }, [activeTab]);
+    const loadData = async () => {
+      const studentID = await getItem("studentID");
+      if (!studentID) {
+        setRefreshing(false);
+        return;
+      }
+
+      const isCollected = activeTab === 'collected';
+      await getTotalItems(studentID, isCollected);
+      setRefreshing(false);
+    };
+    loadData();
+  }, [activeTab, searchQuery]);
 
   useEffect(() => {
     let unsubscribe;
 
     const loadData = async () => {
-      unsubscribe = await fetchPage(1, activeTab);
+      const studentID = await getItem("studentID");
+      if (!studentID) return;
+
+      const isCollected = activeTab === 'collected';
+      unsubscribe = await getTotalItems(studentID, isCollected);
     };
 
     loadData();
@@ -204,7 +189,14 @@ const RedemptionListingScreen = () => {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [activeTab]);
+  }, [activeTab, searchQuery]); // Reload when tab or search changes
+
+  // Effect to fetch first page when allRedemptions changes
+  useEffect(() => {
+    if (allRedemptions.length > 0) {
+      fetchPage(1, activeTab);
+    }
+  }, [allRedemptions]);
 
   const renderTabItem = useCallback(({ item }) => {
     const isSelected = activeTab === item.id;
@@ -313,6 +305,38 @@ const RedemptionListingScreen = () => {
     );
   };
 
+  const ListEmptyComponent = useMemo(() => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>
+        {searchQuery.trim() 
+          ? "No redemptions found matching your search"
+          : "No redemptions found"}
+      </Text>
+      <Text style={styles.emptySubText}>
+        {searchQuery.trim()
+          ? "Try a different search term"
+          : "Check back later for new redemptions"}
+      </Text>
+    </View>
+  ), [searchQuery]);
+
+  const TabEmptyComponent = useMemo(() => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>
+        {activeTab === 'collected' 
+          ? "No collected redemptions found"
+          : "No uncollected redemptions found"
+        }
+      </Text>
+      <Text style={styles.emptySubText}>
+        {activeTab === 'collected'
+          ? "You haven't collected any redemptions yet"
+          : "You don't have any uncollected redemptions"
+        }
+      </Text>
+    </View>
+  ), [activeTab]);
+
   return (
     <View style={styles.background}>
       <SearchBar
@@ -340,6 +364,21 @@ const RedemptionListingScreen = () => {
               <Text style={styles.loadingText}>Loading redemptions...</Text>
             </View>
           </View>
+        ) : allRedemptions.length === 0 ? (
+          <View style={[styles.emptyContainer, { flexGrow: 1 }]}>
+            <Text style={styles.emptyText}>
+              {activeTab === 'collected' 
+                ? "No collected redemptions found"
+                : "No uncollected redemptions found"
+              }
+            </Text>
+            <Text style={styles.emptySubText}>
+              {activeTab === 'collected'
+                ? "You haven't collected any redemptions yet"
+                : "You don't have any uncollected redemptions"
+              }
+            </Text>
+          </View>
         ) : (
           <FlatList
             ref={flatListRef}
@@ -352,25 +391,21 @@ const RedemptionListingScreen = () => {
             ]}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>
-                  {searchQuery.trim() 
-                    ? "No redemptions found matching your search"
-                    : "No redemptions found"}
-                </Text>
-                <Text style={styles.emptySubText}>
-                  {searchQuery.trim()
-                    ? "Try a different search term"
-                    : "Check back later for new redemptions"}
-                </Text>
-              </View>
+              (searchQuery.trim() !== '' && allRedemptions.length === 0) || 
+              (redemptions.length === 0) ? (
+                searchQuery.trim() !== '' ? ListEmptyComponent : TabEmptyComponent
+              ) : null
             }
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             refreshing={refreshing}
             onRefresh={handleRefresh}
           />
         )}
-        {filteredRedemptions.length > 0 && totalPages > 1 && <PageSelector />}
+        {allRedemptions.length > 0 && totalPages > 1 && !searchQuery && (
+          <View style={styles.floatingPaginationContainer}>
+            <PageSelector />
+          </View>
+        )}
       </View>
     </View>
   );
@@ -463,19 +498,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12,
     paddingHorizontal: 8,
     backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderRadius: 25,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   pageButton: {
-    minWidth: 35,
-    height: 35,
-    borderRadius: 8,
+    minWidth: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 4,
+    marginHorizontal: 2,
     backgroundColor: '#f5f5f5',
   },
   pageButtonActive: {
@@ -496,5 +537,11 @@ const styles = StyleSheet.create({
   pageEllipsis: {
     marginHorizontal: 8,
     color: '#666',
+  },
+  floatingPaginationContainer: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    zIndex: 1000,
   },
 });
