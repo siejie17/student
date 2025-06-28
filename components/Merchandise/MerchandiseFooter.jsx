@@ -51,14 +51,20 @@ const MerchandiseFooter = ({ merch, balanceDiamonds }) => {
                 diamonds: increment(-totalDiamonds),
             });
 
-            await addDoc(collection(db, "redemption"), {
+            let redemptionData = {
                 merchandiseID: merch.id,
                 redemptionID: new Date().getTime().toString() + Math.random().toString(36).substr(2, 5),
                 redeemedTime: new Date(),
                 studentID: studentID,
                 quantity: quantity,
                 collected: false,
-            });
+            };
+
+            if (merch.category === "Clothing") {
+                redemptionData.selectedSize = selectedSize;
+            }
+
+            await addDoc(collection(db, "redemption"), redemptionData);
 
             setRedemptionSuccessModal(true);
         } catch (error) {
