@@ -90,7 +90,8 @@ const EventListingScreen = ({ route, navigation }) => {
       let baseQuery = query(
         collection(db, "event"),
         where("registrationClosingDate", ">", Timestamp.now()),
-        where("status", "not-in", ["Completed", "Cancelled"])
+        where("status", "not-in", ["Completed", "Cancelled"]),
+        orderBy("eventStartDateTime", "asc"),
       );
 
       if (selectedCategory !== 'All') {

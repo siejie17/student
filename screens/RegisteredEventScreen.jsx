@@ -481,7 +481,6 @@ const RegisteredEventScreen = ({ route }) => {
                     onCancel={() => setCancelModalVisible(false)}
                     onConfirm={handleCancelRegistration}
                     isDeleting={isDeleting}
-                    error={error}
                 />
             </ScrollView>
 

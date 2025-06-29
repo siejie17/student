@@ -27,7 +27,6 @@ const CancelRegistrationModal = ({
     onCancel,
     onConfirm,
     isDeleting,
-    error
 }) => {
     // Animation values
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -120,8 +119,6 @@ const CancelRegistrationModal = ({
                         Are you sure you want to cancel this event registration?
                         This action cannot be undone.
                     </Text>
-
-                    {error && <Text style={styles.errorText}>{error}</Text>}
 
                     <View style={styles.buttonContainer}>
                         <TouchableOpacity
