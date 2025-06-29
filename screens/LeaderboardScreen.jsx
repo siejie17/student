@@ -950,7 +950,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
   },
   listContainer: {
-    paddingBottom: 120, // Extra space at bottom for floating rank indicator
+    paddingBottom: 70, // Extra space at bottom for floating rank indicator
     paddingHorizontal: 16,
   },
   listHeader: {
