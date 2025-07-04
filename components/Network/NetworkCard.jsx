@@ -14,6 +14,17 @@ const FACULTY_MAPPING = {
     10: "FSSH",
 };
 
+const CATEGORIES_MAPPING = {
+    1: "Academic",
+    2: "Volunteering",
+    3: "Entertainment",
+    4: "Cultural",
+    5: "Sports",
+    6: "Health & Wellness",
+    7: "Others",
+    "Not Available": "N/A",
+  };
+
 const NetworkCard = ({ item, index, animatedValues }) => {
     // Format Firebase timestamp to readable date
     const formatTimestamp = (timestamp) => {
@@ -68,7 +79,38 @@ const NetworkCard = ({ item, index, animatedValues }) => {
 
                     <View style={styles.eventContainer}>
                         <Text style={styles.eventLabel}>🎯</Text>
-                        <Text style={styles.eventName} numberOfLines={1}>{item.eventName}</Text>
+                        <Text style={styles.eventName} numberOfLines={1}>Connected at: {item.eventName}</Text>
+                    </View>
+                </View>
+            </View>
+
+            {/* Hobbies Section (same row, padding on top, beautified) */}
+            {Array.isArray(item.hobbies) && item.hobbies.length > 0 && (
+                <View style={styles.hobbiesSectionRow}>
+                    <Text style={styles.hobbiesLabelBeautified}>Hobbies</Text>
+                    <View style={styles.hobbiesContainerBeautified}>
+                        {item.hobbies.map((hobby, idx) => (
+                            <View key={idx} style={styles.hobbyChipBeautified}>
+                                <Text style={styles.hobbyTextBeautified}>{hobby}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            )}
+
+            {/* Last Attended Event Section */}
+            <View style={styles.lastEventSectionRow}>
+                <Text style={styles.lastEventLabel}>Last Attended Event</Text>
+                <View style={styles.lastEventInfoContainer}>
+                    <Text
+                        style={styles.lastEventName}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
+                        {item.lastAttendedEventName}
+                    </Text>
+                    <View style={styles.lastEventCategoryChip}>
+                        <Text style={styles.lastEventCategoryText}>{CATEGORIES_MAPPING[item.lastAttendedEventCategory]}</Text>
                     </View>
                 </View>
             </View>
@@ -76,7 +118,7 @@ const NetworkCard = ({ item, index, animatedValues }) => {
             <View style={styles.chatPromptContainer}>
                 {item.hasUnread && (
                     <View style={styles.unreadIndicator}>
-                        <Text style={{ color: '#fff', fontSize: 8, textAlign: 'center' }}>New message(s).</Text>    
+                        <Text style={{ color: '#fff', fontSize: 8, textAlign: 'center' }}>New message(s).</Text>
                     </View>
                 )}
                 <MaterialCommunityIcons name="message" size={14} color="#3B6FC9" />
@@ -110,6 +152,8 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 18,
         alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
     },
     profilePicContainer: {
         padding: 1.5,
@@ -200,5 +244,91 @@ const styles = StyleSheet.create({
         color: '#3B6FC9',
         fontWeight: '500',
         marginLeft: 6,
-    }
+    },
+    hobbiesSectionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingTop: 8,
+        paddingBottom: 4,
+    },
+    hobbiesLabelBeautified: {
+        fontSize: 10,
+        color: '#2B4C7E',
+        fontWeight: 'bold',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
+        marginRight: 40,
+    },
+    hobbiesContainerBeautified: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        borderRadius: 10,
+    },
+    hobbyChipBeautified: {
+        backgroundColor: '#D6E6FF',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        marginRight: 6,
+        shadowColor: '#3B6FC9',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    hobbyTextBeautified: {
+        fontSize: 11,
+        color: '#2B4C7E',
+        fontWeight: '600',
+    },
+    // Last Attended Event Section Styles
+    lastEventSectionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingTop: 4,
+        paddingBottom: 8,
+    },
+    lastEventLabel: {
+        fontSize: 10,
+        color: '#7E4C2B',
+        fontWeight: 'bold',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
+        marginRight: 4,
+        backgroundColor: 'transparent',
+    },
+    lastEventInfoContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'nowrap',
+    },
+    lastEventName: {
+        fontSize: 11,
+        color: '#7E4C2B',
+        fontWeight: '500',
+        flex: 1,
+        marginRight: 8,
+    },
+    lastEventCategoryChip: {
+        backgroundColor: '#FFE6D6',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        marginRight: 0,
+        shadowColor: '#7E4C2B',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    lastEventCategoryText: {
+        fontSize: 11,
+        color: '#7E4C2B',
+        fontWeight: '600',
+    },
 });

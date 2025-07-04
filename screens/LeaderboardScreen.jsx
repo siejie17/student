@@ -354,9 +354,11 @@ const LeaderboardScreen = () => {
                 />
               </View>
             </View>
-            <Text style={styles.podiumName} numberOfLines={1}>{secondPlace?.firstName || "Silver's open!"}</Text>
+            <Text style={styles.podiumName} numberOfLines={1}>
+              {secondPlace?.firstName || "Waiting..."}
+            </Text>
             <Text style={[styles.podiumPoints, styles.secondPoints]}>
-              {secondPlace?.points ? `${secondPlace.points} pts` : "Join the race!"}
+              {secondPlace?.points ? `${secondPlace.points} pts` : "0"}
             </Text>
           </View>
 
@@ -380,10 +382,10 @@ const LeaderboardScreen = () => {
               </View>
             </View>
             <Text style={[styles.podiumName, styles.firstName]} numberOfLines={1}>
-              {firstPlace?.firstName || "Be the champ!"}
+              {firstPlace?.firstName || "Waiting..."}
             </Text>
             <Text style={[styles.podiumPoints, styles.firstPoints]}>
-              {firstPlace?.points ? `${firstPlace.points} pts` : "No points yet!"}
+              {firstPlace?.points ? `${firstPlace.points} pts` : "0"}
             </Text>
           </View>
 
@@ -403,9 +405,11 @@ const LeaderboardScreen = () => {
                 />
               </View>
             </View>
-            <Text style={styles.podiumName} numberOfLines={1}>{thirdPlace?.firstName || "Bronze is yours!"}</Text>
+            <Text style={styles.podiumName} numberOfLines={1}>
+              {thirdPlace?.firstName || "Waiting..."}
+            </Text>
             <Text style={[styles.podiumPoints, styles.thirdPoints]}>
-              {thirdPlace?.points ? `${thirdPlace.points} pts` : "Score now!"}
+              {thirdPlace?.points ? `${thirdPlace.points} pts` : "0"}
             </Text>
           </View>
         </View>

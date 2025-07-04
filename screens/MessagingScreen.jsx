@@ -11,6 +11,8 @@ import {
     Image,
     Animated,
     ActivityIndicator,
+    Modal,
+    Pressable,
 } from 'react-native';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
@@ -20,11 +22,13 @@ import { auth, db } from '../utils/firebaseConfig';
 import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 
 const MessagingScreen = ({ navigation, route }) => {
-    const { studentID, fullName, profilePic } = route.params;
+    const { studentID, fullName, profilePic, hobbies, lastAttendedEventName, yearOfStudy, faculty, connectedAt } = route.params;
 
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [infoModalVisible, setInfoModalVisible] = useState(false);
+    const infoModalAnim = useRef(new Animated.Value(0)).current;
 
     const getChatID = () => {
         return [studentID, auth.currentUser.uid].sort().join("_");
@@ -150,6 +154,19 @@ const MessagingScreen = ({ navigation, route }) => {
                         <Text style={styles.profileName}>{fullName}</Text>
                     </View>
                 </View>
+                <TouchableOpacity
+                    style={styles.infoIconButton}
+                    onPress={() => {
+                        setInfoModalVisible(true);
+                        Animated.timing(infoModalAnim, {
+                            toValue: 1,
+                            duration: 250,
+                            useNativeDriver: true,
+                        }).start();
+                    }}
+                >
+                    <Ionicons name="information-circle-outline" size={24} color="#3B6FC9" />
+                </TouchableOpacity>
             </View>
         </View>
     );
@@ -271,6 +288,88 @@ const MessagingScreen = ({ navigation, route }) => {
     return (
         <View style={styles.container}>
             <ProfileHeader />
+            {/* Info Modal */}
+            <Modal
+                visible={infoModalVisible}
+                transparent
+                animationType="none"
+                onRequestClose={() => setInfoModalVisible(false)}
+            >
+                <Pressable style={styles.infoModalOverlay} onPress={() => setInfoModalVisible(false)}>
+                    <Animated.View
+                        style={[
+                            styles.infoModalContent,
+                            {
+                                transform: [
+                                    { translateY: infoModalAnim.interpolate({ inputRange: [0, 1], outputRange: [-100, 0] }) },
+                                    { translateX: infoModalAnim.interpolate({ inputRange: [0, 1], outputRange: [100, 0] }) },
+                                ],
+                                opacity: infoModalAnim,
+                            },
+                        ]}
+                    >
+                        <View style={styles.infoModalHeader}>
+                            <Text style={styles.infoModalTitle}>Network Info</Text>
+                            <TouchableOpacity onPress={() => setInfoModalVisible(false)}>
+                                <Ionicons name="close" size={22} color="#333" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.infoModalBody}>
+                            {yearOfStudy && (
+                                <View style={styles.infoRowColumn}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                                        <Ionicons name="book-outline" size={16} color="#000" style={{ marginRight: 6 }} />
+                                        <Text style={styles.infoLabel}>Year of Study:</Text>
+                                    </View>
+                                    <Text style={styles.eventNameTextRow}>{yearOfStudy}</Text>
+                                </View>
+                            )}
+                            {faculty && (
+                                <View style={styles.infoRowColumn}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Ionicons name="school-outline" size={16} color="#000" style={{ marginRight: 6 }} />
+                                        <Text style={styles.infoLabel}>Faculty:</Text>
+                                    </View>
+                                    <Text style={styles.eventNameTextRow}>{faculty}</Text>
+                                </View>
+                            )}
+                            {Array.isArray(hobbies) && hobbies.length > 0 && (
+                                <View style={styles.infoRowColumn}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Ionicons name="sparkles-outline" size={16} color="#000" style={{ marginRight: 6 }} />
+                                        <Text style={styles.infoLabel}>Hobbies:</Text>
+                                    </View>
+                                    <View style={styles.hobbiesList}>
+                                        {hobbies.map((hobby, idx) => (
+                                            <View key={idx} style={styles.hobbyChip}>
+                                                <Text style={styles.hobbyText}>{hobby}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+                            {connectedAt && (
+                                <View style={styles.infoRowColumn}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Ionicons name="link-outline" size={16} color="#000" style={{ marginRight: 6 }} />
+                                        <Text style={styles.infoLabel}>Connected At Event:</Text>
+                                    </View>
+                                    <Text style={styles.eventNameTextRow}>{connectedAt}</Text>
+                                </View>
+                            )}
+                            {lastAttendedEventName && (
+                                <View style={styles.infoRowColumn}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                                        <Ionicons name="calendar-outline" size={16} color="#000" style={{ marginRight: 6 }} />
+                                        <Text style={styles.infoLabel}>Last Attended Event:</Text>
+                                    </View>
+                                    <Text style={styles.eventNameTextRow}>{lastAttendedEventName}</Text>
+                                </View>
+                            )}
+                        </View>
+                    </Animated.View>
+                </Pressable>
+            </Modal>
             <KeyboardAvoidingView
                 style={styles.messageContentContainer}
             >
@@ -731,6 +830,103 @@ const styles = StyleSheet.create({
     sendButtonDisabled: {
         backgroundColor: '#007AFF',
         opacity: 0.5
+    },
+    infoCard: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 16,
+        padding: 14,
+        marginHorizontal: 16,
+        marginTop: 8,
+        marginBottom: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: 6,
+    },
+    infoLabel: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#000',
+        marginRight: 6,
+    },
+    hobbiesList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 4,
+        marginLeft: 22,
+    },
+    hobbyChip: {
+        backgroundColor: '#D6E6FF',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        marginRight: 4,
+        marginBottom: 4,
+    },
+    hobbyText: {
+        fontSize: 12,
+        color: '#2B4C7E',
+        fontWeight: '600',
+    },
+    infoRowColumn: {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        marginBottom: 10,
+    },
+    eventNameTextRow: {
+        fontSize: 14,
+        color: '#555',
+        fontWeight: '500',
+        marginLeft: 24,
+        marginTop: 6,
+        flexShrink: 1,
+    },
+    infoIconButton: {
+        marginLeft: 10,
+        padding: 4,
+        borderRadius: 16,
+        backgroundColor: 'rgba(59, 111, 201, 0.07)',
+    },
+    infoModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.12)',
+        justifyContent: 'flex-start',
+        alignItems: 'flex-end',
+        paddingTop: 60,
+        paddingRight: 16,
+    },
+    infoModalContent: {
+        width: 370,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 18,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    infoModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    infoModalTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#000',
+    },
+    infoModalBody: {
+        marginTop: 2,
     },
 });
 

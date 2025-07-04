@@ -22,7 +22,7 @@ const EVENT_TYPE_MAPPING = {
     6: "health_wellness",
 }
 
-const AttendanceQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, latitude, longitude, updateQuestStatus, registrationID }) => {
+const AttendanceQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, latitude, longitude, updateQuestStatus, registrationID, locked }) => {
     // Mode state: 'display' for showing QR, 'scan' for scanning QR
     const [mode, setMode] = useState('display');
 
@@ -536,24 +536,38 @@ const AttendanceQuestSheet = ({ selectedQuest, onCancel, eventID, categoryID, la
                 </View>
             </View>
 
-            {!selectedQuest.isCompleted && (mode === 'scan' ? (
-                <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('display')}>
-                    <Text style={styles.showQRButtonText}>Close QR Scanner </Text>
-                </TouchableOpacity>
-            ) : (
-                <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('scan')}>
-                    <Text style={styles.showQRButtonText}>Scan Attendance QR</Text>
-                </TouchableOpacity>
-            ))}
+            {!selectedQuest.isCompleted && (
+                locked ? (
+                    <View style={[styles.showQRButton, { marginBottom: 5, backgroundColor: '#ccc' }]}> 
+                        <Text style={[styles.showQRButtonText, { color: '#888' }]}>Event is ended</Text>
+                    </View>
+                ) : (
+                    mode === 'scan' ? (
+                        <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('display')}>
+                            <Text style={styles.showQRButtonText}>Close QR Scanner </Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('scan')}>
+                            <Text style={styles.showQRButtonText}>Scan Attendance QR</Text>
+                        </TouchableOpacity>
+                    )
+                )
+            )}
 
             {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
-                <TouchableOpacity
-                    style={[styles.rewardsButton, { marginBottom: 5 }, animatingDiamonds && styles.claimedButton]}
-                    disabled={animatingDiamonds}
-                    onPress={claimRewards}
-                >
-                    <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
-                </TouchableOpacity>
+                locked ? (
+                    <View style={[styles.rewardsButton, { marginBottom: 5, backgroundColor: '#ccc' }]}> 
+                        <Text style={[styles.rewardsButtonText, { color: '#888' }]}>Event is ended</Text>
+                    </View>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.rewardsButton, { marginBottom: 5 }, animatingDiamonds && styles.claimedButton]}
+                        disabled={animatingDiamonds}
+                        onPress={claimRewards}
+                    >
+                        <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
+                    </TouchableOpacity>
+                )
             )}
 
             {/* Animated diamonds */}

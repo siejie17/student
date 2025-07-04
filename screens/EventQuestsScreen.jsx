@@ -181,10 +181,14 @@ const EventQuestsScreen = ({ route, navigation }) => {
   // Automatically update user quests list when quests or progress change
   useEffect(() => {
     setUserQuestsList(
-      quests.map(q => ({
-        ...q,
-        ...(questProgress.find(qp => qp.questID === q.questID) || {}),
-      }))
+      quests.map(q => {
+        const isLocked = (status === 'Completed' || status === 'Cancelled') && q.questType !== 'feedback';
+        return {
+          ...q,
+          ...(questProgress.find(qp => qp.questID === q.questID) || {}),
+          locked: isLocked,
+        };
+      })
     );
   }, [quests, questProgress]);
 
@@ -307,6 +311,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
                   onCancel={handleClosePress}
                   eventID={eventID}
                   updateQuestStatus={updateQuestStatus}
+                  locked={selectedQuest.locked}
                 />
               }
               {selectedQuest.questType === "feedback" &&
@@ -317,6 +322,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
                   updateQuestStatus={updateQuestStatus}
                   navigation={navigation}
                   registrationID={registrationID}
+                  locked={selectedQuest.locked}
                 />
               }
               {selectedQuest.questType === "q&a" &&
@@ -327,6 +333,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
                   updateQuestStatus={updateQuestStatus}
                   navigation={navigation}
                   registrationID={registrationID}
+                  locked={selectedQuest.locked}
                 />
               }
               {selectedQuest.questType === "networking" &&
@@ -337,6 +344,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
                   updateQuestStatus={updateQuestStatus}
                   navigation={navigation}
                   registrationID={registrationID}
+                  locked={selectedQuest.locked}
                 />
               }
               {selectedQuest.questType === "attendance" &&
@@ -350,6 +358,7 @@ const EventQuestsScreen = ({ route, navigation }) => {
                   registrationID={registrationID}
                   latitude={latitude}
                   longitude={longitude}
+                  locked={selectedQuest.locked}
                 />
               }
             </>

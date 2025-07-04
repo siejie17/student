@@ -11,6 +11,8 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
     const [animatingDiamonds, setAnimatingDiamonds] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [claimed, setClaimed] = useState(false);
+    const [locked, setLocked] = useState(false);
+    const [mode, setMode] = useState('display');
 
     const diamondAnims = useRef([...Array(30)].map(() => ({
         translateX: new Animated.Value(0),
@@ -375,14 +377,38 @@ const EarlyBirdQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStat
                 </View>
             </View>
 
+            {!selectedQuest.isCompleted && (
+                locked ? (
+                    <View style={[styles.showQRButton, { marginBottom: 5, backgroundColor: '#ccc' }]}> 
+                        <Text style={[styles.showQRButtonText, { color: '#888' }]}>Event is ended</Text>
+                    </View>
+                ) : (
+                    mode === 'scan' ? (
+                        <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('display')}>
+                            <Text style={styles.showQRButtonText}>Close QR Scanner </Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('scan')}>
+                            <Text style={styles.showQRButtonText}>Scan Early Bird QR</Text>
+                        </TouchableOpacity>
+                    )
+                )
+            )}
+
             {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
-                <TouchableOpacity
-                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
-                    disabled={claimed}
-                    onPress={claimRewards}
-                >
-                    <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
-                </TouchableOpacity>
+                locked ? (
+                    <View style={[styles.rewardsButton, { marginBottom: 5, backgroundColor: '#ccc' }]}> 
+                        <Text style={[styles.rewardsButtonText, { color: '#888' }]}>Event is ended</Text>
+                    </View>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
+                        disabled={claimed}
+                        onPress={claimRewards}
+                    >
+                        <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
+                    </TouchableOpacity>
+                )
             )}
 
             {/* Animated diamonds */}
@@ -644,6 +670,22 @@ const styles = StyleSheet.create({
         height: 22,
         width: 22,
         resizeMode: 'contain',
+    },
+    showQRButton: {
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: '#5E96CE',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 1,
+    },
+    showQRButtonText: {
+        textAlign: 'center',
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFF',
     },
 });
 

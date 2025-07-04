@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState
@@ -270,7 +271,6 @@ const EventListingScreen = ({ route, navigation }) => {
     useCallback(() => {
       const loadData = async () => {
         await getTotalItems();
-        // fetchPage will be called after getTotalItems completes and allEvents is set
       };
       loadData();
       return () => {
@@ -286,6 +286,11 @@ const EventListingScreen = ({ route, navigation }) => {
       fetchPage(1);
     }
   }, [allEvents]);
+
+  useEffect(() => {
+    setSelectedCategory('All');
+    setCurrentPage(1);
+  }, []);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);

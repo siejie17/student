@@ -45,6 +45,7 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
     const [isLoading, setIsLoading] = useState(false);
     const [claimed, setClaimed] = useState(false);
     const [scannedModalVisible, setScannedModalVisible] = useState(false);
+    const [networkDetails, setNetworkDetails] = useState({});
     const [completedModalVisible, setCompletedModalVisible] = useState(false);
     const [networkingFailureModalVisible, setNetworkingFailureModalVisible] = useState(false);
     const [networkingFailureModalContent, setNetworkingFailureModalContent] = useState({
@@ -526,6 +527,13 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                         scanCheckmarkScale.setValue(0);
                         scanCheckmarkOpacity.setValue(0);
                         scanProgressAnim.setValue(0);
+
+                        const networkUserRef = doc(db, "user", parsedData.networkID);
+                        const networkUserSnapshot = await getDoc(networkUserRef);
+
+                        setNetworkDetails(networkUserSnapshot.data());
+
+
                         setScanSuccessModalVisible(true);
                         if (Platform.OS !== 'web') {
                             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -572,7 +580,7 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                             duration: 2000,
                             useNativeDriver: false
                         }).start();
-                        setTimeout(() => setScanSuccessModalVisible(false), 2000);
+                        setTimeout(() => setScanSuccessModalVisible(false), 4000);
                     }
                 }
             } else {
@@ -912,24 +920,38 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                 </View>
             </View>
 
-            {!selectedQuest.isCompleted && (mode === 'scan' ? (
-                <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('display')}>
-                    <Text style={styles.showQRButtonText}>Show My Network QR</Text>
-                </TouchableOpacity>
-            ) : (
-                <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('scan')}>
-                    <Text style={styles.showQRButtonText}>Scan Other Participant's QR</Text>
-                </TouchableOpacity>
-            ))}
+            {!selectedQuest.isCompleted && (
+                locked ? (
+                    <View style={[styles.showQRButton, { marginBottom: 5, backgroundColor: '#ccc' }]}> 
+                        <Text style={[styles.showQRButtonText, { color: '#888' }]}>Event is ended</Text>
+                    </View>
+                ) : (
+                    mode === 'scan' ? (
+                        <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('display')}>
+                            <Text style={styles.showQRButtonText}>Show My Network QR</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity style={[styles.showQRButton, { marginBottom: 5 }]} onPress={() => setMode('scan')}>
+                            <Text style={styles.showQRButtonText}>Scan Other Participant's QR</Text>
+                        </TouchableOpacity>
+                    )
+                )
+            )}
 
             {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
-                <TouchableOpacity
-                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
-                    disabled={claimed}
-                    onPress={claimRewards}
-                >
-                    <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
-                </TouchableOpacity>
+                locked ? (
+                    <View style={[styles.rewardsButton, { marginBottom: 5, backgroundColor: '#ccc' }]}> 
+                        <Text style={[styles.rewardsButtonText, { color: '#888' }]}>Event is ended</Text>
+                    </View>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
+                        disabled={claimed}
+                        onPress={claimRewards}
+                    >
+                        <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
+                    </TouchableOpacity>
+                )
             )}
 
             {/* Animated diamonds */}
@@ -1052,6 +1074,39 @@ const NetworkingQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestSta
                                     />
                                 </View>
                             </Animated.View>
+                            <View style={styles.scannedPersonContainer}>
+                                {networkDetails.profilePicture && (
+                                    <Image
+                                        source={{ uri: `data:image/png;base64,${networkDetails.profilePicture}` }}
+                                        style={styles.scannedPersonImage}
+                                    />
+                                )}
+                                <Text style={styles.scannedPersonName}>
+                                    {networkDetails.firstName || 'Unknown'} {networkDetails.lastName || ''}
+                                </Text>
+                                <View style={styles.scannedPersonInfoRow}>
+                                    <View style={styles.scannedPersonInfoItem}>
+                                        <Ionicons name="book-outline" size={16} color="#5E96CE" style={{ marginRight: 4 }} />
+                                        <Text style={styles.scannedPersonDetail}>Year {networkDetails.yearOfStudy || 'N/A'}</Text>
+                                    </View>
+                                    <View style={styles.scannedPersonInfoItem}>
+                                        <Ionicons name="school-outline" size={16} color="#5E96CE" style={{ marginRight: 4 }} />
+                                        <Text style={styles.scannedPersonDetail}>{FACULTY_MAPPING[networkDetails.facultyID] || 'N/A'}</Text>
+                                    </View>
+                                </View>
+                                {Array.isArray(networkDetails.hobbies) && networkDetails.hobbies.length > 0 && (
+                                    <View style={styles.hobbiesContainer}>
+                                        <Text style={styles.hobbiesLabel}>Hobbies</Text>
+                                        <View style={styles.hobbiesList}>
+                                            {networkDetails.hobbies.map((hobby, index) => (
+                                                <View key={index} style={styles.hobbyChip}>
+                                                    <Text style={styles.hobbyText}>{hobby}</Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
                             <Text style={styles.titleText}>Networking Successful!</Text>
                             <Text style={styles.eventNameText}>
                                 You are now connected!
@@ -1538,6 +1593,76 @@ const styles = StyleSheet.create({
     progressFill: {
         height: '100%',
         backgroundColor: '#4CAF50'
+    },
+    scannedPersonContainer: {
+        marginTop: 10,
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    scannedPersonImage: {
+        width: 90,
+        height: 90,
+        borderRadius: 45,
+        marginBottom: 10,
+        borderWidth: 2,
+        borderColor: '#5E96CE',
+    },
+    scannedPersonName: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#252A34',
+        marginBottom: 6,
+        textAlign: 'center',
+    },
+    scannedPersonInfoRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+        gap: 16,
+    },
+    scannedPersonInfoItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: 6,
+    },
+    scannedPersonDetail: {
+        fontSize: 15,
+        color: '#555',
+    },
+    hobbiesContainer: {
+        marginTop: 8,
+        alignItems: 'center',
+    },
+    hobbiesLabel: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: '#5E96CE',
+        marginBottom: 4,
+    },
+    hobbiesList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    hobbyChip: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        backgroundColor: '#D6E6FF',
+        borderRadius: 8,
+        marginBottom: 4,
+    },
+    hobbyText: {
+        fontSize: 13,
+        color: '#2B4C7E',
+        fontWeight: '600',
+    },
+    divider: {
+        width: '100%',
+        height: 1,
+        backgroundColor: '#E0E0E0',
+        marginVertical: 16,
     },
 });
 

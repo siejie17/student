@@ -1,8 +1,10 @@
-import { View, Text, ActivityIndicator, StyleSheet, Animated, TouchableOpacity, FlatList } from 'react-native';
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet, Animated, TouchableOpacity, FlatList, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { Entypo } from '@expo/vector-icons';
-import { collection, doc, getDoc, getDocs, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 import { db } from '../utils/firebaseConfig';
 import { getItem } from '../utils/asyncStorage';
@@ -13,6 +15,42 @@ import SearchBar from '../components/EventListing/SearchBar';
 
 const ITEMS_PER_PAGE = 5; // Number of items to load per page
 
+const FACULTY_MAPPING = {
+    1: "FACA",
+    2: "FBE",
+    3: "FCSHD",
+    4: "FCSIT",
+    5: "FEB",
+    6: "FELC",
+    7: "FENG",
+    8: "FMSH",
+    9: "FRST",
+    10: "FSSH",
+};
+
+const CATEGORIES = [
+    "All",
+    "Academic",
+    "Volunteering",
+    "Entertainment",
+    "Cultural",
+    "Sports",
+    "Health & Wellness",
+    "Others"
+];
+
+const CATEGORIES_MAPPING = {
+    1: "Academic",
+    2: "Volunteering",
+    3: "Entertainment",
+    4: "Cultural",
+    5: "Sports",
+    6: "Health & Wellness",
+    7: "Others",
+    "Not Available": "None",
+    "N/A": "None",
+};
+
 const NetworkScreen = () => {
     const [networks, setNetworks] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -20,11 +58,14 @@ const NetworkScreen = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
+    const [selectedCategory, setSelectedCategory] = useState('All');
+
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(50)).current;
+    const flatListRef = useRef(null);
 
     const listenersRef = useRef([]);
-
     const animatedValues = networks.map(() => new Animated.Value(0.95));
-
     const navigation = useNavigation();
 
     useEffect(() => {
@@ -48,8 +89,8 @@ const NetworkScreen = () => {
 
                 const networkDoc = networkSnap.docs[0];
                 const networkListRef = collection(networkDoc.ref, "networkList");
-
                 const networkListSnap = await getDocs(networkListRef);
+
                 if (networkListSnap.empty) {
                     console.log("No network list records found.");
                     setNetworks([]);
@@ -61,7 +102,6 @@ const NetworkScreen = () => {
                     ...doc.data()
                 }));
 
-                // Cancel any existing listeners before setting new ones
                 listenersRef.current.forEach(unsub => unsub());
                 listenersRef.current = [];
 
@@ -74,13 +114,35 @@ const NetworkScreen = () => {
 
                     if (!userSnap.exists() || !eventSnap.exists()) return null;
 
-                    // Create chat document ID by sorting and joining IDs
                     const sortedIds = [studentID, network.networkID].sort();
                     const chatDocId = sortedIds.join('_');
                     const chatRef = doc(db, "chats", chatDocId);
                     const messagesRef = collection(chatRef, "messages");
 
-                    // Initial unread check
+                    let lastAttendedEventName = "Not Available";
+                    let lastAttendedEventCategory = "Not Available";
+
+                    const lastAttendedEventQuery = query(
+                        collection(db, "registration"),
+                        where("studentID", "==", network.networkID),
+                        where("isAttended", "==", true),
+                        orderBy("attendanceScannedTime", "desc"),
+                        limit(1)
+                    );
+                    const lastAttendedEventSnap = await getDocs(lastAttendedEventQuery);
+
+                    if (!lastAttendedEventSnap.empty) {
+                        const lastEventDoc = lastAttendedEventSnap.docs[0];
+                        const lastEventID = lastEventDoc.data().eventID;
+
+                        const lastEventRef = doc(db, "event", lastEventID);
+                        const lastEventSnap = await getDoc(lastEventRef);
+                        if (lastEventSnap.exists()) {
+                            lastAttendedEventName = lastEventSnap.data().eventName || "Not Available";
+                            lastAttendedEventCategory = lastEventSnap.data().category || "Not Available";
+                        }
+                    }
+
                     const messagesQuery = query(
                         messagesRef,
                         where("senderID", "==", network.networkID),
@@ -96,12 +158,14 @@ const NetworkScreen = () => {
                         yearOfStudy: userSnap.data().yearOfStudy,
                         facultyID: userSnap.data().facultyID,
                         profilePic: userSnap.data().profilePicture,
+                        hobbies: userSnap.data().hobbies,
+                        lastAttendedEventName,
+                        lastAttendedEventCategory,
                         eventName: eventSnap.data().eventName,
                         scannedTime: network.scannedTime,
                         hasUnread: hasUnread
                     };
 
-                    // Set up real-time listener
                     const unsub = onSnapshot(
                         query(messagesRef, where("senderID", "==", network.networkID), where("read", "==", false)),
                         (snapshot) => {
@@ -122,7 +186,6 @@ const NetworkScreen = () => {
                     );
 
                     listenersRef.current.push(unsub);
-
                     return newNetwork;
                 });
 
@@ -147,7 +210,6 @@ const NetworkScreen = () => {
 
         fetchUserNetworks();
 
-        // Cleanup function to remove all listeners
         return () => {
             listenersRef.current.forEach(unsub => unsub());
             listenersRef.current = [];
@@ -168,8 +230,16 @@ const NetworkScreen = () => {
         Animated.stagger(100, animations).start();
     }, [networks]);
 
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedCategory]);
+
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        setCurrentPage(1);
+    };
+
     const handleCardPress = (index) => {
-        // Create bubble animation effect on press
         Animated.sequence([
             Animated.timing(animatedValues[index], {
                 toValue: 1.05,
@@ -183,22 +253,86 @@ const NetworkScreen = () => {
                 useNativeDriver: true,
             }),
         ]).start();
-    }
+    };
 
     const handleNetworkCardPress = (item, index) => {
         handleCardPress(index);
-        navigation.navigate("Messaging", { studentID: item.studentID, fullName: item.networkName, profilePic: item.profilePic });
-    }
-
-    const handleSearch = (query) => {
-        setSearchQuery(query);
-        setCurrentPage(1);
+        navigation.navigate("Messaging", { studentID: item.studentID, fullName: item.networkName, profilePic: item.profilePic, hobbies: item.hobbies, lastAttendedEventName: item.lastAttendedEventName, yearOfStudy: item.yearOfStudy, faculty: FACULTY_MAPPING[item.facultyID], connectedAt: item.eventName });
     };
 
-    const handlePageChange = (pageNumber) => {
-        if (pageNumber < 1 || pageNumber > totalPages) return;
-        setCurrentPage(pageNumber);
-    };
+    const filteredNetworks = useMemo(() => {
+        let filtered = networks;
+        // Explicit filtering by category
+        if (selectedCategory === 'None') {
+            filtered = filtered.filter(item =>
+                CATEGORIES_MAPPING[item.lastAttendedEventCategory] === 'None' ||
+                item.lastAttendedEventCategory === 'N/A'
+            );
+        } else if (selectedCategory !== 'All') {
+            filtered = filtered.filter(item =>
+                CATEGORIES_MAPPING[item.lastAttendedEventCategory] === selectedCategory ||
+                item.lastAttendedEventCategory === selectedCategory
+            );
+        }
+        // Search filter
+        if (searchQuery.trim()) {
+            filtered = filtered.filter(item =>
+                item.networkName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (Array.isArray(item.hobbies) && item.hobbies.some(hobby => hobby.toLowerCase().includes(searchQuery.toLowerCase())))
+            );
+        }
+        return filtered;
+    }, [networks, searchQuery, selectedCategory]);
+
+    const filteredAndPaginatedNetworks = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        const endIndex = startIndex + ITEMS_PER_PAGE;
+        return filteredNetworks.slice(startIndex, endIndex);
+    }, [filteredNetworks, currentPage]);
+
+    const handleCategoryPress = useCallback((category) => {
+        setSelectedCategory(category);
+        // Refresh animations when category changes
+        fadeAnim.setValue(0);
+        slideAnim.setValue(50);
+
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 500,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 400,
+                useNativeDriver: true,
+            })
+        ]).start();
+    }, [fadeAnim, slideAnim]);
+
+    const renderCategoryItem = useCallback(({ item }) => {
+        const isSelected = selectedCategory === item;
+        return (
+            <TouchableOpacity onPress={() => handleCategoryPress(item)} activeOpacity={0.7}>
+                <LinearGradient
+                    colors={isSelected ? ['#3f6bc4', '#6d93e3'] : ['#FFFFFF', '#F8F8F8']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.categoryItem, isSelected && styles.categoryItemSelected]}
+                >
+                    <Text style={[styles.categoryText, isSelected && styles.categoryTextSelected]}>
+                        {item}
+                    </Text>
+                </LinearGradient>
+            </TouchableOpacity>
+        );
+    }, [selectedCategory, handleCategoryPress]);
+
+    const renderNetworkCard = (item, index) => (
+        <TouchableOpacity activeOpacity={0.9} onPress={() => handleNetworkCardPress(item, index)}>
+            <NetworkCard item={item} index={index} animatedValues={animatedValues} />
+        </TouchableOpacity>
+    );
 
     const PageSelector = () => {
         const pageNumbers = [];
@@ -218,7 +352,7 @@ const NetworkScreen = () => {
             <View style={styles.paginationContainer}>
                 <TouchableOpacity
                     style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
-                    onPress={() => handlePageChange(1)}
+                    onPress={() => setCurrentPage(1)}
                     disabled={currentPage === 1}
                 >
                     <Text style={styles.pageButtonText}>{"<<"}</Text>
@@ -226,7 +360,7 @@ const NetworkScreen = () => {
 
                 <TouchableOpacity
                     style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
-                    onPress={() => handlePageChange(currentPage - 1)}
+                    onPress={() => setCurrentPage(currentPage - 1)}
                     disabled={currentPage === 1}
                 >
                     <Text style={styles.pageButtonText}>{"<"}</Text>
@@ -243,7 +377,7 @@ const NetworkScreen = () => {
                             styles.pageButton,
                             currentPage === number && styles.pageButtonActive
                         ]}
-                        onPress={() => handlePageChange(number)}
+                        onPress={() => setCurrentPage(number)}
                     >
                         <Text style={[
                             styles.pageButtonText,
@@ -260,7 +394,7 @@ const NetworkScreen = () => {
 
                 <TouchableOpacity
                     style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
-                    onPress={() => handlePageChange(currentPage + 1)}
+                    onPress={() => setCurrentPage(currentPage + 1)}
                     disabled={currentPage === totalPages}
                 >
                     <Text style={styles.pageButtonText}>{">"}</Text>
@@ -268,7 +402,7 @@ const NetworkScreen = () => {
 
                 <TouchableOpacity
                     style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
-                    onPress={() => handlePageChange(totalPages)}
+                    onPress={() => setCurrentPage(totalPages)}
                     disabled={currentPage === totalPages}
                 >
                     <Text style={styles.pageButtonText}>{">>"}</Text>
@@ -277,36 +411,14 @@ const NetworkScreen = () => {
         );
     };
 
-    const filteredAndPaginatedNetworks = useMemo(() => {
-        let filtered = networks;
-
-        if (searchQuery.trim()) {
-            filtered = filtered.filter(item =>
-                item.networkName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                item.eventName.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-        }
-
-        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-        const endIndex = startIndex + ITEMS_PER_PAGE;
-
-        return filtered.slice(startIndex, endIndex);
-    }, [networks, searchQuery, currentPage]);
-
-    const renderNetworkCard = (item, index) => {
-        return (
-            <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => handleNetworkCardPress(item, index)}
-            >
-                <NetworkCard
-                    item={item}
-                    index={index}
-                    animatedValues={animatedValues}
-                />
-            </TouchableOpacity>
-        )
-    }
+    // Custom empty state for category
+    const CategoryEmptyComponent = (
+        <View style={styles.emptyContainer}>
+            <Ionicons name="people-outline" size={70} color="#CCCCCC" />
+            <Text style={styles.emptyText}>No one has attended this category of event recently</Text>
+            <Text style={styles.emptySubText}>Try selecting a different category or check back later.</Text>
+        </View>
+    );
 
     if (isLoading) {
         return (
@@ -321,44 +433,65 @@ const NetworkScreen = () => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Entypo name="chevron-left" size={24} color="#000" />
-                </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerTitle}>Networks</Text>
-                </View>
-            </View>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <View>
+                    <View style={styles.header}>
+                        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                            <Entypo name="chevron-left" size={24} color="#000" />
+                        </TouchableOpacity>
+                        <View style={styles.headerTitleContainer}>
+                            <Text style={styles.headerTitle}>Networks</Text>
+                        </View>
+                    </View>
 
-            <SearchBar
-                onSearch={handleSearch}
-                placeholder="Search networks..."
-                style={styles.searchBar}
-            />
+                    <SearchBar onSearch={handleSearch} placeholder="Search networks by name or hobby..." style={styles.searchBar} />
+
+                    <View style={styles.categoryLabelContainer}>
+                        <Text style={styles.categoryLabel}>Filter networks by last attended event category</Text>
+                    </View>
+
+                    <FlatList
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        data={CATEGORIES}
+                        renderItem={renderCategoryItem}
+                        keyExtractor={item => item}
+                        contentContainerStyle={styles.categoriesList}
+                    />
+                </View>
+            </TouchableWithoutFeedback>
 
             <View style={styles.promptContainer}>
-                <Text style={styles.promptText}>Explore all the connections you've made by scanning QR codes at various events around campus.</Text>
+                <Text style={styles.promptText}>
+                    Explore all the connections you've made by scanning QR codes at various events around campus.
+                </Text>
             </View>
 
-            <FlatList
-                data={filteredAndPaginatedNetworks}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={[
-                    styles.cardList,
-                    filteredAndPaginatedNetworks.length === 0 && styles.emptyListContainer
-                ]}
-                renderItem={({ item, index }) => renderNetworkCard(item, index)}
-                ListEmptyComponent={
-                    <EmptyNetworkState />
-                }
-            />
-            {filteredAndPaginatedNetworks.length > 0 && totalPages > 1 && <PageSelector />}
+            <View style={{ flex: 1, paddingBottom: 80 }}>
+                <FlatList
+                    data={filteredAndPaginatedNetworks}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={[
+                        styles.cardList,
+                        filteredAndPaginatedNetworks.length === 0 && styles.emptyListContainer
+                    ]}
+                    renderItem={({ item, index }) => renderNetworkCard(item, index)}
+                    ListEmptyComponent={
+                        selectedCategory !== 'All' && filteredNetworks.length === 0
+                            ? CategoryEmptyComponent
+                            : <EmptyNetworkState />
+                    }
+                />
+            </View>
+
+            {filteredNetworks.length > ITEMS_PER_PAGE && (
+                <View style={styles.floatingPaginationContainer}>
+                    <PageSelector />
+                </View>
+            )}
         </View>
-    )
-}
+    );
+};
 
 const styles = StyleSheet.create({
     background: {
@@ -392,14 +525,15 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 20,
         marginHorizontal: 16,
-        marginVertical: 12,
+        marginTop: 8,
+        marginBottom: 12,
+        alignItems: 'flex-start', // Left align
     },
     promptText: {
         fontSize: 13,
         fontStyle: "italic",
         color: '#455B7C',
-        justifyContent: "center",
-        textAlign: "center",
+        textAlign: "left", // Left align
     },
     loadingContainer: {
         flex: 1,
@@ -428,26 +562,43 @@ const styles = StyleSheet.create({
     searchBar: {
         marginBottom: 5,
     },
+    categoryLabelContainer: {
+        paddingHorizontal: 20,
+        paddingBottom: 4,
+    },
+    categoryLabel: {
+        fontSize: 12,
+        color: '#666',
+        fontWeight: 'bold',
+        fontStyle: 'italic',
+    },
     paginationContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
         backgroundColor: 'white',
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
+        borderRadius: 25,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     pageButton: {
-        minWidth: 35,
-        height: 35,
-        borderRadius: 8,
+        minWidth: 32,
+        height: 32,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
-        marginHorizontal: 4,
+        marginHorizontal: 2,
         backgroundColor: '#f5f5f5',
     },
     pageButtonActive: {
-        backgroundColor: '#6284bf',
+        backgroundColor: '#3f6bc4',
     },
     pageButtonDisabled: {
         backgroundColor: '#f5f5f5',
@@ -464,6 +615,60 @@ const styles = StyleSheet.create({
     pageEllipsis: {
         marginHorizontal: 8,
         color: '#666',
+    },
+    categoriesList: {
+        paddingHorizontal: 15,
+        paddingTop: 10,
+        paddingBottom: 10,
+    },
+    categoryItem: {
+        paddingHorizontal: 18,
+        paddingVertical: 10,
+        marginRight: 12,
+        borderRadius: 24,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+    },
+    categoryItemSelected: {
+        elevation: 4,
+        shadowOpacity: 0.2,
+    },
+    categoryText: {
+        fontSize: 16,
+        color: '#333',
+        fontWeight: '500',
+    },
+    categoryTextSelected: {
+        color: '#fff',
+    },
+    floatingPaginationContainer: {
+        position: 'absolute',
+        bottom: 20,
+        right: 20,
+        zIndex: 1000,
+    },
+    emptyContainer: {
+        display: 'flex',
+        flex: 1,
+        padding: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyText: {
+        fontSize: 22,
+        fontWeight: '600',
+        color: '#666',
+        marginTop: 16,
+        textAlign: 'center',
+    },
+    emptySubText: {
+        fontSize: 14,
+        color: '#999',
+        marginTop: 8,
+        textAlign: 'center',
     },
 });
 

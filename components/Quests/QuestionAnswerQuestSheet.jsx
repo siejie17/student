@@ -8,7 +8,7 @@ import QuestCompletedModal from '../Modal/QuestCompletedModal';
 import { db } from '../../utils/firebaseConfig';
 import { getItem } from '../../utils/asyncStorage';
 
-const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatus }) => {
+const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQuestStatus, locked }) => {
     const [animatingDiamonds, setAnimatingDiamonds] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [answer, setAnswer] = useState('');
@@ -330,11 +330,12 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
                                 styles.answerArea,
                                 answer && styles.activeInput,
                             ]}
-                            placeholder="Enter your answer here..."
+                            placeholder={locked ? `Event has ended. Answer: ${selectedQuest.correctAnswer}.` : "Enter your answer here..."}
                             placeholderTextColor="#A0A0A0"
                             value={answer}
                             onChangeText={setAnswer}
                             textAlignVertical="center"
+                            editable={!locked}
                         />
                         {answer && (
                             <TouchableOpacity
@@ -397,7 +398,7 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
                 </View>
             </View>
 
-            {selectedQuest.progress !== selectedQuest.completionNum && !selectedQuest.isCompleted && (
+            {selectedQuest.progress !== selectedQuest.completionNum && !selectedQuest.isCompleted && !locked && (
                 <TouchableOpacity
                     style={[styles.submitButton, { marginBottom: 5 }, !isAllowSubmit && styles.disabledSubmit]}
                     disabled={!isAllowSubmit}
@@ -408,13 +409,19 @@ const QuestionAnswerQuestSheet = ({ selectedQuest, onCancel, eventID, updateQues
             )}
 
             {!selectedQuest.rewardsClaimed && selectedQuest.progress === selectedQuest.completionNum && selectedQuest.isCompleted && (
-                <TouchableOpacity
-                    style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
-                    disabled={claimed}
-                    onPress={claimRewards}
-                >
-                    <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
-                </TouchableOpacity>
+                locked ? (
+                    <View style={[styles.rewardsButton, { marginBottom: 5, backgroundColor: '#ccc' }]}>
+                        <Text style={[styles.rewardsButtonText, { color: '#888' }]}>Event is ended</Text>
+                    </View>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.rewardsButton, { marginBottom: 5 }, claimed && styles.claimedButton]}
+                        disabled={claimed}
+                        onPress={claimRewards}
+                    >
+                        <Text style={styles.rewardsButtonText}>Claim Rewards</Text>
+                    </TouchableOpacity>
+                )
             )}
 
             {/* Animated diamonds */}

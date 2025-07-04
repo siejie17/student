@@ -16,7 +16,7 @@ const EventQuestCard = ({
   maxEarlyBird,
   eventID,
   pointsRewards,
-  onPress
+  onPress,
 }) => {
   const [isFailed, setIsFailed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -146,7 +146,7 @@ const EventQuestCard = ({
               />
             </View>
             <Text style={styles.progressText}>
-              {!isLoading && (questType === "earlyBird" ? (isFailed ? 'Failed' : (isCompleted ? (isCompleted && rewardsClaimed) ? 'Rewards Claimed' : 'Completed, Come to Claim Your Rewards' : 'In progress')) : (isCompleted ? (isCompleted && rewardsClaimed) ? 'Rewards Claimed' : 'Completed, Come to Claim Your Rewards' : 'In progress'))}
+              {!isLoading && (questType === "earlyBird" ? (isFailed ? 'Failed' : (isCompleted ? (isCompleted && rewardsClaimed) ? 'Rewards Claimed' : 'Completed, Get Rewards Now' : 'In progress')) : (isCompleted ? (isCompleted && rewardsClaimed) ? 'Rewards Claimed' : 'Completed, Get Rewards Now' : 'In progress'))}
             </Text>
           </View>
 

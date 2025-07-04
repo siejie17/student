@@ -32,6 +32,7 @@ import FeedbackFormScreen from './screens/FeedbackFormScreen.jsx';
 import MessagingScreen from './screens/MessagingScreen.jsx';
 import NotificationListScreen from './screens/NotificationListScreen.jsx';
 import LoadingIndicator from './components/General/LoadingIndicator.jsx';
+import HobbySelectionScreen from './screens/HobbySelectionScreen.jsx';
 
 import { getItem } from './utils/asyncStorage.js';
 import { auth, db } from './utils/firebaseConfig';
@@ -62,6 +63,7 @@ export default function App() {
   const [studentID, setStudentID] = useState(null);
   const [student, setStudent] = useState({});
   const [loading, setLoading] = useState(true);
+  const [isFirstTime, setIsFirstTime] = useState(false);
 
   const notificationListener = useRef();
   const responseListener = useRef();
@@ -85,6 +87,16 @@ export default function App() {
             setStudent(user);
             setStudentID(storedStudentID);
 
+            // Check if user has hobbies
+            const userRef = doc(db, 'user', storedStudentID);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+              const userData = userSnap.data();
+              setIsFirstTime(!userData.hobbies || userData.hobbies.length === 0);
+            } else {
+              setIsFirstTime(true);
+            }
+
             // Register and store push token
             if (Device.isDevice) {
               const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -99,9 +111,6 @@ export default function App() {
                 const tokenData = await Notifications.getExpoPushTokenAsync();
                 const expoPushToken = tokenData.data;
 
-                const userRef = doc(db, 'user', storedStudentID);
-                const userSnap = await getDoc(userRef);
-
                 const currentToken = userSnap.exists() ? userSnap.data().expoPushToken : null;
 
                 if (expoPushToken !== currentToken) {
@@ -112,10 +121,12 @@ export default function App() {
           } else {
             setStudent({});
             setStudentID(null);
+            setIsFirstTime(false);
           }
         } else {
           setStudent({});
           setStudentID(null);
+          setIsFirstTime(false);
         }
 
         setLoading(false);
@@ -160,7 +171,18 @@ export default function App() {
         hidden={false}
       />
       <NavigationContainer ref={navigationRef}>
-        {studentID ? <AppStack /> : <AuthStackScreen showOnboarding={showOnboarding} />}
+        {studentID ? (
+          isFirstTime ? (
+            <HobbySelectionScreen
+              studentID={studentID}
+              onComplete={() => setIsFirstTime(false)}
+            />
+          ) : (
+            <AppStack />
+          )
+        ) : (
+          <AuthStackScreen showOnboarding={showOnboarding} />
+        )}
       </NavigationContainer>
     </SafeAreaView>
   );

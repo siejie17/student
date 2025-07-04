@@ -133,27 +133,6 @@ const MerchandiseListingScreen = ({ navigation }) => {
     }
   };
 
-  const createMerchandiseQuery = (pageNumber = 1) => {
-    let baseQuery = query(
-      collection(db, "merchandise"),
-      where("available", "==", true),
-      orderBy("createdAt", "desc"),
-      limit(ITEMS_PER_PAGE)
-    );
-
-    if (selectedCategory !== 'All') {
-      baseQuery = query(
-        collection(db, "merchandise"),
-        where("available", "==", true),
-        where("category", "==", selectedCategory),
-        orderBy("createdAt", "desc"),
-        limit(ITEMS_PER_PAGE)
-      );
-    }
-
-    return baseQuery;
-  };
-
   const fetchPage = async (pageNumber) => {
     try {
       setIsLoading(true);
@@ -386,7 +365,7 @@ const MerchandiseListingScreen = ({ navigation }) => {
               <ActivityIndicator size="large" color="#6284bf" />
               <Text style={styles.loadingText}>Loading merchandises list...</Text>
             </View>
-          ) : allMerchandises.length === 0 ? (
+          ) : (allMerchandises.length === 0 && !isLoading) ? (
             <View style={[styles.emptyContainer, { flexGrow: 1 }]}>
               <Ionicons name="cart-outline" size={50} color="#CCCCCC" />
               <Text style={styles.emptyText}>
