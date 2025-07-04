@@ -48,7 +48,7 @@ const LoadingIndicator = () => {
         />
       </Animated.View>
       <Text style={styles.loadingText}>
-        Hang tight! Your UniEXP adventure is just starting
+        UniEXP
       </Text>
     </Animated.View>
   )
@@ -73,11 +73,11 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   loadingText: {
-    marginTop: 20,
+    marginTop: 10,
     textAlign: 'center',
     color: '#2c3e50',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: 'bold',
   }
 })
 
