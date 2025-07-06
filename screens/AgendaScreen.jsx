@@ -12,7 +12,7 @@ const AgendaScreen = () => {
   const [registeredEvents, setRegisteredEvents] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date(2025, 5, 31).toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   const navigation = useNavigation();
 
